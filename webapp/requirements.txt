@@ -1,0 +1,20 @@
+# Dependencias Web para Scan Agent
+# ==================================
+
+# FastAPI - Framework web moderno y rápido
+fastapi==0.115.0
+
+# Uvicorn - Servidor ASGI de alto rendimiento
+uvicorn[standard]==0.31.0
+
+# Jinja2 - Motor de templates para HTML
+jinja2==3.1.4
+
+# Python-multipart - Soporte para formularios multipart
+python-multipart==0.0.9
+
+# Pydantic - Validación de datos
+pydantic==2.9.0
+
+# WebSockets - Soporte para comunicación en tiempo real
+websockets==13.1

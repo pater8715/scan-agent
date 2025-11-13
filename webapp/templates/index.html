@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scan Agent Web - Interfaz de Escaneo de Seguridad</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <h1 class="logo">
+                    <span class="logo-icon">🛡️</span>
+                    Scan Agent Web
+                </h1>
+                <nav class="nav">
+                    <button class="nav-btn active" data-page="scanner">
+                        <span class="icon">🔍</span> Nuevo Escaneo
+                    </button>
+                    <button class="nav-btn" data-page="history">
+                        <span class="icon">📋</span> Historial
+                    </button>
+                    <button class="nav-btn" data-page="reports">
+                        <span class="icon">📊</span> Reportes
+                    </button>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            
+            <!-- Scanner Page -->
+            <div id="scanner-page" class="page active">
+                <div class="page-header">
+                    <h2>Nuevo Escaneo de Seguridad</h2>
+                    <p class="subtitle">Selecciona el perfil de escaneo y configura los parámetros</p>
+                </div>
+
+                <!-- Profile Selection -->
+                <section class="card">
+                    <h3 class="card-title">1. Selecciona el Perfil de Escaneo</h3>
+                    <div id="profiles-grid" class="profiles-grid">
+                        <!-- Los perfiles se cargarán dinámicamente -->
+                        <div class="loading">Cargando perfiles...</div>
+                    </div>
+                </section>
+
+                <!-- Scan Configuration -->
+                <section class="card" id="scan-config-section" style="display: none;">
+                    <h3 class="card-title">2. Configurar Parámetros</h3>
+                    <form id="scan-form">
+                        <div class="form-group">
+                            <label for="target" class="required">Objetivo</label>
+                            <input 
+                                type="text" 
+                                id="target" 
+                                name="target" 
+                                placeholder="Ej: 192.168.1.1 o ejemplo.com"
+                                required
+                                pattern="^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$|^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$"
+                            >
+                            <small class="help-text">Ingresa una dirección IP o nombre de dominio</small>
+                            <div class="error-message" id="target-error"></div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Formatos de Reporte</label>
+                            <div class="checkbox-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="format" value="json" checked>
+                                    <span>JSON</span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="format" value="html" checked>
+                                    <span>HTML</span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="format" value="txt">
+                                    <span>TXT</span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="format" value="md">
+                                    <span>Markdown</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="save-to-db" name="save_to_db" checked>
+                                <span>Guardar resultados en base de datos</span>
+                            </label>
+                            <small class="help-text">Permite acceder al historial de escaneos</small>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary" id="start-scan-btn">
+                                <span class="icon">▶️</span> Iniciar Escaneo
+                            </button>
+                            <button type="button" class="btn btn-secondary" id="reset-form-btn">
+                                <span class="icon">🔄</span> Restablecer
+                            </button>
+                        </div>
+                    </form>
+                </section>
+
+                <!-- Scan Progress -->
+                <section class="card" id="scan-progress-section" style="display: none;">
+                    <h3 class="card-title">Progreso del Escaneo</h3>
+                    <div class="progress-info">
+                        <div class="progress-header">
+                            <span id="scan-status-text">Iniciando...</span>
+                            <span id="scan-percentage">0%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progress-fill"></div>
+                        </div>
+                        <div class="progress-details">
+                            <div class="detail-item">
+                                <strong>ID:</strong> <span id="current-scan-id">-</span>
+                            </div>
+                            <div class="detail-item">
+                                <strong>Objetivo:</strong> <span id="current-target">-</span>
+                            </div>
+                            <div class="detail-item">
+                                <strong>Perfil:</strong> <span id="current-profile">-</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button class="btn btn-danger" id="cancel-scan-btn">
+                            <span class="icon">⛔</span> Cancelar Escaneo
+                        </button>
+                    </div>
+                </section>
+
+                <!-- Scan Results -->
+                <section class="card" id="scan-results-section" style="display: none;">
+                    <h3 class="card-title">Resultados del Escaneo</h3>
+                    <div id="scan-results-content"></div>
+                    <div class="form-actions">
+                        <button class="btn btn-primary" id="view-report-btn">
+                            <span class="icon">📄</span> Ver Reporte Completo
+                        </button>
+                        <button class="btn btn-secondary" id="new-scan-btn">
+                            <span class="icon">🔍</span> Nuevo Escaneo
+                        </button>
+                    </div>
+                </section>
+            </div>
+
+            <!-- History Page -->
+            <div id="history-page" class="page">
+                <div class="page-header">
+                    <h2>Historial de Escaneos</h2>
+                    <p class="subtitle">Revisa todos los escaneos realizados</p>
+                </div>
+
+                <div class="card">
+                    <div class="filter-bar">
+                        <input type="text" id="search-scans" placeholder="🔍 Buscar por objetivo o ID...">
+                        <select id="filter-status">
+                            <option value="">Todos los estados</option>
+                            <option value="completed">Completados</option>
+                            <option value="running">En ejecución</option>
+                            <option value="failed">Fallidos</option>
+                        </select>
+                        <button class="btn btn-secondary" id="refresh-history-btn">
+                            <span class="icon">🔄</span> Actualizar
+                        </button>
+                    </div>
+
+                    <div id="scans-table-container">
+                        <table class="scans-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Objetivo</th>
+                                    <th>Perfil</th>
+                                    <th>Estado</th>
+                                    <th>Fecha</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="scans-tbody">
+                                <tr>
+                                    <td colspan="6" class="loading">Cargando historial...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reports Page -->
+            <div id="reports-page" class="page">
+                <div class="page-header">
+                    <h2>Reportes</h2>
+                    <p class="subtitle">Descarga y visualiza reportes generados</p>
+                </div>
+
+                <div class="card">
+                    <p class="info-text">Selecciona un escaneo del historial para ver sus reportes</p>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <p>Scan Agent Web v1.0 | Desarrollado para análisis de seguridad</p>
+        </div>
+    </footer>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container"></div>
+
+    <!-- Scripts -->
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

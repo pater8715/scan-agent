@@ -1,0 +1,35 @@
+{
+  "retention": {
+    "default_policy": "standard",
+    "enable_auto_cleanup": true,
+    "cleanup_schedule": "daily"
+  },
+  "storage": {
+    "base_dir": "./storage",
+    "max_size_gb": 20,
+    "archive_threshold_days": 7,
+    "delete_threshold_days": 90,
+    "compression_level": 6
+  },
+  "policies": {
+    "standard": {
+      "active_days": 7,
+      "archived_days": 30,
+      "delete_after_days": 90
+    },
+    "critical": {
+      "active_days": 30,
+      "archived_days": 90,
+      "delete_after_days": 365
+    },
+    "temporary": {
+      "active_days": 3,
+      "archived_days": 7,
+      "delete_after_days": 30
+    }
+  },
+  "quotas": {
+    "max_active_scans": 1000,
+    "max_archived_scans": 5000
+  }
+}

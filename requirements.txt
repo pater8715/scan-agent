@@ -1,0 +1,114 @@
+# Scan Agent - Requirements
+# ===========================
+# Dependencias para el agente de análisis de vulnerabilidades
+#
+# Instalación:
+#   pip install -r requirements.txt
+#
+# Python Version: 3.12+
+
+# ============================================================================
+# SCAN AGENT v2.0 - Requisitos
+# ============================================================================
+#
+# Este proyecto NO requiere dependencias externas de Python.
+# Utiliza únicamente bibliotecas estándar de Python 3.12+
+#
+# Bibliotecas estándar utilizadas:
+# - re (expresiones regulares)
+# - json (manejo de JSON)
+# - pathlib (manejo de rutas)
+# - datetime (fechas y tiempos)
+# - argparse (argumentos CLI)
+# - typing (type hints)
+# - subprocess (ejecución de comandos) - NUEVO v2.0
+# - shutil (utilidades de shell) - NUEVO v2.0
+#
+# ============================================================================
+# HERRAMIENTAS EXTERNAS (v2.0 - para funcionalidad de escaneo)
+# ============================================================================
+#
+# Estas herramientas son necesarias SOLO si usas --scan
+# NO son necesarias para análisis de archivos existentes
+#
+# Instalación en Debian/Ubuntu/Kali:
+# -----------------------------------
+# sudo apt update
+# sudo apt install -y nmap nikto gobuster curl
+#
+# Instalación en Fedora/RHEL/CentOS:
+# -----------------------------------
+# sudo dnf install -y nmap nikto gobuster curl
+#
+# Instalación en Arch Linux:
+# ---------------------------
+# sudo pacman -S nmap nikto gobuster curl
+#
+# Verificar instalación:
+# ----------------------
+# which nmap nikto gobuster curl
+# nmap --version
+# nikto -Version
+# gobuster version
+# curl --version
+#
+# ============================================================================
+# VERSIONES MÍNIMAS RECOMENDADAS
+# ============================================================================
+#
+# - Python: 3.12+
+# - nmap: 7.80+
+# - nikto: 2.1.6+
+# - gobuster: 3.0+
+# - curl: 7.68+
+#
+# ============================================================================
+# VERIFICACIÓN DE HERRAMIENTAS
+# ============================================================================
+#
+# El agente puede verificar automáticamente las herramientas instaladas:
+#
+# python3 agent.py --scan --target <IP> --profile quick
+#
+# Si falta alguna herramienta, el agente mostrará un error explicativo.
+#
+# ============================================================================
+
+# NO hay dependencias Python externas - proyecto autosuficiente
+
+# ============================================================================
+# NOTA: Si en el futuro deseas agregar funcionalidades adicionales,
+# aquí están algunas sugerencias de bibliotecas útiles:
+# ============================================================================
+
+# Para análisis de CVE y bases de datos de vulnerabilidades:
+# requests>=2.31.0
+# beautifulsoup4>=4.12.0
+
+# Para generación de PDFs:
+# reportlab>=4.0.0
+# weasyprint>=60.0
+
+# Para análisis más avanzado:
+# pandas>=2.1.0
+# numpy>=1.26.0
+
+# Para visualizaciones en informes:
+# matplotlib>=3.8.0
+# plotly>=5.17.0
+
+# Para integración con APIs de seguridad:
+# python-nmap>=0.7.1
+# shodan>=1.31.0
+
+# Para generación de gráficos en HTML:
+# jinja2>=3.1.2
+
+# ============================================================================
+# INSTALACIÓN OPCIONAL (características extendidas)
+# ============================================================================
+# Si deseas funcionalidades extendidas, descomenta estas líneas:
+
+# requests>=2.31.0        # Para consultas HTTP y APIs externas
+# jinja2>=3.1.2           # Para templates HTML más avanzados
+# python-dateutil>=2.8.2  # Para manejo avanzado de fechas

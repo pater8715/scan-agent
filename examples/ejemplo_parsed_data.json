@@ -1,0 +1,159 @@
+{
+  "comentario": "Este es un ejemplo del formato JSON generado por el parser del Scan Agent",
+  "target_ip": "10.1.11.177",
+  
+  "servicios_detectados": [
+    {
+      "nombre": "http",
+      "puerto": 80,
+      "version": "Apache httpd 2.4.41 ((Ubuntu))"
+    },
+    {
+      "nombre": "ssh",
+      "puerto": 22,
+      "version": "OpenSSH 8.2p1 Ubuntu 4ubuntu0.5"
+    },
+    {
+      "nombre": "mysql",
+      "puerto": 3306,
+      "version": "MySQL 5.7.40"
+    }
+  ],
+  
+  "versiones": {
+    "Apache": "Apache httpd 2.4.41 ((Ubuntu))",
+    "OpenSSH": "OpenSSH 8.2p1 Ubuntu 4ubuntu0.5",
+    "MySQL": "MySQL 5.7.40",
+    "PHP": "PHP/7.4.3",
+    "Server": "Apache/2.4.41 (Ubuntu)"
+  },
+  
+  "puertos": [
+    {
+      "puerto": 22,
+      "protocolo": "tcp",
+      "servicio": "ssh",
+      "estado": "open",
+      "version": "OpenSSH 8.2p1 Ubuntu 4ubuntu0.5"
+    },
+    {
+      "puerto": 80,
+      "protocolo": "tcp",
+      "servicio": "http",
+      "estado": "open",
+      "version": "Apache httpd 2.4.41 ((Ubuntu))"
+    },
+    {
+      "puerto": 3306,
+      "protocolo": "tcp",
+      "servicio": "mysql",
+      "estado": "open",
+      "version": "MySQL 5.7.40"
+    }
+  ],
+  
+  "rutas_descubiertas": [
+    {
+      "ruta": "/admin",
+      "codigo_http": 200,
+      "tamano": 1024
+    },
+    {
+      "ruta": "/api",
+      "codigo_http": 200,
+      "tamano": 512
+    },
+    {
+      "ruta": "/backup",
+      "codigo_http": 403,
+      "tamano": 256
+    },
+    {
+      "ruta": "/.git",
+      "codigo_http": 301,
+      "tamano": 128
+    }
+  ],
+  
+  "errores_http": [
+    {
+      "codigo": 500,
+      "mensaje": "Internal Server Error",
+      "fuente": "curl_verbose"
+    }
+  ],
+  
+  "vulnerabilidades_nikto": [
+    {
+      "id_osvdb": "OSVDB-3233",
+      "ubicacion": "/icons/README",
+      "descripcion": "Apache default file found.",
+      "fuente": "nikto"
+    },
+    {
+      "id_osvdb": "OSVDB-877",
+      "ubicacion": "/phpmyadmin/",
+      "descripcion": "phpMyAdmin is for managing MySQL databases and should be protected.",
+      "fuente": "nikto"
+    },
+    {
+      "id_osvdb": "N/A",
+      "ubicacion": "/admin/",
+      "descripcion": "Admin directory is world readable",
+      "fuente": "nikto"
+    }
+  ],
+  
+  "indicadores_owasp_top10": [
+    {
+      "fuente": "headers_http",
+      "tipo": "missing_security_headers",
+      "headers_faltantes": [
+        "Strict-Transport-Security",
+        "X-Frame-Options",
+        "Content-Security-Policy"
+      ],
+      "severidad": "media",
+      "owasp_category": "A05:2021 - Security Misconfiguration"
+    },
+    {
+      "fuente": "headers_http",
+      "tipo": "information_disclosure",
+      "detalle": "X-Powered-By revelado: PHP/7.4.3",
+      "severidad": "baja",
+      "owasp_category": "A05:2021 - Security Misconfiguration"
+    },
+    {
+      "fuente": "gobuster",
+      "tipo": "ruta_sensible_expuesta",
+      "ruta": "/admin",
+      "codigo_http": 200,
+      "severidad": "alta",
+      "owasp_category": "A01:2021 - Broken Access Control"
+    },
+    {
+      "fuente": "nmap_nse",
+      "tipo": "VULNERABLE",
+      "contexto": "SQL Injection detected in login form",
+      "severidad": "critica",
+      "owasp_category": "A03:2021 - Injection"
+    }
+  ],
+  
+  "metadata_http": {
+    "headers": {
+      "Server": "Apache/2.4.41 (Ubuntu)",
+      "X-Powered-By": "PHP/7.4.3",
+      "Content-Type": "text/html; charset=UTF-8",
+      "Date": "Wed, 12 Nov 2025 18:00:00 GMT",
+      "Connection": "keep-alive",
+      "X-Content-Type-Options": "nosniff",
+      "X-XSS-Protection": "1; mode=block"
+    },
+    "http_response_code": 200,
+    "http_response_message": "OK",
+    "tls_version": "TLSv1.2",
+    "cipher": "ECDHE-RSA-AES256-GCM-SHA384",
+    "ssl_version": "TLSv1.2"
+  }
+}

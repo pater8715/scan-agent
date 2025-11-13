@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Informe de Vulnerabilidades - 10.1.11.177</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f4f4f4;
+            padding: 20px;
+        }
+        .dashboard-link {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #667eea;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: bold;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            transition: all 0.3s;
+            z-index: 1000;
+        }
+        .dashboard-link:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+            border-radius: 8px;
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 4px solid #3498db;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        h2 {
+            color: #34495e;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            border-left: 4px solid #3498db;
+            padding-left: 10px;
+        }
+        h3 {
+            color: #7f8c8d;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            color: white;
+            border: none;
+        }
+        .metadata {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .metadata-item {
+            background: #ecf0f1;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        .metadata-label {
+            font-weight: bold;
+            color: #7f8c8d;
+            font-size: 0.9em;
+        }
+        .metadata-value {
+            font-size: 1.2em;
+            color: #2c3e50;
+            margin-top: 5px;
+        }
+        .risk-badge {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+        .risk-critico {
+            background: #e74c3c;
+            color: white;
+        }
+        .risk-alto {
+            background: #e67e22;
+            color: white;
+        }
+        .risk-medio {
+            background: #f39c12;
+            color: white;
+        }
+        .risk-bajo {
+            background: #27ae60;
+            color: white;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-box {
+            background: #3498db;
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-box.critica { background: #e74c3c; }
+        .stat-box.alta { background: #e67e22; }
+        .stat-box.media { background: #f39c12; }
+        .stat-box.baja { background: #27ae60; }
+        .stat-number {
+            font-size: 2.5em;
+            font-weight: bold;
+        }
+        .stat-label {
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+        .vulnerability {
+            background: #fff;
+            border: 1px solid #ddd;
+            border-left: 4px solid #3498db;
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+        .vulnerability.critica { border-left-color: #e74c3c; }
+        .vulnerability.alta { border-left-color: #e67e22; }
+        .vulnerability.media { border-left-color: #f39c12; }
+        .vulnerability.baja { border-left-color: #27ae60; }
+        .vuln-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .vuln-title {
+            font-weight: bold;
+            font-size: 1.1em;
+            color: #2c3e50;
+        }
+        .cvss-score {
+            background: #34495e;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .vuln-meta {
+            display: flex;
+            gap: 15px;
+            margin: 10px 0;
+            flex-wrap: wrap;
+        }
+        .vuln-meta span {
+            background: #ecf0f1;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-size: 0.9em;
+        }
+        .vuln-description {
+            margin: 15px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+        .vuln-recommendation {
+            margin-top: 15px;
+            padding: 15px;
+            background: #d1ecf1;
+            border-left: 3px solid #0c5460;
+            border-radius: 3px;
+        }
+        .recommendations {
+            margin: 20px 0;
+        }
+        .rec-section {
+            margin: 15px 0;
+            padding: 20px;
+            border-radius: 5px;
+        }
+        .rec-section.corto { background: #fee; border-left: 4px solid #e74c3c; }
+        .rec-section.mediano { background: #fef5e7; border-left: 4px solid #f39c12; }
+        .rec-section.largo { background: #e8f8f5; border-left: 4px solid #27ae60; }
+        .rec-section h3 {
+            margin-top: 0;
+        }
+        ul {
+            margin-left: 20px;
+            margin-top: 10px;
+        }
+        li {
+            margin: 8px 0;
+        }
+        .port-table, .tech-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        .port-table th, .port-table td, .tech-table th, .tech-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        .port-table th, .tech-table th {
+            background: #34495e;
+            color: white;
+        }
+        .port-table tr:hover, .tech-table tr:hover {
+            background: #f5f5f5;
+        }
+        .critical-port {
+            background: #ffe6e6 !important;
+        }
+        .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 2px solid #ddd;
+            text-align: center;
+            color: #7f8c8d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Informe Técnico de Análisis de Vulnerabilidades</h1>
+            <p>Generado por Scan Agent v1.0.0</p>
+            <p>Fecha: 2025-11-12 20:47:26</p>
+        </div>
+
+        <div class="metadata">
+            <div class="metadata-item">
+                <div class="metadata-label">Target IP</div>
+                <div class="metadata-value">10.1.11.177</div>
+            </div>
+            <div class="metadata-item">
+                <div class="metadata-label">Total Vulnerabilidades</div>
+                <div class="metadata-value">20</div>
+            </div>
+            <div class="metadata-item">
+                <div class="metadata-label">Nivel de Riesgo</div>
+                <div class="metadata-value">
+                    <span class="risk-badge risk-amarillo">
+                        MEDIO
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <h2>📋 Resumen Ejecutivo</h2>
+        <p><strong>Recomendación General:</strong> Se recomienda planificar la remediación de vulnerabilidades detectadas. Aunque el riesgo no es crítico, debe abordarse en el mediano plazo.</p>
+        
+        <div class="stats">
+            <div class="stat-box critica">
+                <div class="stat-number">0</div>
+                <div class="stat-label">CRÍTICAS</div>
+            </div>
+            <div class="stat-box alta">
+                <div class="stat-number">2</div>
+                <div class="stat-label">ALTAS</div>
+            </div>
+            <div class="stat-box media">
+                <div class="stat-number">10</div>
+                <div class="stat-label">MEDIAS</div>
+            </div>
+            <div class="stat-box baja">
+                <div class="stat-number">8</div>
+                <div class="stat-label">BAJAS</div>
+            </div>
+        </div>
+
+        <h3>🎯 Principales Riesgos Identificados</h3><ul><li>Vulnerabilidad: vulnerabilidad_nikto</li><li>Uncommon header 'x-xss-protection' found, with contents: 0</li><li>Vulnerabilidad: http-sql-injection</li></ul>
+
+        <h2>🎯 Superficie de Ataque</h2>
+        <div class="metadata">
+            <div class="metadata-item">
+                <div class="metadata-label">Puertos Expuestos</div>
+                <div class="metadata-value">3</div>
+            </div>
+            <div class="metadata-item">
+                <div class="metadata-label">Servicios Activos</div>
+                <div class="metadata-value">4</div>
+            </div>
+            <div class="metadata-item">
+                <div class="metadata-label">Endpoints Descubiertos</div>
+                <div class="metadata-value">0</div>
+            </div>
+        </div>
+
+        <h3>Puertos Detectados</h3><table class="port-table"><thead><tr><th>Puerto</th><th>Servicio</th><th>Versión</th><th>Estado</th></tr></thead><tbody><tr class=""><td>443</td><td>http</td><td>Apache httpd 2.4.58</td><td>✅ Normal</td></tr><tr class=""><td>8000</td><td>http</td><td>Ajenti http control panel</td><td>✅ Normal</td></tr><tr class=""><td>8081</td><td>blackice-icecap?</td><td>1 service unrecognized despite returning data. If you know the service/version, please submit the following fingerprint at https://nmap.org/cgi-bin/submit.cgi?new-service :</td><td>✅ Normal</td></tr></tbody></table>
+        
+
+        <h2>💻 Tecnologías Detectadas</h2>
+        <p><strong>Servidor Web:</strong> Apache - Apache/2.4.58 (Ubuntu)</p>
+
+        <h2>🔐 Vulnerabilidades Detalladas</h2>
+        <h3>ALTA (2)</h3><div class="vulnerability alta"><div class="vuln-header"><div class="vuln-title">Vulnerabilidad: vulnerabilidad_nikto</div><div class="cvss-score">CVSS: 7.5</div></div><div class="vuln-meta"><span><strong>ID:</strong> IND-6</span><span><strong>Categoría OWASP:</strong> A05:2021 - Security Misconfiguration</span><span><strong>Fuente:</strong> nikto</span></div><div class="vuln-description"><strong>Descripción:</strong><br>Uncommon header 'x-xss-protection' found, with contents: 0</div><div class="vuln-recommendation"><strong>💡 Recomendación:</strong><br>Revisar y remediar según mejores prácticas de seguridad</div></div><div class="vulnerability alta"><div class="vuln-header"><div class="vuln-title">Uncommon header 'x-xss-protection' found, with contents: 0</div><div class="cvss-score">CVSS: 7.5</div></div><div class="vuln-meta"><span><strong>ID:</strong> N/A</span><span><strong>Categoría OWASP:</strong> A03:2021 - Injection</span><span><strong>Fuente:</strong> nikto</span></div><div class="vuln-description"><strong>Descripción:</strong><br>Uncommon header 'x-xss-protection' found, with contents: 0</div><div class="vuln-recommendation"><strong>💡 Recomendación:</strong><br>Revisar y remediar según la naturaleza específica de la vulnerabilidad</div></div><h3>MEDIA (10)</h3><div class="vulnerability media"><div class="vuln-header"><div class="vuln-title">Vulnerabilidad: http-sql-injection</div><div class="cvss-score">CVSS: 5.0</div></div><div class="vuln-meta"><span><strong>ID:</strong> IND-1</span><span><strong>Categoría OWASP:</strong> A05:2021 - Security Misconfiguration</span><span><strong>Fuente:</strong> nmap_nse</span></div><div class="vuln-description"><strong>Descripción:</strong><br># Nmap 7.94SVN scan initiated Wed Nov 12 18:10:19 2025 as: nmap --script=http-enum,http-auth,http-sql-injection -p 8081 -oN nmap_nse_10.1.11.177.txt 10.1.11.177
+Nmap scan report for 10.1.11.177
+Host is up (0.0019s latency).
+
+PORT     STATE SERVICE
+8081/tcp open  blackice-icecap
+
+# Nmap done at Wed Nov 12 18:10</div><div class="vuln-recommendation"><strong>💡 Recomendación:</strong><br>Revisar y remediar según mejores prácticas de seguridad</div></div><div class="vulnerability media"><div class="vuln-header"><div class="vuln-title">Headers de Seguridad HTTP Faltantes</div><div class="cvss-score">CVSS: 5.0</div></div><div class="vuln-meta"><span><strong>ID:</strong> IND-2</span><span><strong>Categoría OWASP:</strong> A05:2021 - Security Misconfiguration</span><span><strong>Fuente:</strong> headers_http</span></div><div class="vuln-description"><strong>Descripción:</strong><br></div><div class="vuln-recommendation"><strong>💡 Recomendación:</strong><br>Agregar headers: Strict-Transport-Security, X-Frame-Options, X-Content-Type-Options, Content-Security-Policy</div></div><div class="vulnerability media"><div class="vuln-header"><div class="vuln-title">Vulnerabilidad: vulnerabilidad_nikto</div><div class="cvss-score">CVSS: 5.0</div></div><div class="vuln-meta"><span><strong>ID:</strong> IND-3</span><span><strong>Categoría OWASP:</strong> A05:2021 - Security Misconfiguration</span><span><strong>Fuente:</strong> nikto</span></div><div class="vuln-description"><strong>Descripción:</strong><br>10.1.11.177</div><div class="vuln-recommendation"><strong>💡 Recomendación:</strong><br>Revisar y remediar según mejores prácticas de seguridad</div></div><div class="vulnerability media"><div class="vuln-header"><div class="vuln-title">Vulnerabilidad: vulnerabilidad_nikto</div><div class="cvss-score">CVSS: 5.0</div></div><div class="vuln-meta"><span><strong>ID:</strong> IND-4</span><span><strong>Categoría OWASP:</strong> A05:2021 - Security Misconfiguration</span><span><strong>Fuente:</strong> nikto</span></div><div class="vuln-description"><strong>Descripción:</strong><br>8081</div><div class="vuln-recommendation"><strong>💡 Recomendación:</strong><br>Revisar y remediar según mejores prácticas de seguridad</div></div><div class="vulnerability media"><div class="vuln-header"><div class="vuln-title">Vulnerabilidad: vulnerabilidad_nikto</div><div class="cvss-score">CVSS: 5.0</div></div><div class="vuln-meta"><span><strong>ID:</strong> IND-5</span><span><strong>Categoría OWASP:</strong> A05:2021 - Security Misconfiguration</span><span><strong>Fuente:</strong> nikto</span></div><div class="vuln-description"><strong>Descripción:</strong><br>Uncommon header 'x-content-type-options' found, with contents: nosniff</div><div class="vuln-recommendation"><strong>💡 Recomendación:</strong><br>Revisar y remediar según mejores prácticas de seguridad</div></div><div class="vulnerability media"><div class="vuln-header"><div class="vuln-title">Vulnerabilidad: vulnerabilidad_nikto</div><div class="cvss-score">CVSS: 5.0</div></div><div class="vuln-meta"><span><strong>ID:</strong> IND-7</span><span><strong>Categoría OWASP:</strong> A05:2021 - Security Misconfiguration</span><span><strong>Fuente:</strong> nikto</span></div><div class="vuln-description"><strong>Descripción:</strong><br>Uncommon header 'x-frame-options' found, with contents: DENY</div><div class="vuln-recommendation"><strong>💡 Recomendación:</strong><br>Revisar y remediar según mejores prácticas de seguridad</div></div><div class="vulnerability media"><div class="vuln-header"><div class="vuln-title">Vulnerabilidad: vulnerabilidad_nikto</div><div class="cvss-score">CVSS: 5.0</div></div><div class="vuln-meta"><span><strong>ID:</strong> IND-8</span><span><strong>Categoría OWASP:</strong> A05:2021 - Security Misconfiguration</span><span><strong>Fuente:</strong> nikto</span></div><div class="vuln-description"><strong>Descripción:</strong><br>Cookie JSESSIONID created without the httponly flag</div><div class="vuln-recommendation"><strong>💡 Recomendación:</strong><br>Revisar y remediar según mejores prácticas de seguridad</div></div><div class="vulnerability media"><div class="vuln-header"><div class="vuln-title">Vulnerabilidad: vulnerabilidad_nikto</div><div class="cvss-score">CVSS: 5.0</div></div><div class="vuln-meta"><span><strong>ID:</strong> IND-9</span><span><strong>Categoría OWASP:</strong> A05:2021 - Security Misconfiguration</span><span><strong>Fuente:</strong> nikto</span></div><div class="vuln-description"><strong>Descripción:</strong><br>Allowed HTTP Methods: GET, HEAD, POST, PUT, DELETE, OPTIONS</div><div class="vuln-recommendation"><strong>💡 Recomendación:</strong><br>Revisar y remediar según mejores prácticas de seguridad</div></div><div class="vulnerability media"><div class="vuln-header"><div class="vuln-title">Vulnerabilidad: vulnerabilidad_nikto</div><div class="cvss-score">CVSS: 5.0</div></div><div class="vuln-meta"><span><strong>ID:</strong> IND-10</span><span><strong>Categoría OWASP:</strong> A05:2021 - Security Misconfiguration</span><span><strong>Fuente:</strong> nikto</span></div><div class="vuln-description"><strong>Descripción:</strong><br>GET /: HTTP method ('Allow' Header): 'PUT' method could allow clients to save files on the web server.</div><div class="vuln-recommendation"><strong>💡 Recomendación:</strong><br>Revisar y remediar según mejores prácticas de seguridad</div></div><div class="vulnerability media"><div class="vuln-header"><div class="vuln-title">Vulnerabilidad: vulnerabilidad_nikto</div><div class="cvss-score">CVSS: 5.0</div></div><div class="vuln-meta"><span><strong>ID:</strong> IND-11</span><span><strong>Categoría OWASP:</strong> A05:2021 - Security Misconfiguration</span><span><strong>Fuente:</strong> nikto</span></div><div class="vuln-description"><strong>Descripción:</strong><br>GET /: HTTP method ('Allow' Header): 'DELETE' may allow clients to remove files on the web server.</div><div class="vuln-recommendation"><strong>💡 Recomendación:</strong><br>Revisar y remediar según mejores prácticas de seguridad</div></div><h3>BAJA (8)</h3><div class="vulnerability baja"><div class="vuln-header"><div class="vuln-title">10.1.11.177</div><div class="cvss-score">CVSS: 2.5</div></div><div class="vuln-meta"><span><strong>ID:</strong> N/A</span><span><strong>Categoría OWASP:</strong> A05:2021 - Security Misconfiguration</span><span><strong>Fuente:</strong> nikto</span></div><div class="vuln-description"><strong>Descripción:</strong><br>10.1.11.177</div><div class="vuln-recommendation"><strong>💡 Recomendación:</strong><br>Revisar y remediar según la naturaleza específica de la vulnerabilidad</div></div><div class="vulnerability baja"><div class="vuln-header"><div class="vuln-title">8081</div><div class="cvss-score">CVSS: 2.5</div></div><div class="vuln-meta"><span><strong>ID:</strong> N/A</span><span><strong>Categoría OWASP:</strong> A05:2021 - Security Misconfiguration</span><span><strong>Fuente:</strong> nikto</span></div><div class="vuln-description"><strong>Descripción:</strong><br>8081</div><div class="vuln-recommendation"><strong>💡 Recomendación:</strong><br>Revisar y remediar según la naturaleza específica de la vulnerabilidad</div></div><div class="vulnerability baja"><div class="vuln-header"><div class="vuln-title">Uncommon header 'x-content-type-options' found, with contents: nosniff</div><div class="cvss-score">CVSS: 2.5</div></div><div class="vuln-meta"><span><strong>ID:</strong> N/A</span><span><strong>Categoría OWASP:</strong> A05:2021 - Security Misconfiguration</span><span><strong>Fuente:</strong> nikto</span></div><div class="vuln-description"><strong>Descripción:</strong><br>Uncommon header 'x-content-type-options' found, with contents: nosniff</div><div class="vuln-recommendation"><strong>💡 Recomendación:</strong><br>Revisar y remediar según la naturaleza específica de la vulnerabilidad</div></div><div class="vulnerability baja"><div class="vuln-header"><div class="vuln-title">Uncommon header 'x-frame-options' found, with contents: DENY</div><div class="cvss-score">CVSS: 2.5</div></div><div class="vuln-meta"><span><strong>ID:</strong> N/A</span><span><strong>Categoría OWASP:</strong> A05:2021 - Security Misconfiguration</span><span><strong>Fuente:</strong> nikto</span></div><div class="vuln-description"><strong>Descripción:</strong><br>Uncommon header 'x-frame-options' found, with contents: DENY</div><div class="vuln-recommendation"><strong>💡 Recomendación:</strong><br>Revisar y remediar según la naturaleza específica de la vulnerabilidad</div></div><div class="vulnerability baja"><div class="vuln-header"><div class="vuln-title">Cookie JSESSIONID created without the httponly flag</div><div class="cvss-score">CVSS: 2.5</div></div><div class="vuln-meta"><span><strong>ID:</strong> N/A</span><span><strong>Categoría OWASP:</strong> A05:2021 - Security Misconfiguration</span><span><strong>Fuente:</strong> nikto</span></div><div class="vuln-description"><strong>Descripción:</strong><br>Cookie JSESSIONID created without the httponly flag</div><div class="vuln-recommendation"><strong>💡 Recomendación:</strong><br>Revisar y remediar según la naturaleza específica de la vulnerabilidad</div></div><div class="vulnerability baja"><div class="vuln-header"><div class="vuln-title">Allowed HTTP Methods: GET, HEAD, POST, PUT, DELETE, OPTIONS</div><div class="cvss-score">CVSS: 2.5</div></div><div class="vuln-meta"><span><strong>ID:</strong> N/A</span><span><strong>Categoría OWASP:</strong> A05:2021 - Security Misconfiguration</span><span><strong>Fuente:</strong> nikto</span></div><div class="vuln-description"><strong>Descripción:</strong><br>Allowed HTTP Methods: GET, HEAD, POST, PUT, DELETE, OPTIONS</div><div class="vuln-recommendation"><strong>💡 Recomendación:</strong><br>Revisar y remediar según la naturaleza específica de la vulnerabilidad</div></div><div class="vulnerability baja"><div class="vuln-header"><div class="vuln-title">GET /: HTTP method ('Allow' Header): 'PUT' method could allow clients to save files on the web serve...</div><div class="cvss-score">CVSS: 2.5</div></div><div class="vuln-meta"><span><strong>ID:</strong> N/A</span><span><strong>Categoría OWASP:</strong> A05:2021 - Security Misconfiguration</span><span><strong>Fuente:</strong> nikto</span></div><div class="vuln-description"><strong>Descripción:</strong><br>GET /: HTTP method ('Allow' Header): 'PUT' method could allow clients to save files on the web server.</div><div class="vuln-recommendation"><strong>💡 Recomendación:</strong><br>Revisar y remediar según la naturaleza específica de la vulnerabilidad</div></div><div class="vulnerability baja"><div class="vuln-header"><div class="vuln-title">GET /: HTTP method ('Allow' Header): 'DELETE' may allow clients to remove files on the web server.</div><div class="cvss-score">CVSS: 2.5</div></div><div class="vuln-meta"><span><strong>ID:</strong> N/A</span><span><strong>Categoría OWASP:</strong> A05:2021 - Security Misconfiguration</span><span><strong>Fuente:</strong> nikto</span></div><div class="vuln-description"><strong>Descripción:</strong><br>GET /: HTTP method ('Allow' Header): 'DELETE' may allow clients to remove files on the web server.</div><div class="vuln-recommendation"><strong>💡 Recomendación:</strong><br>Revisar y remediar según la naturaleza específica de la vulnerabilidad</div></div>
+
+        <h2>✅ Recomendaciones de Mitigación</h2>
+        <div class="recommendations">
+            <div class="rec-section mediano"><h3>🟡 Mediano Plazo (1-4 semanas)</h3><ul><li>Remediar 2 vulnerabilidad(es) de severidad alta</li><li>Actualizar componentes de software a versiones más recientes</li><li>Implementar autenticación multifactor (MFA) en paneles administrativos</li><li>Realizar auditoría de configuraciones de seguridad</li><li>Implementar rate limiting en endpoints críticos</li></ul></div><div class="rec-section largo"><h3>🟢 Largo Plazo (1-6 meses)</h3><ul><li>Implementar un programa de gestión de vulnerabilidades continuo</li><li>Establecer políticas de hardening para servidores y aplicaciones</li><li>Implementar WAF (Web Application Firewall)</li><li>Desarrollar plan de respuesta a incidentes</li><li>Implementar monitoreo y logging centralizado</li><li>Realizar pentesting periódico (trimestral o semestral)</li><li>Capacitación en seguridad para el equipo de desarrollo</li><li>Implementar análisis de seguridad en CI/CD pipeline</li></ul></div>
+        </div>
+
+        <div class="footer">
+            <p><strong>Scan Agent v2.1.0</strong></p>
+            <p>Informe generado automáticamente el 2025-11-12 a las 20:47:26</p>
+        </div>
+    </div>
+    
+    <!-- Enlace al dashboard -->
+    <a href="dashboard.html" class="dashboard-link">⬅ Volver al Dashboard</a>
+</body>
+</html>

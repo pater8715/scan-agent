@@ -1,0 +1,73 @@
+version: '3.8'
+
+services:
+  scan-agent:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: scan-agent:2.1.0
+    container_name: scan-agent
+    
+    # Capacidades de red para escaneos avanzados
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    
+    # Modo de red host para acceder a la red del host
+    # Cambiar a 'bridge' si se ejecuta contra objetivos externos
+    network_mode: host
+    
+    # Volúmenes para persistir datos
+    volumes:
+      - ../outputs:/scan-agent/outputs
+      - ../reports:/scan-agent/reports
+      - ../data:/scan-agent/data
+    
+    # Variables de entorno
+    environment:
+      - TZ=Europe/Madrid
+      - PYTHONUNBUFFERED=1
+    
+    # Comando por defecto (puede ser sobreescrito)
+    command: --help
+    
+    # Recursos (opcional)
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 512M
+
+# Configuración alternativa para análisis solamente (sin escaneo)
+  scan-agent-analyzer:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: scan-agent:2.1.0
+    container_name: scan-agent-analyzer
+    
+    # Sin capacidades especiales
+    network_mode: bridge
+    
+    volumes:
+      - ../outputs:/scan-agent/outputs
+      - ../reports:/scan-agent/reports
+      - ../data:/scan-agent/data
+      - ./scan_agent.db:/scan-agent/scan_agent.db
+    
+    environment:
+      - TZ=Europe/Madrid
+      - PYTHONUNBUFFERED=1
+    
+    # Solo análisis de archivos existentes
+    command: --outputs-dir /scan-agent/outputs --format html
+    
+    profiles:
+      - analyzer
+
+networks:
+  default:
+    name: scan-agent-network
