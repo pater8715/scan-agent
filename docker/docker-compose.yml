@@ -1,73 +1,282 @@
+# Scan Agent v3.0 - Docker Compose Configuration
+# ===============================================
+# Multi-service setup para Scan Agent v3.0
+# Soporta CLI scanning, Web UI, desarrollo, y producción
+
 version: '3.8'
 
+# ============================================================================
+# SERVICIOS PRINCIPALES
+# ============================================================================
 services:
-  scan-agent:
+  
+  # -------------------------------------------------------------------------
+  # Scan Agent CLI - Para escaneos desde línea de comandos
+  # -------------------------------------------------------------------------
+  scan-agent-cli:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    image: scan-agent:2.1.0
-    container_name: scan-agent
+      target: production
+    image: scan-agent:3.0.0
+    container_name: scan-agent-cli
+    hostname: scan-agent-cli
     
     # Capacidades de red para escaneos avanzados
     cap_add:
       - NET_RAW
       - NET_ADMIN
+      - SYS_PTRACE  # Para debugging avanzado
     
-    # Modo de red host para acceder a la red del host
-    # Cambiar a 'bridge' si se ejecuta contra objetivos externos
+    # Modo de red host para acceso completo a la red local
     network_mode: host
     
     # Volúmenes para persistir datos
     volumes:
-      - ../outputs:/scan-agent/outputs
-      - ../reports:/scan-agent/reports
-      - ../data:/scan-agent/data
+      - ../outputs:/scan-agent/outputs:rw
+      - ../reports:/scan-agent/reports:rw
+      - ../data:/scan-agent/data:rw
+      - ../logs:/scan-agent/logs:rw
+      - /etc/localtime:/etc/localtime:ro  # Sincronizar timezone
     
     # Variables de entorno
     environment:
       - TZ=Europe/Madrid
       - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      - SCAN_MODE=cli
+      - LOG_LEVEL=INFO
+      - MAX_CONCURRENT_SCANS=3
     
-    # Comando por defecto (puede ser sobreescrito)
-    command: --help
+    # Comando por defecto
+    command: ["--help"]
     
-    # Recursos (opcional)
+    # Recursos limitados
     deploy:
       resources:
         limits:
           cpus: '2.0'
           memory: 2G
         reservations:
-          cpus: '1.0'
-          memory: 512M
+          cpus: '0.5'
+          memory: 256M
+    
+    # Reinicio automático en caso de fallo
+    restart: unless-stopped
+    
+    # Solo disponible en perfil CLI
+    profiles: ["cli", "all"]
 
-# Configuración alternativa para análisis solamente (sin escaneo)
+  # -------------------------------------------------------------------------
+  # Scan Agent Web UI - Interfaz web con API REST
+  # -------------------------------------------------------------------------
+  scan-agent-web:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: production
+    image: scan-agent:3.0.0
+    container_name: scan-agent-web
+    hostname: scan-agent-web
+    
+    # Capacidades mínimas para web UI
+    cap_add:
+      - NET_RAW      # Para escaneos básicos
+      - NET_ADMIN    # Para escaneos avanzados
+    
+    # Red bridge para web UI
+    networks:
+      - scan-agent-network
+    
+    # Puertos expuestos
+    ports:
+      - "8080:8080"  # Web UI
+      - "8000:8000"  # API alternativa
+    
+    # Volúmenes para persistir datos
+    volumes:
+      - ../outputs:/scan-agent/outputs:rw
+      - ../reports:/scan-agent/reports:rw
+      - ../data:/scan-agent/data:rw
+      - ../logs:/scan-agent/logs:rw
+      - /etc/localtime:/etc/localtime:ro
+    
+    # Variables de entorno para web
+    environment:
+      - TZ=Europe/Madrid
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      - SCAN_MODE=web
+      - WEB_HOST=0.0.0.0
+      - WEB_PORT=8080
+      - API_PORT=8000
+      - LOG_LEVEL=INFO
+      - MAX_CONCURRENT_SCANS=5
+      - ENABLE_API_DOCS=true
+      - CORS_ORIGINS=*
+    
+    # Comando para iniciar web UI
+    command: ["--web", "--host", "0.0.0.0", "--port", "8080"]
+    
+    # Recursos para web UI
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 1.5G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    
+    # Healthcheck para web UI
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health", "||", "exit", "1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    
+    # Reinicio automático
+    restart: unless-stopped
+    
+    # Dependencias
+    depends_on:
+      - scan-agent-analyzer
+    
+    # Solo disponible en perfil web
+    profiles: ["web", "all"]
+
+  # -------------------------------------------------------------------------
+  # Scan Agent Analyzer - Solo análisis (sin escaneo activo)
+  # -------------------------------------------------------------------------
   scan-agent-analyzer:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    image: scan-agent:2.1.0
+      target: production
+    image: scan-agent:3.0.0
     container_name: scan-agent-analyzer
+    hostname: scan-agent-analyzer
     
-    # Sin capacidades especiales
-    network_mode: bridge
+    # Sin capacidades especiales (solo análisis)
+    networks:
+      - scan-agent-network
     
+    # Volúmenes solo para análisis
     volumes:
-      - ../outputs:/scan-agent/outputs
-      - ../reports:/scan-agent/reports
-      - ../data:/scan-agent/data
-      - ./scan_agent.db:/scan-agent/scan_agent.db
+      - ../outputs:/scan-agent/outputs:ro  # Solo lectura
+      - ../reports:/scan-agent/reports:rw
+      - ../data:/scan-agent/data:rw
+      - ../logs:/scan-agent/logs:rw
+      - /etc/localtime:/etc/localtime:ro
     
+    # Variables de entorno para análisis
     environment:
       - TZ=Europe/Madrid
       - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      - SCAN_MODE=analyzer
+      - LOG_LEVEL=INFO
+      - ANALYSIS_ONLY=true
     
-    # Solo análisis de archivos existentes
-    command: --outputs-dir /scan-agent/outputs --format html
+    # Comando para análisis automático
+    command: ["--outputs-dir", "/scan-agent/outputs", "--format", "html", "--auto-analyze"]
     
-    profiles:
-      - analyzer
+    # Recursos mínimos
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    
+    # Reinicio en caso de fallo
+    restart: unless-stopped
+    
+    # Solo disponible en perfil analyzer
+    profiles: ["analyzer", "all"]
 
+  # -------------------------------------------------------------------------
+  # Desarrollo - Hot reload y debugging
+  # -------------------------------------------------------------------------
+  scan-agent-dev:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: app  # Sin optimizaciones de seguridad para desarrollo
+    image: scan-agent:3.0.0-dev
+    container_name: scan-agent-dev
+    hostname: scan-agent-dev
+    
+    # Capacidades completas para desarrollo
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+      - SYS_PTRACE
+    
+    # Red host para desarrollo
+    network_mode: host
+    
+    # Volúmenes con código fuente montado para desarrollo
+    volumes:
+      - ..:/scan-agent:rw          # Código fuente editable
+      - /etc/localtime:/etc/localtime:ro
+    
+    # Variables de desarrollo
+    environment:
+      - TZ=Europe/Madrid
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      - SCAN_MODE=development
+      - LOG_LEVEL=DEBUG
+      - DEVELOPMENT=true
+      - RELOAD=true
+    
+    # Comando interactivo
+    command: ["/bin/bash"]
+    
+    # Modo interactivo
+    stdin_open: true
+    tty: true
+    
+    # Recursos para desarrollo
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 4G
+    
+    # Solo disponible en perfil development
+    profiles: ["dev", "development"]
+
+# ============================================================================
+# CONFIGURACIÓN DE REDES
+# ============================================================================
 networks:
-  default:
+  scan-agent-network:
     name: scan-agent-network
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+    driver_opts:
+      com.docker.network.bridge.name: scan-agent-br
+
+# ============================================================================
+# VOLÚMENES NOMBRADOS (OPCIONAL)
+# ============================================================================
+volumes:
+  scan-agent-data:
+    name: scan-agent-data
+    driver: local
+  scan-agent-logs:
+    name: scan-agent-logs
+    driver: local
+  scan-agent-reports:
+    name: scan-agent-reports
+    driver: local
+  scan-agent-outputs:
+    name: scan-agent-outputs
+    driver: local
