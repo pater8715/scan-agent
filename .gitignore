@@ -58,6 +58,8 @@ storage/temp/
 informe_tecnico.*
 parsed_data.json
 analysis.json
+STATUS.txt
+task-1.md
 
 # Server logs
 server.log

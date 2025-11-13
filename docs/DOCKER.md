@@ -385,7 +385,7 @@ docker logs <container_id>
 
 ## 📚 Referencias
 
-- [Documentación principal](README.md)
+- [Documentación principal](../README.md)
 - [Guía de escaneo](GUIA_ESCANEO.md)
 - [Dockerfile](Dockerfile)
 - [Docker Compose](docker-compose.yml)

@@ -544,7 +544,7 @@ python3 agent.py --outputs-dir ./outputs --format html
 firefox informe_tecnico.html
 ```
 
-**Para más información detallada, consulta:** [`GUIA_ESCANEO.md`](GUIA_ESCANEO.md)
+**Para más información detallada, consulta:** [`GUIA_ESCANEO.md`](docs/GUIA_ESCANEO.md)
 
 ## 📁 Estructura del Proyecto
 
@@ -990,7 +990,7 @@ docker-compose run --rm scan-agent --scan --target 192.168.1.100 --profile stand
 docker-compose run --rm scan-agent --outputs-dir /scan-agent/outputs --format txt
 ```
 
-**📖 Ver la [Guía Docker Completa](DOCKER.md)** para ejemplos avanzados, troubleshooting y configuración de red.
+**📖 Ver la [Guía Docker Completa](docs/DOCKER.md)** para ejemplos avanzados, troubleshooting y configuración de red.
 
 ---
 

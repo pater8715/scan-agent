@@ -718,7 +718,7 @@ for i, item in enumerate(risk_matrix[:10], 1):
 - [Schema SQL](schema.sql)
 - [Database Module](database.py)
 - [Dashboard Generator](dashboard_generator.py)
-- [README Principal](README.md)
+- [README Principal](../README.md)
 
 ---
 
