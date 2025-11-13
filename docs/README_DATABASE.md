@@ -25,12 +25,23 @@ A partir de la **versión 2.1.0**, Scan Agent incluye un sistema de persistencia
 ✅ Generar dashboard interactivo HTML  
 ✅ Consultas y análisis avanzados  
 
+### 🆕 Mejoras en v3.0
+
+A partir de la **versión 3.0.0**, los reportes almacenados incluyen:
+
+✅ **Análisis inteligente de vulnerabilidades** con clasificación automática  
+✅ **Risk scoring** (0-100+) calculado y almacenado  
+✅ **Severidad clasificada** (CRITICAL/HIGH/MEDIUM/LOW) por hallazgo  
+✅ **Recomendaciones accionables** específicas para cada vulnerabilidad  
+✅ **Metadata enriquecida** con información de puertos, servicios y versiones  
+
 ### Ventajas del Sistema de BD
 
 - **Sin configuración**: SQLite no requiere servidor
 - **Portátil**: Un solo archivo `.db` contiene todo
 - **Rápido**: Ideal para <100K escaneos
 - **Integrado**: Funciona automáticamente
+- **Análisis inteligente**: v3.0 incluye clasificación automática de riesgos
 
 ---
 

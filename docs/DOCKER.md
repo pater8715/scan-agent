@@ -6,7 +6,7 @@
 
 ```bash
 # Desde el directorio scan-agent
-docker build -t scan-agent:2.0.0 .
+docker build -t scan-agent:3.0.0 .
 
 # O usando docker-compose
 docker-compose build
@@ -16,8 +16,20 @@ docker-compose build
 
 ```bash
 docker images | grep scan-agent
-# scan-agent   2.0.0   <IMAGE_ID>   <SIZE>
+# scan-agent   3.0.0   <IMAGE_ID>   <SIZE>
 ```
+
+---
+
+## 🆕 Novedades v3.0
+
+La imagen Docker ahora incluye:
+
+✅ **Reportes Profesionales**: HTML/JSON/TXT/MD con diseño moderno  
+✅ **Análisis Inteligente**: Clasificación automática CRITICAL/HIGH/MEDIUM/LOW  
+✅ **Risk Scoring**: Puntuación 0-100+ basada en hallazgos  
+✅ **Parser Mejorado**: Extracción estructurada desde Nmap, Nikto, Gobuster  
+✅ **Executive Summary**: Resumen ejecutivo con badges y métricas  
 
 ---
 
@@ -26,20 +38,20 @@ docker images | grep scan-agent
 ### 1. Ayuda y comandos disponibles
 
 ```bash
-docker run --rm scan-agent:2.0.0 --help
+docker run --rm scan-agent:3.0.0 --help
 ```
 
 ### 2. Ver versión
 
 ```bash
-docker run --rm scan-agent:2.0.0 --version
-# Scan Agent v2.0.0
+docker run --rm scan-agent:3.0.0 --version
+# Scan Agent v3.0.0
 ```
 
 ### 3. Listar perfiles de escaneo
 
 ```bash
-docker run --rm scan-agent:2.0.0 --list-profiles
+docker run --rm scan-agent:3.0.0 --list-profiles
 ```
 
 ---
@@ -51,7 +63,7 @@ docker run --rm scan-agent:2.0.0 --list-profiles
 ```bash
 docker run --rm \
   -v $(pwd)/outputs:/scan-agent/outputs \
-  scan-agent:2.0.0 \
+  scan-agent:3.0.0 \
   --scan --target 192.168.1.100 --profile quick
 ```
 
@@ -60,7 +72,7 @@ docker run --rm \
 ```bash
 docker run --rm \
   -v $(pwd)/outputs:/scan-agent/outputs \
-  scan-agent:2.0.0 \
+  scan-agent:3.0.0 \
   --scan --target example.com --profile standard
 ```
 
@@ -69,7 +81,7 @@ docker run --rm \
 ```bash
 docker run --rm \
   -v $(pwd)/outputs:/scan-agent/outputs \
-  scan-agent:2.0.0 \
+  scan-agent:3.0.0 \
   --scan --target https://example.com --profile web
 ```
 
@@ -80,7 +92,7 @@ docker run --rm \
   --cap-add=NET_RAW \
   --cap-add=NET_ADMIN \
   -v $(pwd)/outputs:/scan-agent/outputs \
-  scan-agent:2.0.0 \
+  scan-agent:3.0.0 \
   --scan --target 192.168.1.100 --profile stealth
 ```
 
@@ -92,7 +104,7 @@ docker run --rm \
   --cap-add=NET_ADMIN \
   --network host \
   -v $(pwd)/outputs:/scan-agent/outputs \
-  scan-agent:2.0.0 \
+  scan-agent:3.0.0 \
   --scan --target 192.168.1.0/24 --profile network
 ```
 
@@ -106,7 +118,7 @@ docker run --rm \
 docker run --rm \
   -v $(pwd)/outputs:/scan-agent/outputs \
   -v $(pwd)/reports:/scan-agent/reports \
-  scan-agent:2.0.0 \
+  scan-agent:3.0.0 \
   --outputs-dir /scan-agent/outputs --format txt
 ```
 
@@ -116,7 +128,7 @@ docker run --rm \
 docker run --rm \
   -v $(pwd)/outputs:/scan-agent/outputs \
   -v $(pwd)/reports:/scan-agent/reports \
-  scan-agent:2.0.0 \
+  scan-agent:3.0.0 \
   --outputs-dir /scan-agent/outputs --format html --report-file security_report.html
 ```
 
@@ -126,7 +138,7 @@ docker run --rm \
 docker run --rm \
   -v $(pwd)/outputs:/scan-agent/outputs \
   -v $(pwd)/reports:/scan-agent/reports \
-  scan-agent:2.0.0 \
+  scan-agent:3.0.0 \
   --outputs-dir /scan-agent/outputs --format json --report-file vulnerabilities.json
 ```
 
@@ -196,7 +208,7 @@ docker run --rm \
   -e TZ=America/New_York \
   -e PYTHONUNBUFFERED=1 \
   -v $(pwd)/outputs:/scan-agent/outputs \
-  scan-agent:2.0.0 \
+  scan-agent:3.0.0 \
   --scan --target example.com --profile standard
 ```
 
@@ -207,7 +219,7 @@ docker run --rm \
   --cpus="2.0" \
   --memory="2g" \
   -v $(pwd)/outputs:/scan-agent/outputs \
-  scan-agent:2.0.0 \
+  scan-agent:3.0.0 \
   --scan --target 192.168.1.100 --profile full
 ```
 
@@ -221,7 +233,7 @@ docker network create scan-network
 docker run --rm \
   --network scan-network \
   -v $(pwd)/outputs:/scan-agent/outputs \
-  scan-agent:2.0.0 \
+  scan-agent:3.0.0 \
   --scan --target 192.168.1.100 --profile standard
 ```
 
@@ -248,7 +260,7 @@ docker run --rm \
   --cap-add=NET_ADMIN \
   -v $(pwd)/outputs:/scan-agent/outputs:rw \
   -v $(pwd)/reports:/scan-agent/reports:rw \
-  scan-agent:2.0.0 \
+  scan-agent:3.0.0 \
   --scan --target external-target.com --profile full
 ```
 
@@ -263,7 +275,7 @@ docker run --rm \
 docker run --rm \
   --cap-add=NET_RAW \
   --cap-add=NET_ADMIN \
-  scan-agent:2.0.0 \
+  scan-agent:3.0.0 \
   --scan --target TARGET --profile stealth
 ```
 
@@ -291,7 +303,7 @@ docker run --rm \
 ### Verificar herramientas instaladas
 
 ```bash
-docker run --rm scan-agent:2.0.0 /bin/bash -c "nmap --version && nikto -Version && gobuster version"
+docker run --rm scan-agent:3.0.0 /bin/bash -c "nmap --version && nikto -Version && gobuster version"
 ```
 
 ---
@@ -304,14 +316,14 @@ docker run --rm scan-agent:2.0.0 /bin/bash -c "nmap --version && nikto -Version 
 # 1. Escaneo
 docker run --rm \
   -v $(pwd)/outputs:/scan-agent/outputs \
-  scan-agent:2.0.0 \
+  scan-agent:3.0.0 \
   --scan --target 192.168.1.100 --profile standard
 
 # 2. Análisis y generación de reporte HTML
 docker run --rm \
   -v $(pwd)/outputs:/scan-agent/outputs \
   -v $(pwd)/reports:/scan-agent/reports \
-  scan-agent:2.0.0 \
+  scan-agent:3.0.0 \
   --outputs-dir /scan-agent/outputs --format html --report-file audit_192.168.1.100.html
 
 # 3. Ver reporte
@@ -328,7 +340,7 @@ for target in "${TARGETS[@]}"; do
   echo "[*] Escaneando $target..."
   docker run --rm \
     -v $(pwd)/outputs:/scan-agent/outputs \
-    scan-agent:2.0.0 \
+    scan-agent:3.0.0 \
     --scan --target "$target" --profile quick
 done
 
@@ -336,7 +348,7 @@ echo "[*] Generando reporte consolidado..."
 docker run --rm \
   -v $(pwd)/outputs:/scan-agent/outputs \
   -v $(pwd)/reports:/scan-agent/reports \
-  scan-agent:2.0.0 \
+  scan-agent:3.0.0 \
   --outputs-dir /scan-agent/outputs --format html --report-file consolidated_report.html
 ```
 
@@ -346,7 +358,7 @@ docker run --rm \
 # .gitlab-ci.yml
 scan-security:
   stage: test
-  image: scan-agent:2.0.0
+  image: scan-agent:3.0.0
   script:
     - python3 agent.py --scan --target $TARGET_URL --profile web
     - python3 agent.py --outputs-dir outputs --format json --report-file vulnerabilities.json
@@ -366,7 +378,7 @@ scan-security:
 ### Reconstruir imagen con cambios
 
 ```bash
-docker build --no-cache -t scan-agent:2.0.0 .
+docker build --no-cache -t scan-agent:3.0.0 .
 ```
 
 ### Limpiar imágenes antiguas
