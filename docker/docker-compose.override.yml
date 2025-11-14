@@ -3,8 +3,6 @@
 # Override configuration for development
 # Automatically loaded by docker-compose in development
 
-version: '3.8'
-
 services:
   # Override para desarrollo local
   scan-agent-web:

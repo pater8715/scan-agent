@@ -38,7 +38,7 @@ class VulnerabilityScanner:
             commands=[
                 {
                     'tool': 'nmap',
-                    'args': '-sV -F {target}',
+                    'args': '-Pn -sT --top-ports 100 {target}',
                     'output': 'nmap_service_{target}.txt',
                     'timeout': 300,
                     'required': True

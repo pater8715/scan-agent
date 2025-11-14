@@ -257,8 +257,9 @@ setup_web_mode "$@"
 if [[ "$*" == *"--web"* ]] || [[ "$SCAN_MODE" == "web" ]]; then
     # Modo web
     log "INFO" "Starting web mode"
-    echo -e "${GREEN}[*]${NC} Iniciando Web UI: ${WHITE}python3 -m webapp.main${NC}"
-    exec python3 -m webapp.main "$@"
+    echo -e "${GREEN}[*]${NC} Iniciando Web UI: ${WHITE}uvicorn webapp.main:app --host $WEB_HOST --port $WEB_PORT${NC}"
+    cd /scan-agent
+    exec uvicorn webapp.main:app --host "$WEB_HOST" --port "$WEB_PORT" --reload
 elif [[ "$*" == *"--help"* ]] || [[ $# -eq 0 ]] || [[ "$1" == "--help" ]]; then
     # Mostrar ayuda
     log "INFO" "Showing help"
