@@ -77,12 +77,13 @@ services:
     container_name: scan-agent-web
     hostname: scan-agent-web
     
-    # Capacidades necesarias para web UI y escaneos
+    # Capacidades y permisos para escaneos
     cap_add:
       - NET_RAW      # Para escaneos básicos
       - NET_ADMIN    # Para escaneos avanzados
+      - SYS_PTRACE   # Para debugging
     
-    # Ejecutar como privilegiado para permisos de red
+    # Modo privilegiado para permisos de red completos
     privileged: true
     
     # Red bridge para web UI
@@ -192,7 +193,7 @@ services:
     # Reinicio en caso de fallo
     restart: unless-stopped
     
-    # Solo disponible en perfil analyzer
+    # Solo disponible en perfil analyzer o web
     profiles: ["analyzer", "web", "all"]
 
   # -------------------------------------------------------------------------

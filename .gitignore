@@ -58,8 +58,6 @@ storage/temp/
 informe_tecnico.*
 parsed_data.json
 analysis.json
-STATUS.txt
-task-1.md
 
 # Server logs
 server.log
@@ -70,6 +68,10 @@ nohup.out
 *.tmp
 .DS_Store
 Thumbs.db
+
+# Outputs temporales
+outputs/*.txt
+outputs/*.nmap
 
 # Secrets
 .env
