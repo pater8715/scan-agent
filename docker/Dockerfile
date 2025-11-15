@@ -134,8 +134,9 @@ EXPOSE 8080 8000
 COPY scripts/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# Cambiar a usuario no privilegiado por defecto
-USER scanagent
+# NOTA: Se mantiene como root para permitir escaneos con nmap que requieren raw sockets
+# El contenedor debe ejecutarse con privileged: true o cap_add: NET_RAW, NET_ADMIN
+# USER scanagent
 
 # Punto de entrada y comando por defecto
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]

@@ -3,8 +3,6 @@
 # Multi-service setup para Scan Agent v3.0
 # Soporta CLI scanning, Web UI, desarrollo, y producción
 
-version: '3.8'
-
 # ============================================================================
 # SERVICIOS PRINCIPALES
 # ============================================================================
@@ -79,10 +77,14 @@ services:
     container_name: scan-agent-web
     hostname: scan-agent-web
     
-    # Capacidades mínimas para web UI
+    # Capacidades y permisos para escaneos
     cap_add:
       - NET_RAW      # Para escaneos básicos
       - NET_ADMIN    # Para escaneos avanzados
+      - SYS_PTRACE   # Para debugging
+    
+    # Modo privilegiado para permisos de red completos
+    privileged: true
     
     # Red bridge para web UI
     networks:
@@ -139,10 +141,6 @@ services:
     # Reinicio automático
     restart: unless-stopped
     
-    # Dependencias
-    depends_on:
-      - scan-agent-analyzer
-    
     # Solo disponible en perfil web
     profiles: ["web", "all"]
 
@@ -180,7 +178,7 @@ services:
       - ANALYSIS_ONLY=true
     
     # Comando para análisis automático
-    command: ["--outputs-dir", "/scan-agent/outputs", "--format", "html", "--auto-analyze"]
+    command: ["--outputs-dir", "/scan-agent/outputs", "--format", "html"]
     
     # Recursos mínimos
     deploy:
@@ -195,8 +193,8 @@ services:
     # Reinicio en caso de fallo
     restart: unless-stopped
     
-    # Solo disponible en perfil analyzer
-    profiles: ["analyzer", "all"]
+    # Solo disponible en perfil analyzer o web
+    profiles: ["analyzer", "web", "all"]
 
   # -------------------------------------------------------------------------
   # Desarrollo - Hot reload y debugging
