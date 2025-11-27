@@ -9,16 +9,11 @@
 
 ---
 
-## 🆕 Render.com Deployment (Nube)
+## 🔄 Migración a Render.com
 
-- **[Completado]** Soporte de despliegue en Render.com usando `Dockerfile.render` y `render.yaml`.
-- **Dockerfile separado:**
-  - `Dockerfile.render` para Render (cloud, sin modo privilegiado)
-  - `docker/Dockerfile.backup-local` para desarrollo/local (multi-stage, modo privilegiado)
-- **Documentación y ejemplos actualizados**
-- **Próximos pasos:**
-  - Mejorar soporte multi-cloud (Heroku, Railway, etc.)
-  - Automatizar tests de despliegue cloud
+- Eliminada toda la configuración Docker.
+- El despliegue se realiza directamente en Render.com usando Python y Uvicorn.
+- Documentación y ejemplos actualizados para reflejar solo Render.
 
 ---
 

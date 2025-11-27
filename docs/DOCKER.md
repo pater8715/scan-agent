@@ -520,6 +520,12 @@ docker logs <container_id>
 
 ---
 
+# [ARCHIVO OBSOLETO]
+
+Esta guía ya no es relevante para despliegue directo en Render.com. El proyecto ahora se despliega sin Docker. Usa únicamente las instrucciones del README.md para Render.
+
+---
+
 ## 🆕 Render.com y Dockerfile Separados
 
 A partir de la versión 3.0, Scan Agent soporta despliegue cloud en [Render.com](https://render.com/) usando archivos dedicados:

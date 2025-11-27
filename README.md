@@ -29,49 +29,29 @@
 - **Monitoreo en Vivo**: Seguimiento de progreso en tiempo real
 - **Historial Visual**: Búsqueda y navegación de escaneos anteriores
 
-### 🐳 Docker v3.0
-- **Multi-Stage Build**: Imagen optimizada de 1.2GB
-- **Multi-Service**: CLI, Web UI, Analyzer, Dev profiles
-- **Privileged Mode**: Soporte completo para escaneos de red
-- **Health Checks**: Monitoreo automático de servicios
-
 ---
 
 ## 🚀 Inicio Rápido
 
-### Opción 1: Docker Web UI (Recomendado)
+### Opción 1: Despliegue en Render.com (Recomendado)
 
 ```bash
-# 1. Clonar repositorio
-git clone https://github.com/pater8715/scan-agent.git
-cd scan-agent
-
-# 2. Iniciar servicios
-docker compose -f docker/docker-compose.yml --profile web up -d
-
-# 3. Abrir navegador
-# Web UI: http://localhost:8080
-# API Docs: http://localhost:8080/api/docs
-
-# 4. Ver logs
-docker logs scan-agent-web -f
-
-# 5. Detener servicios
-docker compose -f docker/docker-compose.yml --profile web down
+# 1. Sube tu fork o repo a GitHub
+# 2. En Render, crea un nuevo servicio Web → "Deploy from repo"
+# 3. Selecciona el repo y configura:
+#    - Web Service Port: 8080
+#    - Root Directory: (raíz del repo)
+#    - Variables de entorno: (opcional)
+# 4. Render instalará automáticamente las dependencias de requirements.txt y webapp/requirements.txt
+# 5. Accede a la web: https://<tu-app>.onrender.com
 ```
 
-### Opción 2: Docker CLI
-
-```bash
-# Escaneo rápido
-docker compose -f docker/docker-compose.yml --profile cli run --rm scan-agent-cli \
-  --target scanme.nmap.org --profile quick
-
-# Ver reportes generados
-ls -la reports/
+**Comando de inicio Render:**
+```
+python3 -m uvicorn webapp.main:app --host 0.0.0.0 --port 8080
 ```
 
-### Opción 3: Instalación Local
+### Opción 2: Instalación Local
 
 ```bash
 # 1. Clonar repositorio
@@ -88,36 +68,6 @@ python3 scripts/scan-agent.py --target scanme.nmap.org --profile quick
 # 4. Ver reporte
 open reports/dashboard.html
 ```
-
-### 🚀 Despliegue en Render.com (Cloud)
-
-Scan Agent puede desplegarse fácilmente en la nube usando [Render.com](https://render.com/):
-
-```bash
-# 1. Sube tu fork o repo a GitHub
-# 2. En Render, crea un nuevo servicio Web → "Deploy from repo"
-# 3. Selecciona el repo y configura:
-#    - Dockerfile path: `Dockerfile.render`
-#    - Build Command: (vacío)
-#    - Start Command: (vacío)
-#    - Web Service Port: 8080
-#    - Root Directory: (raíz del repo)
-#    - Variables de entorno: (opcional, ver `render.yaml`)
-# 4. Render usará automáticamente el archivo `render.yaml` si está presente
-# 5. Accede a la web: https://<tu-app>.onrender.com
-```
-
-**Archivos clave para Render:**
-- `Dockerfile.render`: Dockerfile minimal para Render (sin modo privilegiado)
-- `render.yaml`: Configuración declarativa del servicio Render
-- `docker/Dockerfile.backup-local`: Dockerfile completo para desarrollo/local
-
-**Diferencias principales:**
-- Render no permite modo privilegiado ni escaneos de red avanzados
-- Solo expone el puerto 8080 (web)
-- El Dockerfile local soporta todos los perfiles y herramientas avanzadas
-
-Para desarrollo local, sigue usando `docker/docker-compose.yml` y el Dockerfile original (ahora en `docker/Dockerfile.backup-local`).
 
 ---
 
@@ -136,10 +86,6 @@ scan-agent/
 │   ├── api/               # Endpoints REST
 │   ├── templates/         # Plantillas Jinja2
 │   └── static/            # CSS/JS/Assets
-├── docker/                # Configuración Docker
-│   ├── Dockerfile         # Multi-stage build
-│   ├── docker-compose.yml # Orquestación
-│   └── docker-compose.override.yml
 ├── scripts/               # Scripts de utilidad
 │   ├── scan-agent.py      # CLI principal
 │   ├── docker-entrypoint.sh
@@ -160,9 +106,7 @@ scan-agent/
 
 ## 📖 Documentación
 
-- **[Guía de Inicio Rápido Web](docs/guides/QUICKSTART_WEB.md)** - Usar la interfaz web
 - **[Guía de Escaneo](docs/GUIA_ESCANEO.md)** - Perfiles y parámetros
-- **[Documentación Docker](docs/DOCKER.md)** - Configuración avanzada
 - **[Testing Guide](docs/guides/TESTING_GUIDE.md)** - Pruebas y validación
 - **[Changelog v3.0](docs/changelog/CHANGELOG_v3.0.md)** - Novedades de la versión
 - **[API Reference](docs/api/)** - Documentación de endpoints
@@ -173,14 +117,6 @@ scan-agent/
 ## 🔧 Comandos Make
 
 ```bash
-# Docker
-make build          # Construir imagen
-make up-web         # Iniciar Web UI
-make up-cli         # Iniciar CLI
-make down           # Detener servicios
-make logs-web       # Ver logs web
-make shell          # Shell interactivo
-
 # Desarrollo
 make run-cli        # Ejecutar CLI local
 make test           # Ejecutar tests
@@ -194,21 +130,6 @@ make help
 ---
 
 ## 🎯 Ejemplos de Uso
-
-### Docker Web UI (Recomendado)
-
-```bash
-# Iniciar interfaz web
-docker compose -f docker/docker-compose.yml --profile web up -d
-
-# Acceder a:
-# - Web UI: http://localhost:8080
-# - API Docs: http://localhost:8080/api/docs
-# - Health: http://localhost:8080/health
-
-# Ver logs
-docker logs scan-agent-web -f
-```
 
 ### API REST
 
@@ -241,12 +162,6 @@ python3 scripts/scan-agent.py --outputs-dir ./outputs --format html
 ---
 
 ## 🛠️ Requisitos
-
-### Docker
-- Docker Engine 20.10+
-- Docker Compose 2.0+
-- 2GB RAM mínimo
-- 5GB espacio en disco
 
 ### Instalación Local
 - Python 3.12+
