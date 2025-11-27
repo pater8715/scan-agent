@@ -1,57 +1,85 @@
 # 🐳 Scan Agent - Guía Docker
 
-## 📦 Instalación
+## 📦 Instalación y Construcción
+
+### Prerrequisitos
+
+- Docker Desktop 20.10+
+- Docker Compose v2.0+
+- 4GB RAM mínimo
+- 10GB espacio en disco
 
 ### Construcción de la imagen
 
 ```bash
-# Desde el directorio scan-agent
-docker build -t scan-agent:3.0.0 .
+# Usando Docker Compose (recomendado)
+cd scan-agent
+docker compose -f docker/docker-compose.yml --profile web build
 
-# O usando docker-compose
-docker-compose build
+# O construcción directa
+docker build -f docker/Dockerfile -t scan-agent:3.0.0 .
 ```
 
 ### Verificar imagen creada
 
 ```bash
 docker images | grep scan-agent
-# scan-agent   3.0.0   <IMAGE_ID>   <SIZE>
+# scan-agent                3.0.0    <IMAGE_ID>    <SIZE>
+# scan-agent-analyzer       3.0.0    <IMAGE_ID>    <SIZE>
 ```
 
 ---
 
-## 🆕 Novedades v3.0
+## 🆕 Novedades v3.0 - Docker Edition
 
 La imagen Docker ahora incluye:
 
+✅ **Interfaz Web FastAPI**: Servidor web en puerto 8080 con UI moderna  
+✅ **Entrypoint Optimizado**: Uvicorn ASGI server para alto rendimiento  
+✅ **Multi-Service**: Perfiles para web, CLI, analyzer y desarrollo  
 ✅ **Reportes Profesionales**: HTML/JSON/TXT/MD con diseño moderno  
 ✅ **Análisis Inteligente**: Clasificación automática CRITICAL/HIGH/MEDIUM/LOW  
 ✅ **Risk Scoring**: Puntuación 0-100+ basada en hallazgos  
 ✅ **Parser Mejorado**: Extracción estructurada desde Nmap, Nikto, Gobuster  
 ✅ **Executive Summary**: Resumen ejecutivo con badges y métricas  
+✅ **Health Checks**: Monitoreo automático del estado de contenedores  
 
 ---
 
-## 🚀 Uso Básico
+## 🚀 Inicio Rápido
 
-### 1. Ayuda y comandos disponibles
+### 1. Iniciar Web UI (Recomendado)
 
 ```bash
-docker run --rm scan-agent:3.0.0 --help
+# PowerShell (Windows)
+cd scan-agent
+docker compose -f docker/docker-compose.yml --profile web up -d
+
+# Bash (Linux/Mac)
+cd scan-agent
+docker compose -f docker/docker-compose.yml --profile web up -d
 ```
 
-### 2. Ver versión
+### 2. Acceder a la aplicación
+
+- **Web UI**: http://localhost:8080
+- **API Docs**: http://localhost:8080/api/docs
+- **Health Check**: http://localhost:8080/health
+
+### 3. Ver logs en tiempo real
 
 ```bash
-docker run --rm scan-agent:3.0.0 --version
-# Scan Agent v3.0.0
+# Logs del servicio web
+docker logs scan-agent-web -f
+
+# Logs de todos los servicios
+docker compose -f docker/docker-compose.yml --profile web logs -f
 ```
 
-### 3. Listar perfiles de escaneo
+### 4. Detener servicios
 
 ```bash
-docker run --rm scan-agent:3.0.0 --list-profiles
+docker compose -f docker/docker-compose.yml --profile web down
 ```
 
 ---
@@ -144,32 +172,120 @@ docker run --rm \
 
 ---
 
-## 🐙 Uso con Docker Compose
+## 🔍 Perfiles de Servicio
 
-### Escaneo con compose
+### Perfil Web (Recomendado)
 
-```bash
-# Escaneo rápido
-docker-compose run --rm scan-agent --scan --target 192.168.1.100 --profile quick
-
-# Escaneo web
-docker-compose run --rm scan-agent --scan --target https://example.com --profile web
-
-# Escaneo completo
-docker-compose run --rm scan-agent --scan --target 192.168.1.100 --profile full
-```
-
-### Análisis solamente (perfil analyzer)
+Inicia la interfaz web completa con API REST:
 
 ```bash
-# Activar servicio de análisis
-docker-compose --profile analyzer up scan-agent-analyzer
+# Iniciar
+docker compose -f docker/docker-compose.yml --profile web up -d
 
-# O ejecutar una vez
-docker-compose --profile analyzer run --rm scan-agent-analyzer
+# Servicios incluidos:
+# - scan-agent-web: Interfaz web en http://localhost:8080
+# - scan-agent-analyzer: Procesador de análisis en segundo plano
 ```
 
-### Modo interactivo
+**Características:**
+- ✅ Interfaz web moderna y responsive
+- ✅ API REST documentada (Swagger/OpenAPI)
+- ✅ Ejecución de escaneos desde navegador
+- ✅ Visualización de reportes en tiempo real
+- ✅ Historial de escaneos
+- ✅ Health checks automáticos
+
+### Perfil CLI
+
+Para escaneos desde línea de comandos:
+
+```bash
+# Iniciar contenedor CLI
+docker compose -f docker/docker-compose.yml --profile cli run --rm scan-agent-cli \
+  --target scanme.nmap.org --profile quick
+
+# Ver ayuda
+docker compose -f docker/docker-compose.yml --profile cli run --rm scan-agent-cli --help
+```
+
+### Perfil All
+
+Inicia todos los servicios:
+
+```bash
+docker compose -f docker/docker-compose.yml --profile all up -d
+```
+
+---
+
+## 📊 Uso de la Web UI
+
+### 1. Ejecutar escaneo desde el navegador
+
+1. Acceder a http://localhost:8080
+2. Ingresar IP o dominio objetivo
+3. Seleccionar perfil de escaneo
+4. Hacer clic en "Iniciar Escaneo"
+5. Ver progreso en tiempo real
+
+### 2. Consultar API REST
+
+```bash
+# Listar escaneos
+curl http://localhost:8080/api/scans
+
+# Ver detalles de un escaneo
+curl http://localhost:8080/api/scans/{scan_id}
+
+# Descargar reporte
+curl http://localhost:8080/api/scans/{scan_id}/report?format=json
+```
+
+### 3. Documentación interactiva
+
+Visitar http://localhost:8080/api/docs para explorar todos los endpoints disponibles.
+
+---
+
+## 🛠️ Administración de Contenedores
+
+### Ver estado de servicios
+
+```bash
+docker ps
+# o
+docker compose -f docker/docker-compose.yml --profile web ps
+```
+
+### Reiniciar servicios
+
+```bash
+# Reiniciar todos los servicios
+docker compose -f docker/docker-compose.yml --profile web restart
+
+# Reiniciar solo web
+docker restart scan-agent-web
+```
+
+### Ver logs
+
+```bash
+# Logs del servicio web
+docker logs scan-agent-web --tail 50 -f
+
+# Logs del analyzer
+docker logs scan-agent-analyzer --tail 50 -f
+```
+
+### Ejecutar comandos dentro del contenedor
+
+```bash
+# Shell interactivo
+docker exec -it scan-agent-web /bin/bash
+
+# Ejecutar comando específico
+docker exec scan-agent-web python3 --version
+```
 
 ```bash
 # Acceder al contenedor
@@ -401,3 +517,28 @@ docker logs <container_id>
 - [Guía de escaneo](GUIA_ESCANEO.md)
 - [Dockerfile](Dockerfile)
 - [Docker Compose](docker-compose.yml)
+
+---
+
+## 🆕 Render.com y Dockerfile Separados
+
+A partir de la versión 3.0, Scan Agent soporta despliegue cloud en [Render.com](https://render.com/) usando archivos dedicados:
+
+- `Dockerfile.render`: Imagen minimal para Render (sin modo privilegiado, solo web)
+- `render.yaml`: Configuración declarativa Render
+- `docker/Dockerfile.backup-local`: Dockerfile completo para desarrollo/local (multi-stage, modo privilegiado, herramientas avanzadas)
+
+**Diferencias clave:**
+- Render no permite `--privileged` ni capacidades avanzadas de red
+- Solo expone el puerto 8080
+- El Dockerfile local soporta todos los perfiles y escaneos avanzados
+
+### Despliegue en Render.com
+
+1. Sube tu repo a GitHub
+2. En Render, crea un nuevo servicio Web y selecciona:
+   - Dockerfile path: `Dockerfile.render`
+   - Web Service Port: 8080
+   - Variables de entorno: (opcional, ver `render.yaml`)
+3. Render usará automáticamente el archivo `render.yaml` si está presente
+4. Accede a la web: https://<tu-app>.onrender.com

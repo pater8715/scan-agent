@@ -1,0 +1,33 @@
+# Dockerfile para despliegue en Render.com
+FROM python:3.12-slim
+
+# Instalar herramientas necesarias (solo lo esencial para Render)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends nmap nikto gobuster curl sqlite3 && \
+    apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+WORKDIR /app
+
+# Copiar dependencias
+COPY requirements.txt ./
+COPY webapp/requirements.txt ./webapp-requirements.txt
+
+RUN pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir -r webapp-requirements.txt
+
+# Copiar el resto del código
+COPY src/ ./src/
+COPY webapp/ ./webapp/
+COPY config/ ./config/
+COPY scripts/ ./scripts/
+COPY README.md ./
+
+# Crear carpetas necesarias
+RUN mkdir -p outputs reports data logs
+
+EXPOSE 8080
+
+ENV WEB_PORT=8080
+ENV SCAN_MODE=web
+
+CMD ["python3", "-m", "uvicorn", "webapp.main:app", "--host", "0.0.0.0", "--port", "8080"]

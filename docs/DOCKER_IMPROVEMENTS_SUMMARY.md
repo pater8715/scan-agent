@@ -156,4 +156,14 @@ docker-compose --profile dev up -d
 
 ---
 
+## 🆕 Render.com y Dockerfile Separados
+
+- **Dockerfile.render**: Imagen minimal para Render (solo web, sin modo privilegiado)
+- **render.yaml**: Configuración declarativa Render
+- **docker/Dockerfile.backup-local**: Dockerfile completo para desarrollo/local
+
+Esta separación permite despliegue cloud seguro y mantiene todas las capacidades avanzadas para desarrollo local.
+
+---
+
 **✨ Scan Agent v3.0 Docker está listo para producción! ✨**

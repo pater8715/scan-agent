@@ -9,4 +9,17 @@
 
 ---
 
+## 🆕 Render.com Deployment (Nube)
+
+- **[Completado]** Soporte de despliegue en Render.com usando `Dockerfile.render` y `render.yaml`.
+- **Dockerfile separado:**
+  - `Dockerfile.render` para Render (cloud, sin modo privilegiado)
+  - `docker/Dockerfile.backup-local` para desarrollo/local (multi-stage, modo privilegiado)
+- **Documentación y ejemplos actualizados**
+- **Próximos pasos:**
+  - Mejorar soporte multi-cloud (Heroku, Railway, etc.)
+  - Automatizar tests de despliegue cloud
+
+---
+
 [... resto del contenido existente de ROADMAP.md ...]

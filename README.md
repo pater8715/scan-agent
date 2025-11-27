@@ -39,23 +39,39 @@
 
 ## 🚀 Inicio Rápido
 
-### Opción 1: Docker (Recomendado)
+### Opción 1: Docker Web UI (Recomendado)
 
 ```bash
-# Iniciar Web UI
-make up-web
+# 1. Clonar repositorio
+git clone https://github.com/pater8715/scan-agent.git
+cd scan-agent
 
-# Abrir navegador
-open http://localhost:8080
+# 2. Iniciar servicios
+docker compose -f docker/docker-compose.yml --profile web up -d
 
-# Ver logs
-make logs-web
+# 3. Abrir navegador
+# Web UI: http://localhost:8080
+# API Docs: http://localhost:8080/api/docs
 
-# Detener servicios
-make down
+# 4. Ver logs
+docker logs scan-agent-web -f
+
+# 5. Detener servicios
+docker compose -f docker/docker-compose.yml --profile web down
 ```
 
-### Opción 2: Instalación Local
+### Opción 2: Docker CLI
+
+```bash
+# Escaneo rápido
+docker compose -f docker/docker-compose.yml --profile cli run --rm scan-agent-cli \
+  --target scanme.nmap.org --profile quick
+
+# Ver reportes generados
+ls -la reports/
+```
+
+### Opción 3: Instalación Local
 
 ```bash
 # 1. Clonar repositorio
@@ -64,6 +80,7 @@ cd scan-agent
 
 # 2. Instalar dependencias
 pip3 install -r requirements.txt
+pip3 install -r webapp/requirements.txt
 
 # 3. Ejecutar escaneo
 python3 scripts/scan-agent.py --target scanme.nmap.org --profile quick
@@ -71,6 +88,36 @@ python3 scripts/scan-agent.py --target scanme.nmap.org --profile quick
 # 4. Ver reporte
 open reports/dashboard.html
 ```
+
+### 🚀 Despliegue en Render.com (Cloud)
+
+Scan Agent puede desplegarse fácilmente en la nube usando [Render.com](https://render.com/):
+
+```bash
+# 1. Sube tu fork o repo a GitHub
+# 2. En Render, crea un nuevo servicio Web → "Deploy from repo"
+# 3. Selecciona el repo y configura:
+#    - Dockerfile path: `Dockerfile.render`
+#    - Build Command: (vacío)
+#    - Start Command: (vacío)
+#    - Web Service Port: 8080
+#    - Root Directory: (raíz del repo)
+#    - Variables de entorno: (opcional, ver `render.yaml`)
+# 4. Render usará automáticamente el archivo `render.yaml` si está presente
+# 5. Accede a la web: https://<tu-app>.onrender.com
+```
+
+**Archivos clave para Render:**
+- `Dockerfile.render`: Dockerfile minimal para Render (sin modo privilegiado)
+- `render.yaml`: Configuración declarativa del servicio Render
+- `docker/Dockerfile.backup-local`: Dockerfile completo para desarrollo/local
+
+**Diferencias principales:**
+- Render no permite modo privilegiado ni escaneos de red avanzados
+- Solo expone el puerto 8080 (web)
+- El Dockerfile local soporta todos los perfiles y herramientas avanzadas
+
+Para desarrollo local, sigue usando `docker/docker-compose.yml` y el Dockerfile original (ahora en `docker/Dockerfile.backup-local`).
 
 ---
 
@@ -148,26 +195,47 @@ make help
 
 ## 🎯 Ejemplos de Uso
 
-### CLI - Escaneo Rápido
-```bash
-python3 scripts/scan-agent.py --target 192.168.1.1 --profile quick
-```
+### Docker Web UI (Recomendado)
 
-### CLI - Escaneo Completo
 ```bash
-python3 scripts/scan-agent.py --target example.com --profile full --description "Pentesting inicial"
-```
+# Iniciar interfaz web
+docker compose -f docker/docker-compose.yml --profile web up -d
 
-### Docker - Web UI
-```bash
-docker-compose --profile web up -d
+# Acceder a:
+# - Web UI: http://localhost:8080
+# - API Docs: http://localhost:8080/api/docs
+# - Health: http://localhost:8080/health
+
+# Ver logs
+docker logs scan-agent-web -f
 ```
 
 ### API REST
+
 ```bash
+# Iniciar escaneo
 curl -X POST http://localhost:8080/api/scans/start \
   -H "Content-Type: application/json" \
   -d '{"target": "scanme.nmap.org", "profile": "quick"}'
+
+# Listar escaneos
+curl http://localhost:8080/api/scans
+
+# Obtener reporte
+curl http://localhost:8080/api/scans/{scan_id}/report?format=json
+```
+
+### CLI Local
+
+```bash
+# Escaneo rápido
+python3 scripts/scan-agent.py --target 192.168.1.100 --profile quick
+
+# Escaneo completo
+python3 scripts/scan-agent.py --target example.com --profile full --description "Pentesting inicial"
+
+# Análisis de archivos existentes
+python3 scripts/scan-agent.py --outputs-dir ./outputs --format html
 ```
 
 ---

@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: scan-agent-web
+    env: docker
+    plan: starter
+    dockerfilePath: ./Dockerfile.render
+    envVars:
+      - key: WEB_PORT
+        value: 8080
+      - key: SCAN_MODE
+        value: web
+    autoDeploy: true
