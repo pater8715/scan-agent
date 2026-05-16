@@ -508,7 +508,7 @@ class ScanParser:
         except Exception as e:
             print(f"[ERROR] Al parsear API Security results: {str(e)}")
 
-s    def _parse_zap_results(self, target_ip: str) -> None:
+    def _parse_zap_results(self, target_ip: str) -> None:
         """
         Parsea archivos zap_passive_*.json y zap_active_*.json generados por ZAPIntegration.
         Integra las alertas ZAP en el pipeline estándar de indicadores OWASP.
