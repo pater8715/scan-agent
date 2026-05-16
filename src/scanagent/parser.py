@@ -49,22 +49,22 @@ class ScanParser:
     def parse_all(self, target_ip: str = None) -> Dict[str, Any]:
         """
         Parsea todos los archivos disponibles en el directorio de salida.
-        
+
         Args:
             target_ip: IP objetivo del escaneo (se detecta automáticamente si no se provee)
-        
+
         Returns:
             Diccionario con todos los datos parseados
         """
         if not self.outputs_dir.exists():
             raise FileNotFoundError(f"El directorio {self.outputs_dir} no existe")
-        
+
         # Detectar IP objetivo automáticamente si no se provee
         if not target_ip:
             target_ip = self._detect_target_ip()
-        
+
         self.parsed_data["target_ip"] = target_ip
-        
+
         # Parsear cada tipo de archivo
         self._parse_nmap_service(target_ip)
         self._parse_nmap_nse(target_ip)
@@ -72,7 +72,8 @@ class ScanParser:
         self._parse_curl_verbose(target_ip)
         self._parse_gobuster(target_ip)
         self._parse_nikto(target_ip)
-        
+        self._parse_api_security(target_ip)
+
         return self.parsed_data
     
     def _detect_target_ip(self) -> Optional[str]:
@@ -442,6 +443,70 @@ class ScanParser:
         except Exception as e:
             print(f"[ERROR] Al parsear {file_pattern}: {str(e)}")
     
+    def _parse_api_security(self, target_ip: str) -> None:
+        """
+        Parsea el archivo api_security_*.json generado por APISecurityChecker.
+        Integra los hallazgos OWASP API Top 10 (2023) en los indicadores del pipeline.
+        """
+        # Buscar el archivo de resultados de api_security para este target
+        safe_target = target_ip.replace(":", "_").replace("/", "_").replace(".", "_")
+        candidates = [
+            self.outputs_dir / f"api_security_{target_ip}.json",
+            self.outputs_dir / f"api_security_{safe_target}.json",
+        ]
+        # También buscar cualquier archivo api_security_*.json si los anteriores no existen
+        found_file = next((p for p in candidates if p.exists()), None)
+        if not found_file:
+            matches = list(self.outputs_dir.glob("api_security_*.json"))
+            if matches:
+                found_file = matches[0]
+
+        if not found_file:
+            print(f"[INFO] No hay resultados de API Security Checker para este escaneo")
+            return
+
+        try:
+            with open(found_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            findings = data.get("findings", [])
+            # Agregar paths descubiertos al conjunto de rutas
+            for path_info in data.get("discovered_paths", []):
+                self.parsed_data["rutas_descubiertas"].append({
+                    "ruta": path_info.get("path", ""),
+                    "codigo_http": path_info.get("status"),
+                    "tamano": None,
+                    "fuente": "api_security_checker"
+                })
+
+            # Integrar hallazgos vulnerables y posiblemente vulnerables
+            active_findings = [
+                f for f in findings
+                if f.get("estado") in ("vulnerable", "posiblemente_vulnerable")
+            ]
+            for finding in active_findings:
+                self.parsed_data["indicadores_owasp_top10"].append({
+                    "fuente": "api_security_checker",
+                    "tipo": finding.get("check_id", "API-UNKNOWN"),
+                    "titulo": finding.get("titulo", ""),
+                    "descripcion": finding.get("descripcion", ""),
+                    "severidad": finding.get("severidad", "media"),
+                    "cvss_score": finding.get("cvss_score", 5.0),
+                    "owasp_api_category": finding.get("owasp_api_category", ""),
+                    "owasp_web_category": finding.get("owasp_web_eq", ""),
+                    "estado": finding.get("estado", ""),
+                    "evidencia": finding.get("evidencia", {}),
+                    "recomendacion": finding.get("recomendacion", ""),
+                })
+
+            print(
+                f"[OK] Parseado: {found_file.name} — "
+                f"{len(active_findings)} hallazgos API Security integrados"
+            )
+
+        except Exception as e:
+            print(f"[ERROR] Al parsear API Security results: {str(e)}")
+
     def save_json(self, output_file: str = "parsed_data.json") -> str:
         """
         Guarda los datos parseados en formato JSON.

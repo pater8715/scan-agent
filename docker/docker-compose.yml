@@ -132,7 +132,7 @@ services:
     
     # Healthcheck para web UI
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health", "||", "exit", "1"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -141,8 +141,8 @@ services:
     # Reinicio automático
     restart: unless-stopped
     
-    # Solo disponible en perfil web
-    profiles: ["web", "all"]
+    # Solo disponible en perfil web o lab
+    profiles: ["web", "lab", "all"]
 
   # -------------------------------------------------------------------------
   # Scan Agent Analyzer - Solo análisis (sin escaneo activo)
@@ -195,6 +195,85 @@ services:
     
     # Solo disponible en perfil analyzer o web
     profiles: ["analyzer", "web", "all"]
+
+  # -------------------------------------------------------------------------
+  # OWASP Juice Shop - Aplicación web vulnerable para práctica
+  # Acceso: http://localhost:3000
+  # -------------------------------------------------------------------------
+  juice-shop:
+    image: bkimminich/juice-shop:v17.1.1
+    platform: linux/amd64
+    container_name: juice-shop
+    hostname: juice-shop
+    networks:
+      - scan-agent-network
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=unsafe
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+    restart: unless-stopped
+    profiles: ["lab", "all"]
+
+  # -------------------------------------------------------------------------
+  # DVWA - Damn Vulnerable Web Application para práctica
+  # Acceso: http://localhost:8081  |  usuario: admin / password: password
+  # -------------------------------------------------------------------------
+  dvwa:
+    image: ghcr.io/digininja/dvwa@sha256:00fa10a5de76202e0921212ea814d1f7c408eb3f08e29bfdd5a75ad0ca0a65ff
+    platform: linux/amd64
+    container_name: dvwa
+    hostname: dvwa
+    networks:
+      - scan-agent-network
+    ports:
+      - "8081:80"
+    environment:
+      - DB_SERVER=dvwa-db
+      - DB_PORT=3306
+      - DB_DATABASE=dvwa
+      - DB_USER=dvwa
+      - DB_PASSWORD=p@ssw0rd
+      - RECAPTCHA_PRIV_KEY=
+      - RECAPTCHA_PUB_KEY=
+    depends_on:
+      - dvwa-db
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    restart: unless-stopped
+    profiles: ["lab", "all"]
+
+  # -------------------------------------------------------------------------
+  # Base de datos para DVWA
+  # -------------------------------------------------------------------------
+  dvwa-db:
+    image: mariadb:10.11
+    platform: linux/amd64
+    container_name: dvwa-db
+    hostname: dvwa-db
+    networks:
+      - scan-agent-network
+    environment:
+      - MYSQL_ROOT_PASSWORD=dvwa_root
+      - MYSQL_DATABASE=dvwa
+      - MYSQL_USER=dvwa
+      - MYSQL_PASSWORD=p@ssw0rd
+    volumes:
+      - dvwa-db-data:/var/lib/mysql
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    restart: unless-stopped
+    profiles: ["lab", "all"]
 
   # -------------------------------------------------------------------------
   # Desarrollo - Hot reload y debugging
@@ -277,4 +356,7 @@ volumes:
     driver: local
   scan-agent-outputs:
     name: scan-agent-outputs
+    driver: local
+  dvwa-db-data:
+    name: dvwa-db-data
     driver: local

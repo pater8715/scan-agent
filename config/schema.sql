@@ -307,6 +307,72 @@ END;
 -- ORDER BY critical_count DESC;
 
 -- ========================================
+-- Table: cve_cache  (VulnDB - Fase 2)
+-- ========================================
+-- Cache local de CVEs consultados a NVD API 2.0
+CREATE TABLE IF NOT EXISTS cve_cache (
+    cve_id          TEXT PRIMARY KEY,
+    source          TEXT NOT NULL DEFAULT 'nvd',
+    cvss_score      REAL,
+    cvss_vector     TEXT,
+    cvss_version    TEXT,
+    severity        TEXT,
+    description     TEXT,
+    published       TEXT,
+    modified        TEXT,
+    cwe_ids         TEXT,
+    references_     TEXT,
+    affected_cpe    TEXT,
+    raw_json        TEXT,
+    cached_at       TEXT NOT NULL,
+    expires_at      TEXT NOT NULL
+);
+
+-- ========================================
+-- Table: kev_catalog  (VulnDB - Fase 2)
+-- ========================================
+-- CISA Known Exploited Vulnerabilities Catalog
+CREATE TABLE IF NOT EXISTS kev_catalog (
+    cve_id              TEXT PRIMARY KEY,
+    vendor_project      TEXT,
+    product             TEXT,
+    vulnerability_name  TEXT,
+    date_added          TEXT,
+    short_description   TEXT,
+    required_action     TEXT,
+    due_date            TEXT,
+    known_ransomware    TEXT,
+    cached_at           TEXT NOT NULL
+);
+
+-- ========================================
+-- Table: osv_cache  (VulnDB - Fase 2)
+-- ========================================
+-- Cache de consultas a OSV (osv.dev) por paquete/ecosistema
+CREATE TABLE IF NOT EXISTS osv_cache (
+    cache_key   TEXT PRIMARY KEY,
+    package     TEXT NOT NULL,
+    ecosystem   TEXT NOT NULL,
+    vulns_json  TEXT NOT NULL,
+    cached_at   TEXT NOT NULL,
+    expires_at  TEXT NOT NULL
+);
+
+-- ========================================
+-- Table: vuln_db_meta  (VulnDB - Fase 2)
+-- ========================================
+CREATE TABLE IF NOT EXISTS vuln_db_meta (
+    key     TEXT PRIMARY KEY,
+    value   TEXT NOT NULL
+);
+
+-- Indexes para VulnDB
+CREATE INDEX IF NOT EXISTS idx_cve_expires  ON cve_cache(expires_at);
+CREATE INDEX IF NOT EXISTS idx_kev_cached   ON kev_catalog(cached_at);
+CREATE INDEX IF NOT EXISTS idx_kev_datecve  ON kev_catalog(date_added);
+CREATE INDEX IF NOT EXISTS idx_osv_expires  ON osv_cache(expires_at);
+
+-- ========================================
 -- MAINTENANCE
 -- ========================================
 

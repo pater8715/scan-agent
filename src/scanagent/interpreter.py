@@ -10,8 +10,14 @@ Versión: 1.0.0
 """
 
 import json
-from typing import Dict, List, Any, Tuple
+from typing import Dict, List, Any, Tuple, Optional
 from datetime import datetime
+
+try:
+    from scanagent.vuln_db import get_default_db
+    _VULNDB_AVAILABLE = True
+except ImportError:
+    _VULNDB_AVAILABLE = False
 
 
 class VulnerabilityInterpreter:
@@ -19,7 +25,7 @@ class VulnerabilityInterpreter:
     Clase para interpretar y clasificar vulnerabilidades detectadas.
     """
     
-    # Mapeo de categorías OWASP Top 10 2021
+    # Mapeo de categorías OWASP Top 10 2021 (Web)
     OWASP_TOP_10 = {
         "A01": "Broken Access Control",
         "A02": "Cryptographic Failures",
@@ -32,6 +38,34 @@ class VulnerabilityInterpreter:
         "A09": "Security Logging and Monitoring Failures",
         "A10": "Server-Side Request Forgery (SSRF)"
     }
+
+    # Mapeo de categorías OWASP API Security Top 10 2023
+    OWASP_API_TOP_10 = {
+        "API1:2023": "Broken Object Level Authorization",
+        "API2:2023": "Broken Authentication",
+        "API3:2023": "Broken Object Property Level Authorization",
+        "API4:2023": "Unrestricted Resource Consumption",
+        "API5:2023": "Broken Function Level Authorization",
+        "API6:2023": "Unrestricted Access to Sensitive Business Flows",
+        "API7:2023": "Server Side Request Forgery",
+        "API8:2023": "Security Misconfiguration",
+        "API9:2023": "Improper Inventory Management",
+        "API10:2023": "Unsafe Consumption of APIs",
+    }
+
+    # CWE más relevantes por categoría API Top 10 2023
+    API_TO_CWE = {
+        "API1:2023":  "CWE-639 — Authorization Bypass Through User-Controlled Key",
+        "API2:2023":  "CWE-287 — Improper Authentication",
+        "API3:2023":  "CWE-213 — Exposure of Sensitive Information / CWE-915 — Mass Assignment",
+        "API4:2023":  "CWE-770 — Allocation of Resources Without Limits",
+        "API5:2023":  "CWE-285 — Improper Authorization",
+        "API6:2023":  "CWE-799 — Improper Control of Interaction Frequency",
+        "API7:2023":  "CWE-918 — Server-Side Request Forgery (SSRF)",
+        "API8:2023":  "CWE-16 — Configuration / CWE-614 — Sensitive Cookie Without Secure",
+        "API9:2023":  "CWE-1059 — Insufficient Technical Documentation",
+        "API10:2023": "CWE-20 — Improper Input Validation",
+    }
     
     # Mapeo de severidad a score CVSS
     CVSS_SEVERITY = {
@@ -42,12 +76,15 @@ class VulnerabilityInterpreter:
         "critica": (9.0, 10.0)
     }
     
-    def __init__(self, parsed_data: Dict[str, Any]):
+    def __init__(self, parsed_data: Dict[str, Any], use_vuln_db: bool = True,
+                 vuln_db_path: Optional[str] = None):
         """
         Inicializa el intérprete con datos parseados.
-        
+
         Args:
-            parsed_data: Datos en formato JSON del parser
+            parsed_data:   Datos en formato JSON del parser
+            use_vuln_db:   Enriquecer hallazgos con NVD/CISA KEV (requiere red)
+            vuln_db_path:  Ruta al SQLite de VulnDB (default: ./data/vuln_cache.db)
         """
         self.data = parsed_data
         self.vulnerabilities = []
@@ -60,6 +97,13 @@ class VulnerabilityInterpreter:
             "baja": 0,
             "total": 0
         }
+        # VulnDB — enriquecimiento con datos actualizados de CVE/KEV
+        self.vuln_db = None
+        if use_vuln_db and _VULNDB_AVAILABLE:
+            try:
+                self.vuln_db = get_default_db(db_path=vuln_db_path)
+            except Exception:
+                pass
     
     def analyze(self) -> Dict[str, Any]:
         """
@@ -81,10 +125,13 @@ class VulnerabilityInterpreter:
         # 3. Procesar vulnerabilidades
         self._process_vulnerabilities()
         
-        # 4. Clasificar riesgos
+        # 4. Enriquecer con VulnDB (NVD + CISA KEV)
+        self._enrich_with_vuln_db()
+
+        # 5. Clasificar riesgos
         self._classify_risks()
-        
-        # 5. Generar recomendaciones
+
+        # 6. Generar recomendaciones
         recommendations = self._generate_recommendations()
         
         # 6. Compilar análisis completo
@@ -251,12 +298,15 @@ class VulnerabilityInterpreter:
         """
         print("\n[*] Procesando vulnerabilidades...")
         
-        # Procesar indicadores OWASP
+        # Procesar indicadores OWASP Web Top 10 (fuentes: nmap, headers, gobuster, nikto)
         for indicator in self.data.get("indicadores_owasp_top10", []):
-            vuln = self._create_vulnerability_from_indicator(indicator)
+            if indicator.get("fuente") == "api_security_checker":
+                vuln = self._create_vulnerability_from_api_checker(indicator)
+            else:
+                vuln = self._create_vulnerability_from_indicator(indicator)
             if vuln:
                 self.vulnerabilities.append(vuln)
-        
+
         # Procesar vulnerabilidades de Nikto
         for nikto_vuln in self.data.get("vulnerabilidades_nikto", []):
             vuln = self._create_vulnerability_from_nikto(nikto_vuln)
@@ -517,6 +567,71 @@ class VulnerabilityInterpreter:
         else:
             return "baja"
     
+    def _enrich_with_vuln_db(self) -> None:
+        """
+        Enriquece cada vulnerabilidad con datos actualizados de NVD y CISA KEV.
+        Si VulnDB no está disponible o no hay red, continúa sin enriquecimiento.
+        """
+        if not self.vuln_db:
+            return
+
+        import re
+        kev_count = 0
+        enriched_count = 0
+
+        for vuln in self.vulnerabilities:
+            # Buscar CVE en el título, descripción o campo cve_id
+            text = " ".join([
+                vuln.get("titulo", ""),
+                vuln.get("descripcion", ""),
+                vuln.get("id", ""),
+            ])
+            cve_match = re.search(r"CVE-\d{4}-\d{4,7}", text, re.IGNORECASE)
+            if not cve_match:
+                vuln.setdefault("is_in_kev", False)
+                continue
+
+            cve_id = cve_match.group(0).upper()
+            vuln["cve_id"] = cve_id
+
+            try:
+                enriched = self.vuln_db.enrich_finding(vuln)
+                if enriched.get("is_in_kev"):
+                    kev_count += 1
+                enriched_count += 1
+            except Exception:
+                vuln.setdefault("is_in_kev", False)
+
+        if enriched_count > 0:
+            print(f"    [VulnDB] {enriched_count} hallazgos enriquecidos con NVD/CISA KEV")
+        if kev_count > 0:
+            print(f"    [VulnDB] {kev_count} CVE(s) en CISA KEV — explotados activamente")
+
+    def _create_vulnerability_from_api_checker(self, indicator: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Crea una vulnerabilidad estructurada desde un hallazgo del APISecurityChecker.
+        Preserva el mapeo OWASP API Top 10 2023 y añade CWE.
+        """
+        check_id = indicator.get("tipo", "API-UNKNOWN")
+        severidad = indicator.get("severidad", "media")
+        cvss = indicator.get("cvss_score", self._calculate_cvss_score(severidad, check_id))
+
+        vuln = {
+            "id": f"API-{len(self.vulnerabilities) + 1:03d}",
+            "titulo": indicator.get("titulo", self._get_vulnerability_title(check_id)),
+            "descripcion": indicator.get("descripcion", ""),
+            "severidad": severidad,
+            "cvss_score": cvss,
+            "owasp_api_category": indicator.get("owasp_api_category", check_id),
+            "owasp_category": indicator.get("owasp_web_category", "A05:2021 - Security Misconfiguration"),
+            "cwe": self.API_TO_CWE.get(check_id, "CWE-200 — Exposure of Sensitive Information"),
+            "fuente": "api_security_checker",
+            "estado": indicator.get("estado", "posiblemente_vulnerable"),
+            "evidencia": indicator.get("evidencia", {}),
+            "recomendacion": indicator.get("recomendacion", "Revisar y remediar según OWASP API Security Top 10 2023"),
+        }
+        return vuln
+
     def _map_nikto_to_owasp(self, description: str) -> str:
         """Mapea vulnerabilidad de Nikto a categoría OWASP Top 10."""
         desc_lower = description.lower()

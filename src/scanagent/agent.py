@@ -22,18 +22,30 @@ from pathlib import Path
 from datetime import datetime
 from typing import Optional
 
+# Ensure UTF-8 output on Windows consoles (cp1252 can't encode box-drawing chars)
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+
 # Importar módulos del agente
 try:
     from scanagent.parser import ScanParser
     from scanagent.interpreter import VulnerabilityInterpreter
     from scanagent.report_generator import ReportGenerator
-    from scanagent.scanner import VulnerabilityScanner  # NUEVO v2.0
-    from scanagent.database import DatabaseManager  # NUEVO v2.1
-    from scanagent.dashboard_generator import DashboardGenerator  # NUEVO v2.1
+    from scanagent.scanner import VulnerabilityScanner
+    from scanagent.database import DatabaseManager
+    from scanagent.dashboard_generator import DashboardGenerator
 except ImportError as e:
     print(f"[ERROR] No se pudieron importar los módulos necesarios: {e}")
     print("Asegúrate de ejecutar desde la raíz del proyecto: python3 -m src.scanagent.agent")
     sys.exit(1)
+
+try:
+    from scanagent.vuln_db import VulnDB
+    _VULNDB_AVAILABLE = True
+except ImportError:
+    _VULNDB_AVAILABLE = False
 
 
 class ScanAgent:
@@ -581,12 +593,56 @@ Perfiles de escaneo disponibles:
         action='version',
         version=f'Scan Agent v{ScanAgent.VERSION}'
     )
-    
+
+    # Opciones de base de conocimiento (Fase 2)
+    db_group = parser.add_argument_group('Base de conocimiento CVE (Fase 2)')
+    db_group.add_argument(
+        '--update-db',
+        action='store_true',
+        help='Actualizar la base de conocimiento CVE (NVD, CISA KEV)'
+    )
+    db_group.add_argument(
+        '--vuln-db-path',
+        default=None,
+        metavar='PATH',
+        help='Ruta al archivo SQLite de VulnDB (default: ./data/vuln_cache.db)'
+    )
+    db_group.add_argument(
+        '--nvd-api-key',
+        default=None,
+        metavar='KEY',
+        help='API key de NVD para mayor rate limit (opcional)'
+    )
+    db_group.add_argument(
+        '--no-vuln-db',
+        action='store_true',
+        help='Deshabilitar enriquecimiento con VulnDB durante el análisis'
+    )
+
     args = parser.parse_args()
     
     # Crear agente
     agent = ScanAgent(verbose=args.verbose, use_database=not args.no_db)
-    
+
+    # --update-db: actualizar base de conocimiento CVE
+    if args.update_db:
+        if not _VULNDB_AVAILABLE:
+            print("[ERROR] VulnDB no disponible. Verifica que vuln_db.py esté en src/scanagent/")
+            sys.exit(1)
+        db = VulnDB(
+            db_path=args.vuln_db_path,
+            api_key=args.nvd_api_key,
+            verbose=True
+        )
+        print("\n[VulnDB] Verificando conectividad...")
+        conn = db.check_connectivity()
+        for svc, ok in conn.items():
+            print(f"  {svc}: {'OK' if ok else 'SIN CONEXION'}")
+        db.update_all()
+        stats = db.get_stats()
+        print(f"\n[VulnDB] Base actualizada: {stats['kev_count']} KEV | {stats['cve_count']} CVEs en cache")
+        sys.exit(0)
+
     # Manejar comandos de información
     if args.list_profiles:
         agent.scanner.list_profiles()

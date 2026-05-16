@@ -16,7 +16,7 @@ YELLOW = \033[1;33m
 BLUE = \033[0;34m
 NC = \033[0m # No Color
 
-.PHONY: help build build-dev push pull run-cli run-web run-analyzer clean logs shell test
+.PHONY: help build build-dev push pull run-cli run-web run-analyzer clean logs shell test lab-start lab-stop lab-status lab-scan-juice lab-scan-dvwa
 
 # Comando por defecto
 help: ## Mostrar esta ayuda
@@ -237,3 +237,48 @@ endif
 web-ui: up-web ## Alias para iniciar interfaz web
 
 stop: down ## Alias para detener servicios
+
+# ============================================================================
+# ENTORNO DE LABORATORIO (FASE 4) - Juice Shop + DVWA + Web UI
+# ============================================================================
+
+lab-start: ## Iniciar entorno de práctica completo (Juice Shop + DVWA + Web UI)
+	@echo -e "$(BLUE)[LAB]$(NC) Iniciando entorno de laboratorio..."
+	@echo -e "$(YELLOW)[INFO]$(NC) Descargando imágenes si es necesario (primera vez puede tardar)..."
+	cd docker && docker-compose --profile lab up -d
+	@echo ""
+	@echo -e "$(GREEN)[LAB LISTO]$(NC) Entorno de práctica disponible:"
+	@echo -e "  $(GREEN)►$(NC) Scan Agent Web UI : http://localhost:8080"
+	@echo -e "  $(GREEN)►$(NC) OWASP Juice Shop   : http://localhost:3000"
+	@echo -e "  $(GREEN)►$(NC) DVWA               : http://localhost:8081"
+	@echo -e "  $(YELLOW)  DVWA credenciales  : admin / password$(NC)"
+	@echo ""
+	@echo -e "$(YELLOW)[DVWA]$(NC) Primera vez: ingresa a http://localhost:8081/setup.php y haz clic en 'Create / Reset Database'"
+
+lab-stop: ## Detener entorno de práctica
+	@echo -e "$(BLUE)[LAB]$(NC) Deteniendo entorno de laboratorio..."
+	cd docker && docker-compose --profile lab down
+	@echo -e "$(GREEN)[OK]$(NC) Entorno de laboratorio detenido"
+
+lab-status: ## Ver estado del entorno de práctica
+	@echo -e "$(BLUE)[LAB]$(NC) Estado del entorno de laboratorio:"
+	@docker ps -a --filter "name=juice-shop" --filter "name=dvwa" --filter "name=scan-agent-web" \
+		--format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+
+lab-scan-juice: ## Escanear OWASP Juice Shop con perfil lab
+	@echo -e "$(BLUE)[LAB]$(NC) Escaneando OWASP Juice Shop (localhost:3000)..."
+	docker run --rm --cap-add=NET_RAW --cap-add=NET_ADMIN \
+		--network scan-agent-network \
+		-v $$(pwd)/outputs:/scan-agent/outputs \
+		-v $$(pwd)/reports:/scan-agent/reports \
+		$(IMAGE_NAME):$(VERSION) --scan --target juice-shop:3000 --profile lab
+	@echo -e "$(GREEN)[OK]$(NC) Reporte disponible en ./reports/"
+
+lab-scan-dvwa: ## Escanear DVWA con perfil lab
+	@echo -e "$(BLUE)[LAB]$(NC) Escaneando DVWA (localhost:8081)..."
+	docker run --rm --cap-add=NET_RAW --cap-add=NET_ADMIN \
+		--network scan-agent-network \
+		-v $$(pwd)/outputs:/scan-agent/outputs \
+		-v $$(pwd)/reports:/scan-agent/reports \
+		$(IMAGE_NAME):$(VERSION) --scan --target dvwa:80 --profile lab
+	@echo -e "$(GREEN)[OK]$(NC) Reporte disponible en ./reports/"

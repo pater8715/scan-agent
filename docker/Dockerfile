@@ -85,15 +85,15 @@ COPY src/ ./src/
 COPY webapp/ ./webapp/
 COPY config/ ./config/
 COPY scripts/ ./scripts/
-COPY scan-agent.py ./
 COPY README.md ./
-COPY VERSION.md ./
 
 # Crear directorios necesarios con permisos correctos
 RUN mkdir -p outputs reports data logs && \
     # Hacer ejecutables los scripts
     chmod +x scripts/*.sh && \
-    chmod +x scan-agent.py
+    chmod +x scripts/scan-agent.py && \
+    # Crear enlace simbólico para compatibilidad
+    ln -sf /scan-agent/scripts/scan-agent.py /scan-agent/scan-agent.py
 
 # ============================================================================
 # STAGE 4: Security & User setup

@@ -285,6 +285,90 @@ class VulnerabilityScanner:
                     'required': False
                 }
             ]
+        ),
+
+        'api-owasp': ScanProfile(
+            name='OWASP API Security Top 10 (2023)',
+            description='Verificación activa de las 10 categorías OWASP API Security Top 10 2023 (20-30 min aprox)',
+            commands=[
+                {
+                    'tool': 'nmap',
+                    'args': '-sV -p80,443,8080,8443,3000,5000,8000,9000 {target}',
+                    'output': 'nmap_service_{target}.txt',
+                    'timeout': 300,
+                    'required': True
+                },
+                {
+                    'tool': 'nmap',
+                    'args': '--script=http-methods,http-auth,http-auth-finder,http-cors,http-security-headers {target}',
+                    'output': 'nmap_nse_{target}.txt',
+                    'timeout': 300,
+                    'required': False
+                },
+                {
+                    'tool': 'curl',
+                    'args': '-I -H "Accept: application/json" http://{target}',
+                    'output': 'headers_{target}.txt',
+                    'timeout': 30,
+                    'required': False
+                },
+                {
+                    'tool': 'gobuster',
+                    'args': 'dir -u http://{target} -w /usr/share/wordlists/dirb/common.txt -q -t 20 -x json',
+                    'output': 'gobuster_{target}.txt',
+                    'timeout': 300,
+                    'required': False
+                }
+            ]
+        ),
+
+        'lab': ScanProfile(
+            name='Lab Environment Scan',
+            description='Escaneo para entornos de práctica (Juice Shop en :3000, DVWA en :8081) - ideal para clases (10-15 min aprox)',
+            commands=[
+                {
+                    'tool': 'nmap',
+                    'args': '-sV -p80,443,3000,8080,8081 {target}',
+                    'output': 'nmap_service_{target}.txt',
+                    'timeout': 120,
+                    'required': True
+                },
+                {
+                    'tool': 'nmap',
+                    'args': '--script=http-enum,http-headers,http-methods,http-auth-finder {target}',
+                    'output': 'nmap_nse_{target}.txt',
+                    'timeout': 180,
+                    'required': False
+                },
+                {
+                    'tool': 'nikto',
+                    'args': '-h http://{target} -Format txt -timeout 3',
+                    'output': 'nikto_{target}.txt',
+                    'timeout': 600,
+                    'required': False
+                },
+                {
+                    'tool': 'gobuster',
+                    'args': 'dir -u http://{target} -w /usr/share/wordlists/dirb/common.txt -q -t 20',
+                    'output': 'gobuster_{target}.txt',
+                    'timeout': 300,
+                    'required': False
+                },
+                {
+                    'tool': 'curl',
+                    'args': '-I http://{target}',
+                    'output': 'headers_{target}.txt',
+                    'timeout': 30,
+                    'required': False
+                },
+                {
+                    'tool': 'curl',
+                    'args': '-v http://{target}',
+                    'output': 'curl_verbose_{target}.txt',
+                    'timeout': 30,
+                    'required': False
+                }
+            ]
         )
     }
     
