@@ -73,6 +73,7 @@ class ScanParser:
         self._parse_gobuster(target_ip)
         self._parse_nikto(target_ip)
         self._parse_api_security(target_ip)
+        self._parse_zap_results(target_ip)
 
         return self.parsed_data
     
@@ -506,6 +507,74 @@ class ScanParser:
 
         except Exception as e:
             print(f"[ERROR] Al parsear API Security results: {str(e)}")
+
+s    def _parse_zap_results(self, target_ip: str) -> None:
+        """
+        Parsea archivos zap_passive_*.json y zap_active_*.json generados por ZAPIntegration.
+        Integra las alertas ZAP en el pipeline estándar de indicadores OWASP.
+        """
+        zap_files = (
+            list(self.outputs_dir.glob("zap_passive_*.json")) +
+            list(self.outputs_dir.glob("zap_active_*.json"))
+        )
+
+        if not zap_files:
+            print("[INFO] No hay resultados de ZAP para este escaneo")
+            return
+
+        total_alerts = 0
+        for zap_file in zap_files:
+            try:
+                with open(zap_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+
+                scan_type = data.get("scan_type", "zap")
+                alerts    = data.get("alerts", [])
+
+                for alert in alerts:
+                    risk      = alert.get("risk", "Informational")
+                    severidad = alert.get("severidad", "baja")
+
+                    # Saltar alertas puramente informativas en el pipeline
+                    if risk == "Informational" and not alert.get("nombre"):
+                        continue
+
+                    self.parsed_data["indicadores_owasp_top10"].append({
+                        "fuente":          f"zap_{scan_type}",
+                        "tipo":            "zap_alert",
+                        "titulo":          alert.get("nombre", ""),
+                        "descripcion":     alert.get("descripcion", ""),
+                        "url":             alert.get("url", ""),
+                        "metodo":          alert.get("metodo", ""),
+                        "evidencia":       alert.get("evidencia", ""),
+                        "solucion":        alert.get("solucion", ""),
+                        "severidad":       severidad,
+                        "cvss_score":      alert.get("cvss_score", 0.0),
+                        "cweid":           alert.get("cweid", ""),
+                        "confidence":      alert.get("confidence", ""),
+                        "owasp_category":  alert.get("owasp_category", ""),
+                        "zap_risk":        risk,
+                    })
+
+                    # Rutas descubiertas por ZAP (URL únicas)
+                    url = alert.get("url", "")
+                    if url:
+                        path = "/" + url.split("/", 3)[-1] if "/" in url else "/"
+                        self.parsed_data["rutas_descubiertas"].append({
+                            "ruta":        path,
+                            "codigo_http": None,
+                            "tamano":      None,
+                            "fuente":      "zap",
+                        })
+
+                total_alerts += len(alerts)
+                print(
+                    f"[OK] Parseado: {zap_file.name} — "
+                    f"{len(alerts)} alertas ZAP integradas"
+                )
+
+            except Exception as e:
+                print(f"[ERROR] Al parsear {zap_file.name}: {str(e)}")
 
     def save_json(self, output_file: str = "parsed_data.json") -> str:
         """

@@ -322,6 +322,50 @@ class VulnerabilityScanner:
             ]
         ),
 
+        'zap-passive': ScanProfile(
+            name='ZAP Passive Scan',
+            description='Spider + escaneo pasivo con OWASP ZAP (sin tráfico activo de ataque) (10-15 min aprox)',
+            commands=[
+                {
+                    'tool': 'nmap',
+                    'args': '-sV -p80,443,3000,8080,8081 {target}',
+                    'output': 'nmap_service_{target}.txt',
+                    'timeout': 120,
+                    'required': True
+                },
+                {
+                    'tool': 'curl',
+                    'args': '-I http://{target}',
+                    'output': 'headers_{target}.txt',
+                    'timeout': 30,
+                    'required': False
+                }
+                # ZAP se ejecuta desde agent.py vía ZAPIntegration (no como subprocess)
+            ]
+        ),
+
+        'zap-active': ScanProfile(
+            name='ZAP Active Scan',
+            description='Spider + escaneo pasivo + escaneo activo con OWASP ZAP (30-60 min aprox)',
+            commands=[
+                {
+                    'tool': 'nmap',
+                    'args': '-sV -p80,443,3000,8080,8081 {target}',
+                    'output': 'nmap_service_{target}.txt',
+                    'timeout': 120,
+                    'required': True
+                },
+                {
+                    'tool': 'curl',
+                    'args': '-I http://{target}',
+                    'output': 'headers_{target}.txt',
+                    'timeout': 30,
+                    'required': False
+                }
+                # ZAP active scan se ejecuta desde agent.py vía ZAPIntegration
+            ]
+        ),
+
         'lab': ScanProfile(
             name='Lab Environment Scan',
             description='Escaneo para entornos de práctica (Juice Shop en :3000, DVWA en :8081) - ideal para clases (10-15 min aprox)',

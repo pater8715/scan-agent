@@ -251,6 +251,45 @@ services:
     profiles: ["lab", "all"]
 
   # -------------------------------------------------------------------------
+  # OWASP ZAP — Escáner de seguridad web activo/pasivo
+  # API: http://localhost:8090  |  UI desktop: no disponible en daemon mode
+  # -------------------------------------------------------------------------
+  zap:
+    image: ghcr.io/zaproxy/zaproxy:stable
+    platform: linux/amd64
+    container_name: zap
+    hostname: zap
+    networks:
+      - scan-agent-network
+    ports:
+      - "8090:8090"
+    command: >
+      zap.sh -daemon
+      -host 0.0.0.0
+      -port 8090
+      -config api.key=zap-scan-agent-lab
+      -config api.addrs.addr.name=.*
+      -config api.addrs.addr.regex=true
+      -config scanner.attackOnStart=false
+      -config ajax.browserId=htmlunit
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 1.5G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8090/JSON/core/view/version/?apikey=zap-scan-agent-lab"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    profiles: ["lab", "zap", "all"]
+
+  # -------------------------------------------------------------------------
   # Base de datos para DVWA
   # -------------------------------------------------------------------------
   dvwa-db:

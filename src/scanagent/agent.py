@@ -47,6 +47,18 @@ try:
 except ImportError:
     _VULNDB_AVAILABLE = False
 
+try:
+    from scanagent.zap_integration import ZAPIntegration
+    _ZAP_AVAILABLE = True
+except ImportError:
+    _ZAP_AVAILABLE = False
+
+try:
+    from scanagent.api_security_checker import APISecurityChecker
+    _APISEC_AVAILABLE = True
+except ImportError:
+    _APISEC_AVAILABLE = False
+
 
 class ScanAgent:
     """
@@ -108,18 +120,75 @@ class ScanAgent:
         print(f"[*] Perfil: {profile}")
         print(f"[*] Directorio de salida: {outputs_dir}\n")
         
-        # Ejecutar escaneo
+        # Ejecutar escaneo con herramientas base (nmap, nikto, gobuster, curl)
         success, scan_files = self.scanner.run_scan(target, profile, outputs_dir)
-        
-        if success:
-            print(f"\n[✓] Escaneo completado exitosamente")
-            print(f"[✓] Archivos generados: {len(scan_files)}")
-            for file in scan_files:
-                print(f"    - {file}")
-            return True
-        else:
+
+        if not success:
             print(f"\n[✗] El escaneo falló o fue interrumpido")
             return False
+
+        print(f"\n[✓] Escaneo base completado — {len(scan_files)} archivos generados")
+
+        # --- API Security Checker (perfiles api-owasp, lab) ---
+        if profile in ("api-owasp", "lab") and _APISEC_AVAILABLE:
+            self._run_api_security_checker(target, outputs_dir)
+
+        # --- ZAP Integration (perfiles zap-passive, zap-active) ---
+        if profile in ("zap-passive", "zap-active") and _ZAP_AVAILABLE:
+            self._run_zap_scan(target, profile, outputs_dir)
+        elif profile in ("zap-passive", "zap-active") and not _ZAP_AVAILABLE:
+            print("[WARN] ZAP integration no disponible (zap_integration.py no encontrado)")
+
+        return True
+
+    def _run_api_security_checker(self, target: str, outputs_dir: str) -> None:
+        """Ejecuta el verificador OWASP API Security Top 10 2023."""
+        self._print_phase("FASE 0b: OWASP API SECURITY CHECKER")
+        try:
+            base_url = f"http://{target}" if not target.startswith("http") else target
+            checker  = APISecurityChecker(base_url=base_url, verbose=self.verbose)
+            results  = checker.run_all_checks()
+            out_path = Path(outputs_dir) / f"api_security_{target}.json"
+            with open(out_path, "w", encoding="utf-8") as f:
+                json.dump(results, f, indent=2, ensure_ascii=False)
+            findings = [r for r in results.get("findings", [])
+                        if r.get("estado") in ("vulnerable", "posiblemente_vulnerable")]
+            print(f"[✓] API Security: {len(findings)} hallazgos activos → {out_path}")
+        except Exception as e:
+            print(f"[WARN] API Security Checker error: {e}")
+            if self.verbose:
+                import traceback
+                traceback.print_exc()
+
+    def _run_zap_scan(self, target: str, profile: str, outputs_dir: str) -> None:
+        """Ejecuta escaneo ZAP (pasivo o activo) según el perfil."""
+        self._print_phase(f"FASE 0c: OWASP ZAP ({'ACTIVO' if 'active' in profile else 'PASIVO'})")
+        import os
+        zap_host = os.environ.get("ZAP_HOST", "zap")
+        zap_port = int(os.environ.get("ZAP_PORT", "8090"))
+        zap_key  = os.environ.get("ZAP_API_KEY", "zap-scan-agent-lab")
+
+        zap = ZAPIntegration(
+            host=zap_host, port=zap_port, api_key=zap_key, verbose=self.verbose
+        )
+        if not zap.is_alive():
+            print(f"[WARN] ZAP daemon no accesible en {zap.base_url}. Saltando ZAP.")
+            print("  Inicia el lab con: docker compose --profile lab up -d")
+            return
+
+        target_url  = f"http://{target}" if not target.startswith("http") else target
+        target_slug = target.replace(":", "_").replace("/", "_")
+
+        try:
+            if "active" in profile:
+                zap.run_active_scan(target_url, outputs_dir, target_slug)
+            else:
+                zap.run_passive_scan(target_url, outputs_dir, target_slug)
+        except Exception as e:
+            print(f"[WARN] ZAP scan error: {e}")
+            if self.verbose:
+                import traceback
+                traceback.print_exc()
     
     def run(self, target_ip: Optional[str] = None, output_format: str = "all", 
             outputs_dir: str = "./outputs", profile_used: str = "manual") -> bool:

@@ -16,7 +16,7 @@ YELLOW = \033[1;33m
 BLUE = \033[0;34m
 NC = \033[0m # No Color
 
-.PHONY: help build build-dev push pull run-cli run-web run-analyzer clean logs shell test lab-start lab-stop lab-status lab-scan-juice lab-scan-dvwa
+.PHONY: help build build-dev push pull run-cli run-web run-analyzer clean logs shell test lab-start lab-stop lab-status lab-scan-juice lab-scan-dvwa zap-start zap-stop zap-status zap-scan-juice zap-scan-dvwa zap-active-juice
 
 # Comando por defecto
 help: ## Mostrar esta ayuda
@@ -282,3 +282,62 @@ lab-scan-dvwa: ## Escanear DVWA con perfil lab
 		-v $$(pwd)/reports:/scan-agent/reports \
 		$(IMAGE_NAME):$(VERSION) --scan --target dvwa:80 --profile lab
 	@echo -e "$(GREEN)[OK]$(NC) Reporte disponible en ./reports/"
+
+# ============================================================================
+# OWASP ZAP — Escaneo activo/pasivo (FASE 3)
+# ============================================================================
+
+zap-start: ## Iniciar ZAP + Juice Shop + DVWA (perfil lab incluye ZAP)
+	@echo -e "$(BLUE)[ZAP]$(NC) Iniciando OWASP ZAP y entorno de laboratorio..."
+	cd docker && docker-compose --profile lab up -d
+	@echo ""
+	@echo -e "$(GREEN)[ZAP LISTO]$(NC) Servicios disponibles:"
+	@echo -e "  $(GREEN)►$(NC) OWASP ZAP API  : http://localhost:8090"
+	@echo -e "  $(GREEN)►$(NC) ZAP API Key    : zap-scan-agent-lab"
+	@echo -e "  $(GREEN)►$(NC) Juice Shop     : http://localhost:3000"
+	@echo -e "  $(GREEN)►$(NC) DVWA           : http://localhost:8081"
+	@echo ""
+	@echo -e "$(YELLOW)[INFO]$(NC) ZAP tarda ~30s en iniciar. Usa 'make zap-status' para verificar."
+
+zap-stop: ## Detener ZAP y entorno de laboratorio
+	@echo -e "$(BLUE)[ZAP]$(NC) Deteniendo servicios..."
+	cd docker && docker-compose --profile lab down
+	@echo -e "$(GREEN)[OK]$(NC) Servicios detenidos"
+
+zap-status: ## Ver estado de ZAP y contenedores del lab
+	@echo -e "$(BLUE)[ZAP]$(NC) Estado del entorno con ZAP:"
+	@docker ps -a --filter "name=zap" --filter "name=juice-shop" --filter "name=dvwa" \
+		--filter "name=scan-agent-web" \
+		--format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+	@echo ""
+	@echo -e "$(BLUE)[ZAP]$(NC) Verificando API ZAP..."
+	@curl -s "http://localhost:8090/JSON/core/view/version/?apikey=zap-scan-agent-lab" 2>/dev/null \
+		| python3 -c "import sys,json; d=json.load(sys.stdin); print('  ZAP versión:', d['version'])" \
+		|| echo -e "  $(YELLOW)ZAP aún iniciando o no disponible$(NC)"
+
+zap-scan-juice: ## Escaneo PASIVO ZAP sobre Juice Shop
+	@echo -e "$(BLUE)[ZAP]$(NC) Escaneo pasivo ZAP → Juice Shop (http://juice-shop:3000)..."
+	docker run --rm --network scan-agent-network \
+		-v $$(pwd)/outputs:/scan-agent/outputs \
+		-v $$(pwd)/reports:/scan-agent/reports \
+		-e ZAP_HOST=zap -e ZAP_PORT=8090 \
+		$(IMAGE_NAME):$(VERSION) --scan --target juice-shop:3000 --profile zap-passive
+	@echo -e "$(GREEN)[OK]$(NC) Resultados en ./outputs/ y reporte en ./reports/"
+
+zap-scan-dvwa: ## Escaneo PASIVO ZAP sobre DVWA
+	@echo -e "$(BLUE)[ZAP]$(NC) Escaneo pasivo ZAP → DVWA (http://dvwa:80)..."
+	docker run --rm --network scan-agent-network \
+		-v $$(pwd)/outputs:/scan-agent/outputs \
+		-v $$(pwd)/reports:/scan-agent/reports \
+		-e ZAP_HOST=zap -e ZAP_PORT=8090 \
+		$(IMAGE_NAME):$(VERSION) --scan --target dvwa:80 --profile zap-passive
+	@echo -e "$(GREEN)[OK]$(NC) Resultados en ./outputs/ y reporte en ./reports/"
+
+zap-active-juice: ## Escaneo ACTIVO ZAP sobre Juice Shop (30-60 min)
+	@echo -e "$(YELLOW)[ZAP ACTIVO]$(NC) Escaneo activo ZAP → Juice Shop. Puede tardar 30-60 minutos..."
+	docker run --rm --network scan-agent-network \
+		-v $$(pwd)/outputs:/scan-agent/outputs \
+		-v $$(pwd)/reports:/scan-agent/reports \
+		-e ZAP_HOST=zap -e ZAP_PORT=8090 \
+		$(IMAGE_NAME):$(VERSION) --scan --target juice-shop:3000 --profile zap-active
+	@echo -e "$(GREEN)[OK]$(NC) Escaneo activo completado. Resultados en ./outputs/ y ./reports/"

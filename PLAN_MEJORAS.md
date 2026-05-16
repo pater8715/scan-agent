@@ -77,19 +77,19 @@ Reemplazar el knowledge base hardcodeado por conexión a fuentes actualizadas.
 ---
 
 ### FASE 3 — Integración OWASP ZAP
-**Prioridad:** ALTA | **Estimado:** ~35h | **Estado:** ⬜ Pendiente
+**Prioridad:** ALTA | **Estimado:** ~35h | **Estado:** ✅ Completado (2026-05-16)
 
 ZAP es el estándar educativo para pruebas de seguridad web/API activas.
 
 | # | Tarea | Estado | Notas |
 |---|-------|--------|-------|
-| 3.1 | Añadir servicio `zap` al `docker/docker-compose.yml` | ⬜ | Imagen `zaproxy/zap-stable` |
-| 3.2 | Crear módulo `src/scanagent/zap_integration.py` | ⬜ | Wrapper de ZAP REST API |
-| 3.3 | Implementar escaneo pasivo ZAP como pre-paso | ⬜ | Antes del escaneo activo |
-| 3.4 | Implementar escaneo activo ZAP (Active Scan) | ⬜ | Para vulnerabilidades web profundas |
-| 3.5 | Parsear resultados ZAP (JSON) en `webapp/utils/report_parser.py` | ⬜ | Integrar con pipeline existente |
-| 3.6 | Crear perfil `zap-active` en `scanner.py` | ⬜ | Perfil de escaneo completo con ZAP |
-| 3.7 | Configurar políticas ZAP para entorno de práctica (evitar daño) | ⬜ | Config files en `config/zap/` |
+| 3.1 | Añadir servicio `zap` al `docker/docker-compose.yml` | ✅ | `ghcr.io/zaproxy/zaproxy:stable`, puerto 8090, perfil `lab` |
+| 3.2 | Crear módulo `src/scanagent/zap_integration.py` | ✅ | Wrapper completo ZAP REST API, solo stdlib |
+| 3.3 | Implementar escaneo pasivo ZAP como pre-paso | ✅ | Spider + passive scan, perfil `zap-passive` |
+| 3.4 | Implementar escaneo activo ZAP (Active Scan) | ✅ | Spider + passive + active scan, perfil `zap-active` |
+| 3.5 | Parsear resultados ZAP (JSON) en `parser.py` | ✅ | `_parse_zap_results()` integrado al pipeline |
+| 3.6 | Crear perfiles `zap-passive` y `zap-active` en `scanner.py` | ✅ | ZAP invocado desde `agent.py` vía `ZAPIntegration` |
+| 3.7 | Configurar políticas ZAP para entorno de práctica (evitar daño) | ✅ | `config/zap/lab-scan-policy.xml` — DoS desactivado |
 
 ---
 
@@ -160,10 +160,10 @@ Mejoras opcionales para enriquecer la experiencia educativa.
 
 | Fase | Descripción | Prioridad | Esfuerzo | Estado |
 |------|-------------|-----------|----------|--------|
-| 4 | Entorno de práctica (Juice Shop + DVWA) | CRÍTICA | ~12h | ⬜ |
-| 1 | OWASP API Security Top 10 2023 | CRÍTICA | ~40h | ⬜ |
-| 2 | CVE/NVD actualizado | ALTA | ~20h | ⬜ |
-| 3 | Integración OWASP ZAP | ALTA | ~35h | ⬜ |
+| 4 | Entorno de práctica (Juice Shop + DVWA) | CRÍTICA | ~12h | ✅ |
+| 1 | OWASP API Security Top 10 2023 | CRÍTICA | ~40h | ✅ |
+| 2 | CVE/NVD actualizado | ALTA | ~20h | ✅ |
+| 3 | Integración OWASP ZAP | ALTA | ~35h | ✅ |
 | 5 | Reportes educativos | MEDIA | ~25h | ⬜ |
 | 6 | Seguridad y arquitectura | MEDIA | ~15h | ⬜ |
 | 7 | Funcionalidades avanzadas | BAJA | ~30h | ⬜ |
@@ -195,6 +195,7 @@ SEMANA 15+:  Fase 7 — Funcionalidades avanzadas (según disponibilidad)
 | 2026-05-16 | Base de conocimiento CVE con NVD, CISA KEV y OSV | 2 |
 | 2026-05-16 | Validación Fases 1, 2 y 4 — 8/8 tests pasados | — |
 | 2026-05-16 | Fix UTF-8 en stdout Windows (agent.py) | — |
+| 2026-05-16 | Implementación completa integración OWASP ZAP | 3 |
 
 ---
 

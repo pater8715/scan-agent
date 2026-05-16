@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ZAP Scan Policy — Lab Environment (Juice Shop / DVWA)
+  ======================================================
+  Política de escaneo adaptada para entorno de práctica controlado.
+  Activa pruebas de inyección y autenticación pero desactiva
+  ataques de DoS para no dañar los servicios de práctica.
+-->
+<policy>
+  <name>Lab Scan Policy</name>
+  <desc>Política ZAP para escanear Juice Shop y DVWA en el laboratorio educativo</desc>
+  <scanner>
+    <id>0</id>
+    <name>Directory Browsing</name>
+    <enabled>true</enabled>
+    <level>MEDIUM</level>
+    <strength>MEDIUM</strength>
+  </scanner>
+  <scanner>
+    <id>6</id>
+    <name>Path Traversal</name>
+    <enabled>true</enabled>
+    <level>MEDIUM</level>
+    <strength>MEDIUM</strength>
+  </scanner>
+  <scanner>
+    <id>7</id>
+    <name>Remote File Inclusion</name>
+    <enabled>true</enabled>
+    <level>MEDIUM</level>
+    <strength>MEDIUM</strength>
+  </scanner>
+  <scanner>
+    <id>40012</id>
+    <name>Cross Site Scripting (Reflected)</name>
+    <enabled>true</enabled>
+    <level>MEDIUM</level>
+    <strength>MEDIUM</strength>
+  </scanner>
+  <scanner>
+    <id>40014</id>
+    <name>Cross Site Scripting (Persistent)</name>
+    <enabled>true</enabled>
+    <level>MEDIUM</level>
+    <strength>MEDIUM</strength>
+  </scanner>
+  <scanner>
+    <id>40018</id>
+    <name>SQL Injection</name>
+    <enabled>true</enabled>
+    <level>MEDIUM</level>
+    <strength>MEDIUM</strength>
+  </scanner>
+  <scanner>
+    <id>40019</id>
+    <name>SQL Injection - MySQL</name>
+    <enabled>true</enabled>
+    <level>MEDIUM</level>
+    <strength>MEDIUM</strength>
+  </scanner>
+  <scanner>
+    <id>40020</id>
+    <name>SQL Injection - Hypersonic SQL</name>
+    <enabled>true</enabled>
+    <level>MEDIUM</level>
+    <strength>MEDIUM</strength>
+  </scanner>
+  <scanner>
+    <id>40021</id>
+    <name>SQL Injection - Oracle</name>
+    <enabled>false</enabled>
+    <level>MEDIUM</level>
+    <strength>LOW</strength>
+  </scanner>
+  <scanner>
+    <id>40022</id>
+    <name>SQL Injection - PostgreSQL</name>
+    <enabled>false</enabled>
+    <level>MEDIUM</level>
+    <strength>LOW</strength>
+  </scanner>
+  <scanner>
+    <id>90019</id>
+    <name>Server Side Code Injection</name>
+    <enabled>true</enabled>
+    <level>HIGH</level>
+    <strength>MEDIUM</strength>
+  </scanner>
+  <scanner>
+    <id>90020</id>
+    <name>Remote OS Command Injection</name>
+    <enabled>true</enabled>
+    <level>HIGH</level>
+    <strength>MEDIUM</strength>
+  </scanner>
+  <!-- DoS desactivado — no afectar servicios del lab -->
+  <scanner>
+    <id>10009</id>
+    <name>In Page Banner Information Leak</name>
+    <enabled>false</enabled>
+  </scanner>
+  <scanner>
+    <id>20012</id>
+    <name>Anti-CSRF Tokens Check</name>
+    <enabled>true</enabled>
+    <level>LOW</level>
+    <strength>MEDIUM</strength>
+  </scanner>
+  <scanner>
+    <id>40003</id>
+    <name>CRLF Injection</name>
+    <enabled>true</enabled>
+    <level>MEDIUM</level>
+    <strength>MEDIUM</strength>
+  </scanner>
+  <scanner>
+    <id>40008</id>
+    <name>Parameter Tampering</name>
+    <enabled>true</enabled>
+    <level>MEDIUM</level>
+    <strength>LOW</strength>
+  </scanner>
+  <scanner>
+    <id>40009</id>
+    <name>Server Side Include</name>
+    <enabled>true</enabled>
+    <level>MEDIUM</level>
+    <strength>MEDIUM</strength>
+  </scanner>
+  <scanner>
+    <id>40028</id>
+    <name>SSRF (Server-Side Request Forgery)</name>
+    <enabled>true</enabled>
+    <level>HIGH</level>
+    <strength>MEDIUM</strength>
+  </scanner>
+</policy>
