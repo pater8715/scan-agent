@@ -110,8 +110,8 @@ Todos los contenedores deben mostrar `Up`. Si alguno aparece como `Restarting`, 
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│                  Red Docker interna                  │
-│                                                      │
+│                  Red Docker interna                 │
+│                                                     │
 │  ┌──────────────┐   escanea   ┌──────────────────┐  │
 │  │ scan-agent   │ ──────────► │  juice-shop      │  │
 │  │ :8080        │             │  :3000           │  │
