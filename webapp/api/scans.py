@@ -19,6 +19,7 @@ sys.path.insert(0, str(src_path))
 
 from scanagent.agent import ScanAgent
 from scanagent.database import DatabaseManager
+from scanagent.scanner import VulnerabilityScanner
 
 # Importar gestor de archivos
 from webapp.utils.file_manager import FileRetentionManager
@@ -35,7 +36,7 @@ active_scans = {}
 class ScanRequest(BaseModel):
     """Modelo de petición para iniciar un escaneo"""
     target: str = Field(..., description="IP o dominio objetivo", min_length=1)
-    profile: str = Field(..., description="Perfil de escaneo: quick, standard, full, web-full")
+    profile: str = Field(..., description="Perfil de escaneo: quick, standard, full, web, api, api-owasp, lab, zap-passive, zap-active, stealth, network, compliance")
     output_formats: List[str] = Field(
         default=["json", "html"], 
         description="Formatos de reporte: json, html, txt, md"
@@ -76,11 +77,11 @@ async def start_scan(request: ScanRequest, background_tasks: BackgroundTasks):
     El escaneo se ejecuta en background y se puede monitorear su progreso
     mediante el endpoint /status/{scan_id} o via WebSocket.
     """
-    # Validar perfil
-    valid_profiles = ['quick', 'standard', 'full', 'web-full']
+    # Validar perfil contra los perfiles reales del scanner
+    valid_profiles = list(VulnerabilityScanner.PROFILES.keys())
     if request.profile not in valid_profiles:
         raise HTTPException(
-            status_code=400, 
+            status_code=400,
             detail=f"Perfil inválido. Opciones: {', '.join(valid_profiles)}"
         )
     
