@@ -364,24 +364,25 @@ class ScanAgent:
             generated_files = []
             
             if output_format == "all":
-                formats = ["txt", "json", "html", "md"]
+                formats = ["txt", "json", "html", "md", "educational"]
             else:
                 formats = [output_format]
-            
+
             # Generar cada formato
             for fmt in formats:
-                output_file = f"informe_tecnico.{fmt}"
-                
+                output_file = f"informe_tecnico.{fmt}" if fmt != "educational" else "informe_educativo.html"
+
                 if fmt == "txt":
                     self.report_generator.generate_txt_report(output_file)
                 elif fmt == "json":
                     self.report_generator.generate_json_report(output_file)
                 elif fmt == "html":
-                    # Pasar scan_id si está disponible para renombrar
                     scan_id = self.stats.get('scan_id')
                     self.report_generator.generate_html_report(output_file, scan_id=scan_id)
                 elif fmt == "md":
                     self.report_generator.generate_markdown_report(output_file)
+                elif fmt == "educational":
+                    self.report_generator.generate_educational_report(output_file)
                 else:
                     print(f"[WARN] Formato desconocido: {fmt}")
                     continue
@@ -641,9 +642,9 @@ Perfiles de escaneo disponibles:
     )
     analysis_group.add_argument(
         '--format',
-        choices=['txt', 'json', 'html', 'md', 'all'],
+        choices=['txt', 'json', 'html', 'md', 'all', 'educational'],
         default='all',
-        help='Formato de salida del informe (default: all)'
+        help='Formato de salida del informe (default: all). "educational" genera informe pedagógico HTML'
     )
     
     # Argumentos generales

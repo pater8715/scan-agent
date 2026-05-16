@@ -44,24 +44,27 @@ class ReportGenerator:
     def generate_all_reports(self, output_dir: str = ".") -> Dict[str, str]:
         """
         Genera todos los formatos de informes.
-        
+
         Args:
             output_dir: Directorio donde guardar los informes
-        
+
         Returns:
             Diccionario con las rutas de los archivos generados
         """
         output_path = Path(output_dir)
         output_path.mkdir(exist_ok=True)
-        
+
         generated_files = {}
-        
+
         # Generar cada formato
         generated_files["txt"] = self.generate_txt_report(str(output_path / "informe_tecnico.txt"))
         generated_files["json"] = self.generate_json_report(str(output_path / "informe_tecnico.json"))
         generated_files["html"] = self.generate_html_report(str(output_path / "informe_tecnico.html"))
         generated_files["md"] = self.generate_markdown_report(str(output_path / "informe_tecnico.md"))
-        
+        generated_files["educational"] = self.generate_educational_report(
+            str(output_path / "informe_educativo.html")
+        )
+
         return generated_files
     
     def generate_txt_report(self, output_file: str) -> str:
@@ -877,13 +880,13 @@ class ReportGenerator:
     def _generate_recommendations_html(self) -> str:
         """Genera sección HTML de recomendaciones."""
         html = ""
-        
+
         sections = [
             ('corto', 'Corto Plazo (Inmediato - 1 semana)', '🔴'),
             ('mediano', 'Mediano Plazo (1-4 semanas)', '🟡'),
             ('largo', 'Largo Plazo (1-6 meses)', '🟢')
         ]
-        
+
         for key, title, emoji in sections:
             recs = self.recomendaciones.get(f'{key}_plazo', [])
             if recs:
@@ -892,8 +895,455 @@ class ReportGenerator:
                 for rec in recs:
                     html += f'<li>{rec}</li>'
                 html += '</ul></div>'
-        
+
         return html
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # FORMATO EDUCATIVO (Fase 5)
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def generate_educational_report(self, output_file: str) -> str:
+        """
+        Genera informe HTML educativo: por cada vulnerabilidad incluye
+        '¿por qué es peligroso?', ejemplo de payload, cómo remediarlo,
+        CWE y enlace a OWASP Cheat Sheet.
+        """
+        edu_vulns = [v for v in self.vulnerabilidades if v.get("por_que_peligroso")]
+        all_vulns_count = len(self.vulnerabilidades)
+        enriched_count  = len(edu_vulns)
+
+        cards_html = self._generate_edu_cards(edu_vulns)
+        summary_html = self._generate_edu_summary()
+
+        html = f"""<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Informe Educativo — {self.metadata.get('target_ip', 'N/A')}</title>
+  <style>
+    {self._get_edu_css()}
+  </style>
+</head>
+<body>
+<div class="edu-wrapper">
+
+  <!-- CABECERA -->
+  <header class="edu-header">
+    <div class="edu-header-inner">
+      <div class="edu-logo">🎓</div>
+      <div>
+        <h1>Análisis Educativo de Vulnerabilidades</h1>
+        <p class="edu-subtitle">
+          Objetivo: <strong>{self.metadata.get('target_ip','N/A')}</strong> &nbsp;|&nbsp;
+          {datetime.now().strftime('%d/%m/%Y %H:%M')} &nbsp;|&nbsp;
+          <a href="informe_tecnico.html" class="header-link">Ver informe técnico →</a>
+        </p>
+      </div>
+    </div>
+  </header>
+
+  <!-- RESUMEN ESTADÍSTICO -->
+  <section class="edu-stats-row">
+    <div class="edu-stat critica">
+      <span class="edu-stat-n">{self.riesgos.get('critica',0)}</span>
+      <span class="edu-stat-l">Críticas</span>
+    </div>
+    <div class="edu-stat alta">
+      <span class="edu-stat-n">{self.riesgos.get('alta',0)}</span>
+      <span class="edu-stat-l">Altas</span>
+    </div>
+    <div class="edu-stat media">
+      <span class="edu-stat-n">{self.riesgos.get('media',0)}</span>
+      <span class="edu-stat-l">Medias</span>
+    </div>
+    <div class="edu-stat baja">
+      <span class="edu-stat-n">{self.riesgos.get('baja',0)}</span>
+      <span class="edu-stat-l">Bajas</span>
+    </div>
+    <div class="edu-stat total">
+      <span class="edu-stat-n">{all_vulns_count}</span>
+      <span class="edu-stat-l">Total</span>
+    </div>
+    <div class="edu-stat edu">
+      <span class="edu-stat-n">{enriched_count}</span>
+      <span class="edu-stat-l">Con guía educativa</span>
+    </div>
+  </section>
+
+  <!-- OBJETIVOS DE APRENDIZAJE -->
+  {summary_html}
+
+  <!-- VULNERABILIDADES CON CONTENIDO EDUCATIVO -->
+  <section class="edu-section">
+    <h2 class="edu-section-title">📚 Vulnerabilidades — Guía Educativa</h2>
+    <p class="edu-intro">
+      Cada tarjeta muestra el contexto de seguridad, un ejemplo real de ataque
+      y cómo corregirlo. Haz clic en cualquier sección para expandirla.
+    </p>
+    {cards_html}
+  </section>
+
+  <!-- RECOMENDACIONES DE MITIGACIÓN -->
+  <section class="edu-section">
+    <h2 class="edu-section-title">✅ Plan de Remediación</h2>
+    <div class="edu-rec-grid">
+      {self._generate_edu_recs()}
+    </div>
+  </section>
+
+  <footer class="edu-footer">
+    <p>Generado por <strong>Scan Agent v3.0</strong> — Herramienta educativa para análisis de seguridad web</p>
+    <p>
+      <a href="https://owasp.org/www-project-top-ten/" target="_blank">OWASP Top 10</a> &nbsp;|&nbsp;
+      <a href="https://owasp.org/API-Security/" target="_blank">OWASP API Security</a> &nbsp;|&nbsp;
+      <a href="https://cwe.mitre.org/" target="_blank">CWE MITRE</a>
+    </p>
+  </footer>
+
+</div>
+<script>{self._get_edu_js()}</script>
+</body>
+</html>"""
+
+        with open(output_file, 'w', encoding='utf-8') as f:
+            f.write(html)
+
+        print(f"[OK] Informe educativo generado: {output_file}")
+        return output_file
+
+    def _generate_edu_summary(self) -> str:
+        """Genera sección de categorías OWASP detectadas como objetivos de aprendizaje."""
+        categories: Dict[str, List[str]] = {}
+        for vuln in self.vulnerabilidades:
+            cat = vuln.get("owasp_category") or vuln.get("owasp_api_category", "")
+            if cat:
+                key = cat.split(" - ")[0].strip()
+                categories.setdefault(key, [])
+                categories[key].append(vuln.get("titulo", ""))
+
+        if not categories:
+            return ""
+
+        items = ""
+        for cat, titles in list(categories.items())[:10]:
+            sample = ", ".join(titles[:2])
+            if len(titles) > 2:
+                sample += f" +{len(titles)-2} más"
+            items += f"""
+            <div class="learn-item">
+              <span class="learn-cat">{cat}</span>
+              <span class="learn-sample">{sample}</span>
+              <span class="learn-count">{len(titles)}</span>
+            </div>"""
+
+        return f"""
+        <section class="edu-section learn-section">
+          <h2 class="edu-section-title">🎯 Categorías OWASP detectadas en este escaneo</h2>
+          <div class="learn-grid">{items}</div>
+        </section>"""
+
+    def _generate_edu_cards(self, vulns: List[Dict[str, Any]]) -> str:
+        """Genera una tarjeta educativa por vulnerabilidad enriquecida."""
+        if not vulns:
+            return "<p class='no-edu'>No se encontraron vulnerabilidades con guía educativa en este escaneo.</p>"
+
+        sev_order = {"critica": 0, "alta": 1, "media": 2, "baja": 3}
+        sorted_v  = sorted(vulns, key=lambda v: sev_order.get(v.get("severidad", "baja"), 4))
+
+        cards = ""
+        for i, vuln in enumerate(sorted_v):
+            sev        = vuln.get("severidad", "baja")
+            titulo     = vuln.get("titulo", "Vulnerabilidad")
+            cvss       = vuln.get("cvss_score", 0)
+            owasp      = vuln.get("owasp_api_category") or vuln.get("owasp_category", "")
+            cwe        = vuln.get("cwe", "")
+            url_cs     = vuln.get("cheat_sheet_url", "")
+            fuente     = vuln.get("fuente", "")
+            descripcion = vuln.get("descripcion", "")[:300]
+
+            why        = vuln.get("por_que_peligroso", "")
+            payload    = vuln.get("ejemplo_payload", "")
+            fix        = vuln.get("como_remediarlo", "")
+
+            cheat_btn = ""
+            if url_cs:
+                cheat_btn = f'<a href="{url_cs}" target="_blank" class="edu-cs-btn">📖 OWASP Cheat Sheet</a>'
+
+            cwe_badge = ""
+            if cwe:
+                cwe_id = cwe.split("—")[0].strip()
+                cwe_badge = f'<span class="edu-cwe-badge" title="{cwe}">{cwe_id}</span>'
+
+            cards += f"""
+<div class="edu-card sev-{sev}" id="card-{i}">
+  <div class="edu-card-header" onclick="toggleCard({i})">
+    <div class="edu-card-left">
+      <span class="edu-sev-dot sev-dot-{sev}"></span>
+      <span class="edu-card-title">{titulo}</span>
+      {cwe_badge}
+    </div>
+    <div class="edu-card-right">
+      <span class="edu-cvss">CVSS {cvss}</span>
+      <span class="edu-owasp-tag">{owasp[:20] if owasp else fuente}</span>
+      <span class="edu-toggle-icon" id="icon-{i}">▼</span>
+    </div>
+  </div>
+
+  <div class="edu-card-body" id="body-{i}" style="display:none">
+
+    <!-- Descripción -->
+    <div class="edu-field">
+      <p class="edu-desc-text">{descripcion}{'…' if len(vuln.get('descripcion','')) > 300 else ''}</p>
+    </div>
+
+    <!-- ¿Por qué es peligroso? -->
+    <div class="edu-field edu-why">
+      <div class="edu-field-header">⚠️ ¿Por qué es peligroso?</div>
+      <p>{why}</p>
+    </div>
+
+    <!-- Ejemplo de payload / ataque -->
+    <div class="edu-field edu-payload">
+      <div class="edu-field-header">🔍 Ejemplo de ataque</div>
+      <pre class="edu-code"><code>{self._escape_html(payload)}</code></pre>
+    </div>
+
+    <!-- Cómo remediarlo -->
+    <div class="edu-field edu-fix">
+      <div class="edu-field-header">🛠️ Cómo remediarlo</div>
+      <pre class="edu-code"><code>{self._escape_html(fix)}</code></pre>
+    </div>
+
+    <!-- Footer de tarjeta -->
+    <div class="edu-card-footer">
+      {cwe_badge}
+      {cheat_btn}
+    </div>
+
+  </div>
+</div>"""
+
+        return cards
+
+    def _generate_edu_recs(self) -> str:
+        """Genera tarjetas de recomendaciones en el formato educativo."""
+        html = ""
+        sections = [
+            ('corto_plazo',   '🔴 Inmediato (esta semana)',   'rec-urgent'),
+            ('mediano_plazo', '🟡 Corto plazo (1-4 semanas)', 'rec-medium'),
+            ('largo_plazo',   '🟢 Largo plazo (1-6 meses)',   'rec-long'),
+        ]
+        for key, title, css in sections:
+            recs = self.recomendaciones.get(key, [])
+            if recs:
+                items = "".join(f"<li>{r}</li>" for r in recs)
+                html += f'<div class="edu-rec-card {css}"><h3>{title}</h3><ul>{items}</ul></div>'
+        return html
+
+    @staticmethod
+    def _escape_html(text: str) -> str:
+        """Escapa caracteres HTML en bloques de código."""
+        return (text
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace('"', "&quot;"))
+
+    @staticmethod
+    def _get_edu_css() -> str:
+        return """
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f0f2f5;
+            color: #1a1a2e;
+            line-height: 1.65;
+        }
+        a { color: #4361ee; }
+        .edu-wrapper { max-width: 1100px; margin: 0 auto; padding: 20px; }
+
+        /* HEADER */
+        .edu-header {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            color: white; border-radius: 12px; padding: 28px 32px;
+            margin-bottom: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+        }
+        .edu-header-inner { display: flex; align-items: center; gap: 20px; }
+        .edu-logo { font-size: 3rem; }
+        .edu-header h1 { font-size: 1.7rem; margin-bottom: 6px; }
+        .edu-subtitle { font-size: 0.9rem; opacity: 0.85; }
+        .header-link { color: #a8d8ea; text-decoration: none; }
+        .header-link:hover { text-decoration: underline; }
+
+        /* STATS */
+        .edu-stats-row {
+            display: flex; gap: 12px; flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+        .edu-stat {
+            flex: 1; min-width: 100px; background: white;
+            border-radius: 10px; padding: 14px 10px;
+            text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            border-top: 4px solid #ccc;
+        }
+        .edu-stat.critica  { border-top-color: #e74c3c; }
+        .edu-stat.alta     { border-top-color: #e67e22; }
+        .edu-stat.media    { border-top-color: #f39c12; }
+        .edu-stat.baja     { border-top-color: #27ae60; }
+        .edu-stat.total    { border-top-color: #667eea; }
+        .edu-stat.edu      { border-top-color: #9b59b6; }
+        .edu-stat-n { display: block; font-size: 2rem; font-weight: 700; }
+        .edu-stat-l { display: block; font-size: 0.78rem; color: #666; margin-top: 2px; }
+
+        /* SECTIONS */
+        .edu-section { background: white; border-radius: 12px; padding: 28px;
+            margin-bottom: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.07); }
+        .edu-section-title {
+            font-size: 1.25rem; font-weight: 700; margin-bottom: 16px;
+            padding-bottom: 10px; border-bottom: 2px solid #f0f2f5; color: #16213e;
+        }
+        .edu-intro { color: #555; margin-bottom: 20px; font-size: 0.95rem; }
+
+        /* LEARNING OBJECTIVES */
+        .learn-section { background: #f8f9ff; }
+        .learn-grid { display: flex; flex-direction: column; gap: 8px; }
+        .learn-item {
+            display: flex; align-items: center; gap: 12px;
+            padding: 10px 14px; background: white; border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        .learn-cat { font-weight: 600; font-size: 0.9rem; min-width: 110px; color: #4361ee; }
+        .learn-sample { flex: 1; font-size: 0.85rem; color: #555; }
+        .learn-count {
+            background: #667eea; color: white; border-radius: 12px;
+            padding: 2px 10px; font-size: 0.8rem; font-weight: 600;
+        }
+
+        /* EDU CARDS */
+        .edu-card {
+            border: 1px solid #e8e8e8; border-radius: 10px;
+            margin-bottom: 14px; overflow: hidden;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+            transition: box-shadow 0.2s;
+        }
+        .edu-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.12); }
+        .edu-card.sev-critica { border-left: 5px solid #e74c3c; }
+        .edu-card.sev-alta    { border-left: 5px solid #e67e22; }
+        .edu-card.sev-media   { border-left: 5px solid #f39c12; }
+        .edu-card.sev-baja    { border-left: 5px solid #27ae60; }
+
+        .edu-card-header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 14px 18px; cursor: pointer;
+            background: #fafbfc; user-select: none;
+        }
+        .edu-card-header:hover { background: #f0f2f5; }
+        .edu-card-left  { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .edu-card-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+
+        .edu-sev-dot {
+            width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0;
+        }
+        .edu-sev-dot.sev-dot-critica { background: #e74c3c; }
+        .edu-sev-dot.sev-dot-alta    { background: #e67e22; }
+        .edu-sev-dot.sev-dot-media   { background: #f39c12; }
+        .edu-sev-dot.sev-dot-baja    { background: #27ae60; }
+
+        .edu-card-title { font-weight: 600; font-size: 0.98rem; }
+        .edu-cvss {
+            background: #34495e; color: white;
+            padding: 3px 9px; border-radius: 4px; font-size: 0.78rem; font-weight: 600;
+        }
+        .edu-owasp-tag {
+            background: #eef2ff; color: #4361ee;
+            padding: 3px 9px; border-radius: 4px; font-size: 0.78rem; font-weight: 600;
+        }
+        .edu-toggle-icon { font-size: 0.85rem; color: #888; }
+
+        .edu-cwe-badge {
+            background: #f1f3ff; color: #5f27cd;
+            padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;
+            border: 1px solid #d5c8ff; cursor: help;
+        }
+        .edu-cs-btn {
+            display: inline-block; padding: 5px 12px;
+            background: #e8f5e9; color: #2e7d32;
+            border: 1px solid #c8e6c9; border-radius: 5px;
+            text-decoration: none; font-size: 0.82rem; font-weight: 600;
+        }
+        .edu-cs-btn:hover { background: #c8e6c9; }
+
+        .edu-card-body { padding: 18px 22px; border-top: 1px solid #f0f2f5; }
+
+        .edu-field { margin-bottom: 18px; }
+        .edu-field-header {
+            font-weight: 700; font-size: 0.9rem; margin-bottom: 8px;
+            padding: 6px 10px; border-radius: 6px;
+        }
+        .edu-why   .edu-field-header { background: #fff3cd; color: #856404; }
+        .edu-payload .edu-field-header { background: #f8d7da; color: #721c24; }
+        .edu-fix   .edu-field-header { background: #d4edda; color: #155724; }
+        .edu-desc-text { color: #444; font-size: 0.93rem; }
+
+        .edu-code {
+            background: #1e1e2e; color: #cdd6f4;
+            padding: 14px 16px; border-radius: 8px;
+            font-family: 'Consolas', 'Fira Code', monospace;
+            font-size: 0.82rem; line-height: 1.7;
+            overflow-x: auto; white-space: pre;
+        }
+
+        .edu-card-footer {
+            display: flex; align-items: center; gap: 10px;
+            padding-top: 12px; border-top: 1px solid #f0f2f5;
+            margin-top: 4px; flex-wrap: wrap;
+        }
+        .no-edu { color: #888; text-align: center; padding: 30px; }
+
+        /* RECOMMENDATIONS */
+        .edu-rec-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px,1fr)); gap: 16px; }
+        .edu-rec-card { border-radius: 10px; padding: 20px; }
+        .edu-rec-card.rec-urgent { background: #fff5f5; border-left: 4px solid #e74c3c; }
+        .edu-rec-card.rec-medium { background: #fffbf0; border-left: 4px solid #f39c12; }
+        .edu-rec-card.rec-long   { background: #f0fff4; border-left: 4px solid #27ae60; }
+        .edu-rec-card h3 { font-size: 0.95rem; margin-bottom: 10px; }
+        .edu-rec-card ul { padding-left: 18px; font-size: 0.88rem; }
+        .edu-rec-card li { margin-bottom: 5px; }
+
+        /* FOOTER */
+        .edu-footer {
+            text-align: center; padding: 20px;
+            font-size: 0.82rem; color: #888;
+        }
+        .edu-footer a { color: #4361ee; }
+
+        @media(max-width:700px) {
+            .edu-stats-row { flex-wrap: wrap; }
+            .edu-stat { min-width: 80px; }
+            .edu-card-header { flex-wrap: wrap; gap: 8px; }
+        }
+        """
+
+    @staticmethod
+    def _get_edu_js() -> str:
+        return """
+        function toggleCard(i) {
+            const body = document.getElementById('body-' + i);
+            const icon = document.getElementById('icon-' + i);
+            if (body.style.display === 'none') {
+                body.style.display = 'block';
+                icon.textContent = '▲';
+            } else {
+                body.style.display = 'none';
+                icon.textContent = '▼';
+            }
+        }
+        // Expandir primera tarjeta automáticamente
+        document.addEventListener('DOMContentLoaded', function() {
+            if (document.getElementById('card-0')) toggleCard(0);
+        });
+        """
 
 
 if __name__ == "__main__":

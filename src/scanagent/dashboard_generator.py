@@ -198,17 +198,20 @@ class DashboardGenerator:
     def _generate_all_timelines(self, targets: List[Dict], scans_by_ip: Dict) -> str:
         """Generate timeline sections for all targets."""
         html_parts = []
-        
+
         for target in targets:
             ip = target['ip_address']
             scans = scans_by_ip.get(ip, [])
-            
+
+            comparison_html = self._generate_comparison_widget(scans) if len(scans) >= 2 else ""
+
             timeline_html = f"""
                 <div class="timeline-section" id="timeline-{ip}" style="display: none;">
                     <div class="timeline-header">
                         <h2>📍 Historial de {ip}</h2>
                         <p>{len(scans)} escaneos realizados</p>
                     </div>
+                    {comparison_html}
                     <div class="timeline">
                         {self._generate_scan_cards(scans)}
                     </div>
@@ -309,6 +312,77 @@ class DashboardGenerator:
         
         return '\n'.join(html_parts)
     
+    def _generate_comparison_widget(self, scans: List[Dict]) -> str:
+        """
+        Genera un widget de comparación antes/después entre los dos últimos escaneos.
+        Scans deben estar ordenados por fecha descendente (más reciente primero).
+        """
+        latest = scans[0]
+        prev   = scans[1]
+
+        def delta_html(new_val: int, old_val: int, invert: bool = False) -> str:
+            diff = new_val - old_val
+            if diff == 0:
+                return f'<span class="delta-neutral">→ {new_val}</span>'
+            better = diff < 0 if not invert else diff > 0
+            cls    = "delta-better" if better else "delta-worse"
+            arrow  = "▼" if diff < 0 else "▲"
+            return f'<span class="{cls}">{arrow}{abs(diff)} → {new_val}</span>'
+
+        latest_date = self._format_datetime(latest['scan_date'])
+        prev_date   = self._format_datetime(prev['scan_date'])
+
+        rows = [
+            ("Vulnerabilidades totales", latest.get('total_vulnerabilities', 0), prev.get('total_vulnerabilities', 0)),
+            ("Críticas",                 latest.get('critical_count', 0),        prev.get('critical_count', 0)),
+            ("Altas",                    latest.get('high_count', 0),            prev.get('high_count', 0)),
+            ("Medias",                   latest.get('medium_count', 0),          prev.get('medium_count', 0)),
+            ("Bajas",                    latest.get('low_count', 0),             prev.get('low_count', 0)),
+        ]
+
+        rows_html = ""
+        for label, new_v, old_v in rows:
+            rows_html += f"""
+            <tr>
+              <td class="cmp-label">{label}</td>
+              <td class="cmp-prev">{old_v}</td>
+              <td class="cmp-latest">{delta_html(new_v, old_v)}</td>
+            </tr>"""
+
+        # Mini sparkline CSS (barras proporcionales a vulns totales)
+        max_vulns = max(s.get('total_vulnerabilities', 0) for s in scans[:6]) or 1
+        bars = ""
+        for s in reversed(scans[:6]):
+            v    = s.get('total_vulnerabilities', 0)
+            h    = max(4, int(v / max_vulns * 60))
+            dt   = self._format_datetime(s['scan_date'])
+            bars += f'<div class="spark-bar" style="height:{h}px" title="{dt}: {v} vulns"></div>'
+
+        return f"""
+        <div class="comparison-widget">
+          <div class="cmp-header">
+            <span>📊 Comparación de escaneos</span>
+            <span class="cmp-dates">{prev_date} → {latest_date}</span>
+          </div>
+          <div class="cmp-body">
+            <table class="cmp-table">
+              <thead>
+                <tr>
+                  <th>Métrica</th>
+                  <th>Anterior</th>
+                  <th>Último</th>
+                </tr>
+              </thead>
+              <tbody>{rows_html}</tbody>
+            </table>
+            <div class="spark-section">
+              <div class="spark-title">Historial de vulnerabilidades</div>
+              <div class="sparkline">{bars}</div>
+              <div class="spark-legend">últimos {min(6, len(scans))} escaneos →</div>
+            </div>
+          </div>
+        </div>"""
+
     def _generate_vuln_bar(self, label: str, count: int, severity: str) -> str:
         """Generate vulnerability count bar."""
         if count == 0:
@@ -726,6 +800,69 @@ class DashboardGenerator:
             }
         }
         
+        /* Comparison Widget */
+        .comparison-widget {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 10px;
+            margin-bottom: 24px;
+            overflow: hidden;
+        }
+        .cmp-header {
+            background: #667eea;
+            color: white;
+            padding: 10px 20px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .cmp-dates { font-size: 0.8rem; opacity: 0.85; }
+        .cmp-body {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 16px;
+            padding: 16px 20px;
+            align-items: start;
+        }
+        .cmp-table { border-collapse: collapse; width: 100%; font-size: 0.88rem; }
+        .cmp-table th {
+            background: #e9ecef;
+            padding: 8px 12px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.8rem;
+            color: #555;
+        }
+        .cmp-table td { padding: 7px 12px; border-bottom: 1px solid #e9ecef; }
+        .cmp-label { color: #444; }
+        .cmp-prev  { color: #888; text-align: center; }
+        .cmp-latest { text-align: center; font-weight: 600; }
+        .delta-better { color: #198754; }
+        .delta-worse  { color: #dc3545; }
+        .delta-neutral { color: #6c757d; }
+
+        /* Sparkline */
+        .spark-section {
+            display: flex; flex-direction: column;
+            align-items: center; min-width: 120px;
+        }
+        .spark-title {
+            font-size: 0.72rem; color: #888; margin-bottom: 8px; text-align: center;
+        }
+        .sparkline {
+            display: flex; align-items: flex-end;
+            gap: 4px; height: 64px; padding: 4px;
+            background: white; border: 1px solid #e0e0e0; border-radius: 6px;
+        }
+        .spark-bar {
+            width: 14px; background: #667eea; border-radius: 3px 3px 0 0;
+            cursor: help; transition: background 0.2s;
+        }
+        .spark-bar:hover { background: #e74c3c; }
+        .spark-legend { font-size: 0.68rem; color: #aaa; margin-top: 4px; }
+
         /* Scrollbar Styling */
         ::-webkit-scrollbar {
             width: 8px;

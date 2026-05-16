@@ -109,19 +109,19 @@ ZAP es el estándar educativo para pruebas de seguridad web/API activas.
 ---
 
 ### FASE 5 — Reportes Educativos
-**Prioridad:** MEDIA | **Estimado:** ~25h | **Estado:** ⬜ Pendiente
+**Prioridad:** MEDIA | **Estimado:** ~25h | **Estado:** ✅ Completado (2026-05-16)
 
 Los reportes actuales son profesionales pero no pedagógicos.
 
 | # | Tarea | Estado | Notas |
 |---|-------|--------|-------|
-| 5.1 | Añadir sección "¿Por qué es peligroso?" en cada vulnerabilidad | ⬜ | Modificar `report_generator.py` |
-| 5.2 | Incluir referencias a CWE (Common Weakness Enumeration) | ⬜ | Mapper CWE en `interpreter.py` |
-| 5.3 | Añadir ejemplos de payload/exploit educativos | ⬜ | Knowledge base de ejemplos |
-| 5.4 | Crear sección "Cómo remediarlo" con fragmentos de código | ⬜ | Templates por lenguaje |
-| 5.5 | Añadir links a OWASP Cheat Sheet Series por vulnerabilidad | ⬜ | Links mapper en `interpreter.py` |
-| 5.6 | Crear modo de reporte `--format educational` | ⬜ | Nuevo formato en `report_generator.py` |
-| 5.7 | Añadir comparación de escaneos en dashboard (antes/después del fix) | ⬜ | `dashboard_generator.py` |
+| 5.1 | Añadir sección "¿Por qué es peligroso?" en cada vulnerabilidad | ✅ | `ReportGenerator.generate_educational_report()` |
+| 5.2 | Incluir referencias a CWE (Common Weakness Enumeration) | ✅ | `OWASP_WEB_CWE` + `_enrich_educational()` en `interpreter.py` |
+| 5.3 | Añadir ejemplos de payload/exploit educativos | ✅ | `EDUCATIONAL_DATA` — 15 entradas con payloads reales |
+| 5.4 | Crear sección "Cómo remediarlo" con fragmentos de código | ✅ | Fragmentos por lenguaje en `EDUCATIONAL_DATA` |
+| 5.5 | Añadir links a OWASP Cheat Sheet Series por vulnerabilidad | ✅ | `cheat_sheet_url` en `EDUCATIONAL_DATA`, botón en HTML |
+| 5.6 | Crear modo de reporte `--format educational` | ✅ | `informe_educativo.html`, incluido en `--format all` |
+| 5.7 | Añadir comparación de escaneos en dashboard (antes/después del fix) | ✅ | `_generate_comparison_widget()` con tabla delta + sparkline |
 
 ---
 
@@ -164,7 +164,7 @@ Mejoras opcionales para enriquecer la experiencia educativa.
 | 1 | OWASP API Security Top 10 2023 | CRÍTICA | ~40h | ✅ |
 | 2 | CVE/NVD actualizado | ALTA | ~20h | ✅ |
 | 3 | Integración OWASP ZAP | ALTA | ~35h | ✅ |
-| 5 | Reportes educativos | MEDIA | ~25h | ⬜ |
+| 5 | Reportes educativos | MEDIA | ~25h | ✅ |
 | 6 | Seguridad y arquitectura | MEDIA | ~15h | ⬜ |
 | 7 | Funcionalidades avanzadas | BAJA | ~30h | ⬜ |
 | | **TOTAL** | | **~177h** | |
@@ -196,6 +196,7 @@ SEMANA 15+:  Fase 7 — Funcionalidades avanzadas (según disponibilidad)
 | 2026-05-16 | Validación Fases 1, 2 y 4 — 8/8 tests pasados | — |
 | 2026-05-16 | Fix UTF-8 en stdout Windows (agent.py) | — |
 | 2026-05-16 | Implementación completa integración OWASP ZAP | 3 |
+| 2026-05-16 | Implementación completa reportes educativos — 181/279 vulns enriquecidas en Juice Shop | 5 |
 
 ---
 
