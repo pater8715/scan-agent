@@ -373,6 +373,44 @@ CREATE INDEX IF NOT EXISTS idx_kev_datecve  ON kev_catalog(date_added);
 CREATE INDEX IF NOT EXISTS idx_osv_expires  ON osv_cache(expires_at);
 
 -- ========================================
+-- Table: student_progress  (Fase 7.5)
+-- ========================================
+-- Tracking de progreso por estudiante a lo largo del tiempo
+CREATE TABLE IF NOT EXISTS student_progress (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    student_id      TEXT NOT NULL,
+    scan_id         INTEGER,
+    target          TEXT NOT NULL,
+    profile         TEXT,
+    scan_date       TEXT NOT NULL DEFAULT (datetime('now')),
+    total_vulns     INTEGER DEFAULT 0,
+    criticas        INTEGER DEFAULT 0,
+    altas           INTEGER DEFAULT 0,
+    medias          INTEGER DEFAULT 0,
+    bajas           INTEGER DEFAULT 0,
+    owasp_coverage  TEXT,   -- JSON: {"A01":2,"A03":5,...}
+    notes           TEXT,
+    FOREIGN KEY (scan_id) REFERENCES scans(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_progress_student  ON student_progress(student_id);
+CREATE INDEX IF NOT EXISTS idx_progress_date     ON student_progress(scan_date DESC);
+
+-- Vista: resumen por estudiante (últimos 30 días)
+CREATE VIEW IF NOT EXISTS v_student_summary AS
+SELECT
+    student_id,
+    COUNT(*) AS total_scans,
+    SUM(total_vulns) AS total_vulns_found,
+    MAX(scan_date) AS last_scan,
+    MIN(total_vulns) AS best_scan_vulns,
+    AVG(total_vulns) AS avg_vulns_per_scan
+FROM student_progress
+WHERE scan_date >= datetime('now', '-30 days')
+GROUP BY student_id
+ORDER BY last_scan DESC;
+
+-- ========================================
 -- MAINTENANCE
 -- ========================================
 

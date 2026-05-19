@@ -355,3 +355,45 @@ zap-active-juice: ## Escaneo ACTIVO ZAP sobre Juice Shop (30-60 min)
 		-e ZAP_HOST=zap -e ZAP_PORT=8090 \
 		$(IMAGE_NAME):$(VERSION) --scan --target juice-shop:3000 --profile zap-active
 	@echo -e "$(GREEN)[OK]$(NC) Escaneo activo completado. Resultados en ./outputs/ y ./reports/"
+
+# ============================================================================
+# FASE 7 — Funcionalidades Avanzadas
+# ============================================================================
+
+dep-scan: ## Escanear dependencias del proyecto buscando CVEs
+	@echo -e "$(BLUE)[DEP]$(NC) Escaneando dependencias Python..."
+	docker run --rm \
+		-v $$(pwd):/scan-agent/project:ro \
+		$(IMAGE_NAME):$(VERSION) --dep-scan /scan-agent/project
+
+ctf-list: ## Listar desafíos CTF disponibles
+	@echo -e "$(BLUE)[CTF]$(NC) Desafíos disponibles..."
+	docker run --rm \
+		-v $$(pwd)/data:/scan-agent/data \
+		-v $$(pwd)/config:/scan-agent/config:ro \
+		$(IMAGE_NAME):$(VERSION) --ctf list
+
+ctf-scoreboard: ## Ver ranking CTF de todos los estudiantes
+	docker run --rm \
+		-v $$(pwd)/data:/scan-agent/data \
+		-v $$(pwd)/config:/scan-agent/config:ro \
+		$(IMAGE_NAME):$(VERSION) --ctf scoreboard
+
+ctf-start: ## Iniciar un desafío CTF (requiere CHALLENGE_ID=CTF-XX y STUDENT_ID=nombre)
+ifndef CHALLENGE_ID
+	@echo -e "$(RED)[ERROR]$(NC) Especifica CHALLENGE_ID=CTF-01 (y opcionalmente STUDENT_ID=mi_nombre)"
+	@exit 1
+endif
+	docker run --rm \
+		-v $$(pwd)/data:/scan-agent/data \
+		-v $$(pwd)/config:/scan-agent/config:ro \
+		-e STUDENT_ID=$${STUDENT_ID:-anonymous} \
+		$(IMAGE_NAME):$(VERSION) --ctf start --challenge-id $(CHALLENGE_ID)
+
+sarif-report: ## Generar reporte SARIF para GitHub Advanced Security (requiere outputs/ previo)
+	@echo -e "$(BLUE)[SARIF]$(NC) Generando reporte SARIF..."
+	docker run --rm \
+		-v $$(pwd)/outputs:/scan-agent/outputs:ro \
+		-v $$(pwd)/reports:/scan-agent/reports \
+		$(IMAGE_NAME):$(VERSION) --format sarif
+	@echo -e "$(GREEN)[OK]$(NC) SARIF generado en ./reports/informe_tecnico.sarif.json"

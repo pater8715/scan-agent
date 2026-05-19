@@ -72,6 +72,30 @@ try:
 except ImportError:
     _APISEC_AVAILABLE = False
 
+try:
+    from scanagent.dependency_scanner import DependencyScanner
+    _DEPSCAN_AVAILABLE = True
+except ImportError:
+    _DEPSCAN_AVAILABLE = False
+
+try:
+    from scanagent.sarif_exporter import SARIFExporter
+    _SARIF_AVAILABLE = True
+except ImportError:
+    _SARIF_AVAILABLE = False
+
+try:
+    from scanagent.notifier import WebhookNotifier
+    _NOTIFIER_AVAILABLE = True
+except ImportError:
+    _NOTIFIER_AVAILABLE = False
+
+try:
+    from scanagent.ctf_mode import CTFEngine
+    _CTF_AVAILABLE = True
+except ImportError:
+    _CTF_AVAILABLE = False
+
 
 class ScanAgent:
     """
@@ -88,23 +112,27 @@ class ScanAgent:
     
     VERSION = "2.1.0"
     
-    def __init__(self, verbose: bool = False, use_database: bool = True):
+    def __init__(self, verbose: bool = False, use_database: bool = True,
+                 student_id: str = ""):
         """
         Inicializa el agente con todos sus componentes.
-        
+
         Args:
             verbose: Activar modo verboso para debug
             use_database: Guardar resultados en base de datos (default: True)
+            student_id: ID del estudiante para tracking de progreso (Fase 7.5)
         """
         self.verbose = verbose
         self.use_database = use_database
+        self.student_id = student_id or __import__("os").environ.get("STUDENT_ID", "")
         self.scanner = VulnerabilityScanner(verbose=verbose)  # v2.0
         self.parser = None  # Se inicializará cuando sea necesario
         self.interpreter = None  # Se inicializará cuando sea necesario
         self.report_generator = None
         self.db_manager = DatabaseManager() if use_database else None  # v2.1
         self.dashboard_generator = DashboardGenerator() if use_database else None  # v2.1
-        
+        self.notifier = WebhookNotifier() if _NOTIFIER_AVAILABLE else None  # v3.1
+
         # Estadísticas de ejecución
         self.stats = {
             'archivos_procesados': 0,
@@ -260,10 +288,24 @@ class ScanAgent:
                 self._print_phase("FASE 5: GENERACIÓN DE DASHBOARD")
                 self._generate_dashboard()
             
+            # FASE 6: NOTIFICACIÓN WEBHOOK (Fase 7.3)
+            if self.notifier and self.notifier.enabled:
+                vulns = analysis.get("vulnerabilities", [])
+                self.notifier.notify_scan_complete(
+                    target=target_ip or "unknown",
+                    vulnerabilities=vulns,
+                    scan_id=str(self.stats.get("scan_id", "")),
+                    profile=profile_used or "",
+                )
+
+            # FASE 7: PROGRESO DE ESTUDIANTE (Fase 7.5)
+            if self.student_id:
+                self._save_student_progress(target_ip, profile_used, analysis)
+
             # Finalizar
             self._print_summary()
             return True
-            
+
         except KeyboardInterrupt:
             print("\n\n[!] Proceso interrumpido por el usuario")
             return False
@@ -383,7 +425,12 @@ class ScanAgent:
 
             # Generar cada formato
             for fmt in formats:
-                output_file = f"informe_tecnico.{fmt}" if fmt != "educational" else "informe_educativo.html"
+                if fmt == "educational":
+                    output_file = "informe_educativo.html"
+                elif fmt == "sarif":
+                    output_file = "informe_tecnico.sarif.json"
+                else:
+                    output_file = f"informe_tecnico.{fmt}"
 
                 if fmt == "txt":
                     self.report_generator.generate_txt_report(output_file)
@@ -396,6 +443,14 @@ class ScanAgent:
                     self.report_generator.generate_markdown_report(output_file)
                 elif fmt == "educational":
                     self.report_generator.generate_educational_report(output_file)
+                elif fmt == "sarif":
+                    if _SARIF_AVAILABLE:
+                        vulns = analysis.get("vulnerabilities", [])
+                        target = analysis.get("target", "")
+                        SARIFExporter(vulns, target).export(output_file)
+                    else:
+                        print("[WARN] SARIF exporter no disponible")
+                        continue
                 else:
                     print(f"[WARN] Formato desconocido: {fmt}")
                     continue
@@ -412,7 +467,46 @@ class ScanAgent:
                 traceback.print_exc()
             return None
     
-    def _save_to_database(self, target_ip: str, profile_used: str, 
+    def _save_student_progress(self, target_ip: str, profile_used: str, analysis: dict) -> None:
+        """Guarda el progreso del estudiante en la base de datos (Fase 7.5)."""
+        if not self.db_manager:
+            return
+        import json as _json
+        vulns = analysis.get("vulnerabilities", [])
+        counts: dict = {}
+        owasp_cov: dict = {}
+        for v in vulns:
+            sev = v.get("severidad", "baja")
+            counts[sev] = counts.get(sev, 0) + 1
+            owasp = v.get("owasp_api_category") or v.get("owasp_category", "")
+            if owasp:
+                key = owasp[:7]
+                owasp_cov[key] = owasp_cov.get(key, 0) + 1
+        try:
+            with self.db_manager._get_connection() as conn:
+                conn.execute(
+                    """INSERT INTO student_progress
+                       (student_id, scan_id, target, profile, total_vulns,
+                        criticas, altas, medias, bajas, owasp_coverage)
+                       VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                    (
+                        self.student_id,
+                        self.stats.get("scan_id"),
+                        target_ip or "",
+                        profile_used or "",
+                        len(vulns),
+                        counts.get("critica", 0),
+                        counts.get("alta", 0),
+                        counts.get("media", 0),
+                        counts.get("baja", 0),
+                        _json.dumps(owasp_cov),
+                    ),
+                )
+            logger.info("Progreso guardado para estudiante '%s'", self.student_id)
+        except Exception as exc:
+            logger.warning("No se pudo guardar progreso del estudiante: %s", exc)
+
+    def _save_to_database(self, target_ip: str, profile_used: str,
                          parsed_data: dict, analysis: dict, outputs_dir: str) -> None:
         """
         Guarda el escaneo en la base de datos.
@@ -655,9 +749,9 @@ Perfiles de escaneo disponibles:
     )
     analysis_group.add_argument(
         '--format',
-        choices=['txt', 'json', 'html', 'md', 'all', 'educational'],
+        choices=['txt', 'json', 'html', 'md', 'all', 'educational', 'sarif'],
         default='all',
-        help='Formato de salida del informe (default: all). "educational" genera informe pedagógico HTML'
+        help='Formato de salida (default: all). "sarif" = SARIF 2.1.0 para GitHub Advanced Security'
     )
     
     # Argumentos generales
@@ -702,10 +796,89 @@ Perfiles de escaneo disponibles:
         help='Deshabilitar enriquecimiento con VulnDB durante el análisis'
     )
 
+    # Opciones Fase 7 — Funcionalidades Avanzadas
+    fase7_group = parser.add_argument_group('Funcionalidades avanzadas (Fase 7)')
+    fase7_group.add_argument(
+        '--dep-scan',
+        metavar='DIR',
+        nargs='?',
+        const='.',
+        help='Escanear dependencias Python/Node.js en DIR buscando CVEs (default: directorio actual)'
+    )
+    fase7_group.add_argument(
+        '--student-id',
+        metavar='ID',
+        default='',
+        help='ID del estudiante para tracking de progreso (también via env STUDENT_ID)'
+    )
+    fase7_group.add_argument(
+        '--ctf',
+        metavar='ACCION',
+        choices=['list', 'start', 'scoreboard'],
+        help='Modo CTF: list=ver desafíos, start=iniciar desafío, scoreboard=ver ranking'
+    )
+    fase7_group.add_argument(
+        '--challenge-id',
+        metavar='ID',
+        default='',
+        help='ID del desafío CTF a iniciar (ej: CTF-01)'
+    )
+    fase7_group.add_argument(
+        '--ctf-hint',
+        metavar='CHALLENGE_ID',
+        help='Pedir pista para un desafío CTF (aplica penalización de puntos)'
+    )
+
     args = parser.parse_args()
-    
+
     # Crear agente
-    agent = ScanAgent(verbose=args.verbose, use_database=not args.no_db)
+    agent = ScanAgent(
+        verbose=args.verbose,
+        use_database=not args.no_db,
+        student_id=args.student_id,
+    )
+
+    # --dep-scan: escaneo de dependencias
+    if args.dep_scan is not None:
+        if not _DEPSCAN_AVAILABLE:
+            print("[ERROR] DependencyScanner no disponible.")
+            sys.exit(1)
+        scan_dir = args.dep_scan or "."
+        print(f"\n[DependencyScanner] Escaneando dependencias en: {scan_dir}")
+        ds = DependencyScanner(verbose=args.verbose)
+        findings = ds.scan_project(scan_dir)
+        if findings:
+            print(f"\n[!] {len(findings)} dependencias vulnerables encontradas:")
+            for f in findings:
+                sev = f.get("severidad", "?").upper()
+                pkg = f.get("package", "?")
+                desc = f.get("descripcion", "")[:80]
+                cves = ", ".join(f.get("cves", []))
+                print(f"  [{sev}] {pkg}: {desc}")
+                if cves:
+                    print(f"         CVEs: {cves}")
+        else:
+            print("[✓] No se encontraron dependencias vulnerables conocidas.")
+        sys.exit(0)
+
+    # --ctf: modo gamificado
+    if args.ctf or args.ctf_hint:
+        if not _CTF_AVAILABLE:
+            print("[ERROR] CTFEngine no disponible.")
+            sys.exit(1)
+        ctf = CTFEngine(student_id=args.student_id)
+        if args.ctf_hint:
+            ctf.hint(args.ctf_hint)
+        elif args.ctf == "list":
+            ctf.list_challenges()
+        elif args.ctf == "scoreboard":
+            ctf.scoreboard()
+        elif args.ctf == "start":
+            if not args.challenge_id:
+                print("[ERROR] Especifica --challenge-id CTF-XX")
+                sys.exit(1)
+            ctf.start_challenge(args.challenge_id)
+        sys.exit(0)
 
     # --update-db: actualizar base de conocimiento CVE
     if args.update_db:

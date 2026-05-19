@@ -142,17 +142,17 @@ Mejoras de seguridad en la propia herramienta.
 ---
 
 ### FASE 7 — Funcionalidades Avanzadas
-**Prioridad:** BAJA | **Estimado:** ~30h | **Estado:** ⬜ Pendiente
+**Prioridad:** BAJA | **Estimado:** ~30h | **Estado:** ✅ Completado (2026-05-19)
 
 Mejoras opcionales para enriquecer la experiencia educativa.
 
 | # | Tarea | Estado | Notas |
 |---|-------|--------|-------|
-| 7.1 | Integrar análisis de dependencias con `safety` (Python) y `npm audit` | ⬜ | Nuevo módulo `dependency_scanner.py` |
-| 7.2 | Exportar resultados en formato SARIF (estándar GitHub Advanced Security) | ⬜ | Nuevo exporter |
-| 7.3 | Añadir notificaciones webhook para vulnerabilidades críticas | ⬜ | Módulo `notifier.py` |
-| 7.4 | Crear modo "CTF" para gamificar el aprendizaje | ⬜ | Feature en la UI web |
-| 7.5 | Reporte de progreso por estudiante (tracking de mejoras) | ⬜ | Dashboard update |
+| 7.1 | Análisis de dependencias Python/Node.js | ✅ | `dependency_scanner.py` — OSV API + `npm audit`; `--dep-scan DIR` en CLI; `make dep-scan` |
+| 7.2 | Exportar resultados en formato SARIF 2.1.0 | ✅ | `sarif_exporter.py` — compatible GitHub Advanced Security; `--format sarif`; `make sarif-report` |
+| 7.3 | Notificaciones webhook para vulnerabilidades críticas | ✅ | `notifier.py` — genérico + Slack; HMAC-SHA256; WEBHOOK_URL/SECRET/FORMAT/MIN_SEV env vars |
+| 7.4 | Modo CTF para gamificar el aprendizaje | ✅ | `ctf_mode.py` + `config/ctf_challenges.json` — 8 desafíos, puntuación, bonus tiempo, pistas con penalización, scoreboard SQLite |
+| 7.5 | Tracking de progreso por estudiante | ✅ | Tabla `student_progress` en schema.sql; `--student-id`/`STUDENT_ID`; progreso por escaneo con cobertura OWASP |
 
 ---
 
@@ -166,7 +166,7 @@ Mejoras opcionales para enriquecer la experiencia educativa.
 | 3 | Integración OWASP ZAP | ALTA | ~35h | ✅ |
 | 5 | Reportes educativos | MEDIA | ~25h | ✅ |
 | 6 | Seguridad y arquitectura | MEDIA | ~15h | ✅ |
-| 7 | Funcionalidades avanzadas | BAJA | ~30h | ⬜ |
+| 7 | Funcionalidades avanzadas | BAJA | ~30h | ✅ |
 | | **TOTAL** | | **~177h** | |
 
 ---
@@ -198,6 +198,7 @@ SEMANA 15+:  Fase 7 — Funcionalidades avanzadas (según disponibilidad)
 | 2026-05-16 | Implementación completa integración OWASP ZAP | 3 |
 | 2026-05-16 | Implementación completa reportes educativos — 181/279 vulns enriquecidas en Juice Shop | 5 |
 | 2026-05-19 | Implementación completa Seguridad y Arquitectura — privileged eliminado, API key auth, rate limiting, target validation, JSON logging, suite pytest | 6 |
+| 2026-05-19 | Implementación completa Funcionalidades Avanzadas — dependency scanner, SARIF exporter, webhook notifier, CTF mode (8 desafíos), student progress tracking | 7 |
 
 ---
 
