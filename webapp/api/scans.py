@@ -77,6 +77,12 @@ async def start_scan(request: ScanRequest, background_tasks: BackgroundTasks):
     El escaneo se ejecuta en background y se puede monitorear su progreso
     mediante el endpoint /status/{scan_id} o via WebSocket.
     """
+    # Validar target (IPs privadas/locales por defecto; ver ALLOW_PUBLIC_TARGETS)
+    try:
+        VulnerabilityScanner.validate_target(request.target)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
     # Validar perfil contra los perfiles reales del scanner
     valid_profiles = list(VulnerabilityScanner.PROFILES.keys())
     if request.profile not in valid_profiles:

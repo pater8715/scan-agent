@@ -1,12 +1,22 @@
 services:
   - type: web
     name: scan-agent-web
-    env: docker
+    runtime: docker
     plan: starter
     dockerfilePath: ./Dockerfile.render
+    dockerContext: .
+    healthCheckPath: /health
     envVars:
-      - key: WEB_PORT
-        value: 8080
       - key: SCAN_MODE
         value: web
+      - key: LOG_LEVEL
+        value: INFO
+      - key: JSON_LOGGING
+        value: "true"
+      - key: ALLOW_PUBLIC_TARGETS
+        value: "false"
+      # Descomenta y configura para activar autenticación por API key:
+      # - key: SCAN_AGENT_API_KEY
+      #   generateValue: true
     autoDeploy: true
+
