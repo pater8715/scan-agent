@@ -126,18 +126,18 @@ Los reportes actuales son profesionales pero no pedagógicos.
 ---
 
 ### FASE 6 — Seguridad y Arquitectura
-**Prioridad:** MEDIA | **Estimado:** ~15h | **Estado:** ⬜ Pendiente
+**Prioridad:** MEDIA | **Estimado:** ~15h | **Estado:** ✅ Completado (2026-05-19)
 
 Mejoras de seguridad en la propia herramienta.
 
 | # | Tarea | Estado | Notas |
 |---|-------|--------|-------|
-| 6.1 | Eliminar `privileged: true` del docker-compose web | ⬜ | Reemplazar con capabilities mínimas |
-| 6.2 | Añadir autenticación a la API FastAPI (API key o JWT) | ⬜ | Middleware en `webapp/main.py` |
-| 6.3 | Validar targets para evitar escanear IPs no autorizadas (whitelist) | ⬜ | Input validation en `scanner.py` |
-| 6.4 | Implementar rate limiting en la API con `slowapi` | ⬜ | `webapp/main.py` |
-| 6.5 | Añadir logging estructurado en JSON para auditoría | ⬜ | Reemplazar prints por logger |
-| 6.6 | Crear suite de tests automáticos con pytest | ⬜ | Directorio `tests/` |
+| 6.1 | Eliminar `privileged: true` del docker-compose web | ✅ | Reemplazado con `cap_add: NET_RAW, NET_ADMIN` + `cap_drop: ALL` + `no-new-privileges` |
+| 6.2 | Añadir autenticación a la API FastAPI (API key o JWT) | ✅ | `X-API-Key` header — se activa con env var `SCAN_AGENT_API_KEY`; sin ella, bypass en dev |
+| 6.3 | Validar targets para evitar escanear IPs no autorizadas (whitelist) | ✅ | `validate_target()` en `scanner.py` — IPs RFC 1918 + hostnames `.local/.internal`; flag `ALLOW_PUBLIC_TARGETS=true` para lab externo |
+| 6.4 | Implementar rate limiting en la API | ✅ | Rate limiter en memoria (sin deps externas): 30 req/60s por IP en endpoints de escaneo |
+| 6.5 | Añadir logging estructurado en JSON para auditoría | ✅ | `src/scanagent/logging_config.py` — `JSONFormatter`, integrado en `agent.py` y `webapp/main.py` |
+| 6.6 | Crear suite de tests automáticos con pytest | ✅ | `tests/` — 4 módulos: scanner validation (15 casos), interpreter educational (9 casos), logging config (3 casos), rate limiter (4 casos) |
 
 ---
 
@@ -165,7 +165,7 @@ Mejoras opcionales para enriquecer la experiencia educativa.
 | 2 | CVE/NVD actualizado | ALTA | ~20h | ✅ |
 | 3 | Integración OWASP ZAP | ALTA | ~35h | ✅ |
 | 5 | Reportes educativos | MEDIA | ~25h | ✅ |
-| 6 | Seguridad y arquitectura | MEDIA | ~15h | ⬜ |
+| 6 | Seguridad y arquitectura | MEDIA | ~15h | ✅ |
 | 7 | Funcionalidades avanzadas | BAJA | ~30h | ⬜ |
 | | **TOTAL** | | **~177h** | |
 
@@ -197,6 +197,7 @@ SEMANA 15+:  Fase 7 — Funcionalidades avanzadas (según disponibilidad)
 | 2026-05-16 | Fix UTF-8 en stdout Windows (agent.py) | — |
 | 2026-05-16 | Implementación completa integración OWASP ZAP | 3 |
 | 2026-05-16 | Implementación completa reportes educativos — 181/279 vulns enriquecidas en Juice Shop | 5 |
+| 2026-05-19 | Implementación completa Seguridad y Arquitectura — privileged eliminado, API key auth, rate limiting, target validation, JSON logging, suite pytest | 6 |
 
 ---
 

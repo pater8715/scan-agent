@@ -15,11 +15,17 @@ Versión: 1.0.0
 """
 
 import sys
+import os
+import logging
+import json
+from collections import defaultdict
+from datetime import datetime, timedelta
 from pathlib import Path
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, HTTPException, Security, Depends
+from fastapi.security.api_key import APIKeyHeader
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
@@ -31,6 +37,64 @@ sys.path.insert(0, str(src_path))
 from webapp.api.scans import router as scans_router
 from webapp.api.reports import router as reports_router
 from webapp.api.profiles import router as profiles_router
+
+# Inicializar logging estructurado
+try:
+    from scanagent.logging_config import setup_logging
+    setup_logging(
+        level=os.environ.get("LOG_LEVEL", "INFO"),
+        json_output=os.environ.get("JSON_LOGGING", "true").lower() != "false",
+    )
+except ImportError:
+    logging.basicConfig(level=logging.INFO)
+
+logger = logging.getLogger("scan_agent.web")
+
+# ---------------------------------------------------------------------------
+# Autenticación por API Key (opcional — se activa con SCAN_AGENT_API_KEY)
+# ---------------------------------------------------------------------------
+API_KEY_HEADER = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+async def verify_api_key(api_key: str = Security(API_KEY_HEADER)):
+    configured_key = os.environ.get("SCAN_AGENT_API_KEY", "").strip()
+    if not configured_key:
+        return  # Auth desactivada en modo desarrollo
+    if api_key != configured_key:
+        logger.warning("Intento de acceso con API key inválida")
+        raise HTTPException(status_code=403, detail="API key inválida o ausente")
+
+
+# ---------------------------------------------------------------------------
+# Rate limiter en memoria (sin dependencias externas)
+# 30 peticiones / 60 s por IP para endpoints de escaneo
+# ---------------------------------------------------------------------------
+class _InMemoryRateLimiter:
+    def __init__(self, max_requests: int = 30, window_seconds: int = 60):
+        self.max_requests = max_requests
+        self.window = timedelta(seconds=window_seconds)
+        self._log: dict[str, list[datetime]] = defaultdict(list)
+
+    def is_allowed(self, client_ip: str) -> bool:
+        now = datetime.now()
+        cutoff = now - self.window
+        bucket = self._log[client_ip]
+        # eliminar entradas viejas
+        self._log[client_ip] = [t for t in bucket if t > cutoff]
+        if len(self._log[client_ip]) >= self.max_requests:
+            return False
+        self._log[client_ip].append(now)
+        return True
+
+
+_rate_limiter = _InMemoryRateLimiter()
+
+
+async def check_rate_limit(request: Request):
+    client_ip = request.client.host if request.client else "unknown"
+    if not _rate_limiter.is_allowed(client_ip):
+        logger.warning("Rate limit excedido para IP %s", client_ip)
+        raise HTTPException(status_code=429, detail="Demasiadas peticiones. Espera un momento.")
+
 
 # Crear aplicación FastAPI
 app = FastAPI(
@@ -56,8 +120,13 @@ app.mount("/static", StaticFiles(directory=str(webapp_path / "static")), name="s
 templates = Jinja2Templates(directory=str(webapp_path / "templates"))
 
 # Incluir routers de la API
-app.include_router(scans_router, prefix="/api/scans", tags=["Scans"])
-app.include_router(reports_router, prefix="/api/reports", tags=["Reports"])
+# Los endpoints de escaneo llevan autenticación + rate limit
+# Los de perfiles y reportes solo autenticación
+_scan_deps = [Depends(verify_api_key), Depends(check_rate_limit)]
+_auth_deps = [Depends(verify_api_key)]
+
+app.include_router(scans_router, prefix="/api/scans", tags=["Scans"], dependencies=_scan_deps)
+app.include_router(reports_router, prefix="/api/reports", tags=["Reports"], dependencies=_auth_deps)
 app.include_router(profiles_router, prefix="/api/profiles", tags=["Profiles"])
 
 

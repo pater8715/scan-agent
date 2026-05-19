@@ -179,11 +179,25 @@ clean-all: ## Limpiar todo (contenedores, imágenes, volúmenes)
 # DESARROLLO Y TESTING
 # ============================================================================
 
-test: ## Ejecutar tests básicos
+test: ## Ejecutar tests básicos (Docker)
 	@echo -e "$(BLUE)[TEST]$(NC) Ejecutando tests básicos..."
 	docker run --rm $(IMAGE_NAME):$(VERSION) --version
 	docker run --rm $(IMAGE_NAME):$(VERSION) --list-profiles
 	@echo -e "$(GREEN)[OK]$(NC) Tests básicos completados"
+
+test-unit: ## Ejecutar suite pytest en local (requiere: pip install pytest)
+	@echo -e "$(BLUE)[TEST]$(NC) Ejecutando suite pytest..."
+	python3 -m pytest tests/ -v --tb=short
+	@echo -e "$(GREEN)[OK]$(NC) Suite pytest completada"
+
+test-unit-docker: ## Ejecutar suite pytest dentro del contenedor
+	@echo -e "$(BLUE)[TEST]$(NC) Ejecutando pytest en Docker..."
+	docker run --rm \
+		-v $$(pwd)/tests:/scan-agent/tests:ro \
+		-v $$(pwd)/pytest.ini:/scan-agent/pytest.ini:ro \
+		--entrypoint python3 $(IMAGE_NAME):$(VERSION) \
+		-m pytest /scan-agent/tests/ -v --tb=short
+	@echo -e "$(GREEN)[OK]$(NC) pytest en Docker completado"
 
 test-scan: ## Test de escaneo (requiere TARGET)
 ifndef TARGET

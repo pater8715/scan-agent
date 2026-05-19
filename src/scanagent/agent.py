@@ -28,6 +28,19 @@ if hasattr(sys.stdout, 'reconfigure'):
 if hasattr(sys.stderr, 'reconfigure'):
     sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 
+import logging
+
+# Configurar logging antes de importar el resto de módulos
+try:
+    from scanagent.logging_config import setup_logging
+    _log_level = __import__("os").environ.get("LOG_LEVEL", "INFO")
+    _json_log = __import__("os").environ.get("JSON_LOGGING", "true").lower() != "false"
+    setup_logging(level=_log_level, json_output=_json_log)
+except ImportError:
+    logging.basicConfig(level=logging.INFO)
+
+logger = logging.getLogger("scan_agent.agent")
+
 # Importar módulos del agente
 try:
     from scanagent.parser import ScanParser

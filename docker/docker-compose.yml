@@ -77,15 +77,15 @@ services:
     container_name: scan-agent-web
     hostname: scan-agent-web
     
-    # Capacidades y permisos para escaneos
+    # Capacidades mínimas necesarias para escaneos de red
     cap_add:
-      - NET_RAW      # Para escaneos básicos
+      - NET_RAW      # Para escaneos básicos (nmap raw sockets)
       - NET_ADMIN    # Para escaneos avanzados
-      - SYS_PTRACE   # Para debugging
-    
-    # Modo privilegiado para permisos de red completos
-    privileged: true
-    
+    cap_drop:
+      - ALL          # Primero descartar todo, luego añadir solo lo necesario
+    security_opt:
+      - no-new-privileges:true
+
     # Red bridge para web UI
     networks:
       - scan-agent-network

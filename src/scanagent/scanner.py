@@ -11,10 +11,15 @@ Versión: 2.0.0
 import subprocess
 import os
 import sys
+import re
+import ipaddress
+import logging
 from datetime import datetime
 from typing import Dict, List, Optional
 from pathlib import Path
 import shlex
+
+logger = logging.getLogger("scan_agent.scanner")
 
 
 class ScanProfile:
@@ -435,6 +440,72 @@ class VulnerabilityScanner:
             'outputs_generated': []
         }
     
+    # Rangos privados permitidos por defecto
+    _PRIVATE_NETS = [
+        ipaddress.ip_network("10.0.0.0/8"),
+        ipaddress.ip_network("172.16.0.0/12"),
+        ipaddress.ip_network("192.168.0.0/16"),
+        ipaddress.ip_network("127.0.0.0/8"),
+        ipaddress.ip_network("::1/128"),
+    ]
+    _HOSTNAME_RE = re.compile(
+        r"^(?:[a-zA-Z0-9](?:[a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)"
+        r"(?:\.(?:[a-zA-Z0-9](?:[a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?))*$"
+    )
+    _LOCAL_SUFFIXES = (".local", ".lan", ".internal", ".corp", ".test")
+
+    @classmethod
+    def validate_target(cls, target: str) -> None:
+        """Valida que el target sea una IP privada/local o un hostname local autorizado.
+
+        Lanza ValueError si el target no está permitido.
+        Establece ALLOW_PUBLIC_TARGETS=true en el entorno para habilitar IPs públicas
+        (útil en laboratorios con objetivos externos autorizados).
+        """
+        allow_public = os.environ.get("ALLOW_PUBLIC_TARGETS", "").lower() == "true"
+
+        # Sanity check: evitar inyección de comandos
+        if not target or len(target) > 253:
+            raise ValueError(f"Target inválido: '{target}'")
+        if any(c in target for c in (";", "&", "|", "`", "$", "\n", "\r", " ")):
+            raise ValueError(f"Target contiene caracteres no permitidos: '{target}'")
+
+        # Intentar parsear como dirección IP
+        try:
+            ip = ipaddress.ip_address(target)
+            if ip.is_loopback or ip.is_private:
+                return  # siempre permitido
+            if allow_public:
+                return
+            raise ValueError(
+                f"Target '{target}' es una IP pública. "
+                "Solo se permiten IPs privadas/locales en este entorno. "
+                "Establece ALLOW_PUBLIC_TARGETS=true para habilitar IPs públicas."
+            )
+        except ValueError as exc:
+            # Si el mensaje de error es nuestro, re-lanzar
+            if "Target" in str(exc):
+                raise
+
+        # Es un hostname: validar formato
+        if not cls._HOSTNAME_RE.match(target):
+            raise ValueError(f"Hostname inválido: '{target}'")
+
+        if target.lower() == "localhost":
+            return
+        if any(target.lower().endswith(s) for s in cls._LOCAL_SUFFIXES):
+            return
+        if allow_public:
+            return
+
+        # Último recurso: intentar resolver y comprobar si es privado
+        # (no hacemos DNS aquí para no añadir latencia — si el env var no está,
+        # rechazamos hostnames externos por seguridad)
+        raise ValueError(
+            f"Hostname '{target}' parece externo. "
+            "Establece ALLOW_PUBLIC_TARGETS=true para escanear hosts no locales."
+        )
+
     def check_tool_availability(self, tool: str) -> bool:
         """Verifica si una herramienta está disponible en el sistema"""
         try:
@@ -568,10 +639,13 @@ class VulnerabilityScanner:
             tuple: (success: bool, generated_files: list)
         """
         
+        # Validar target antes de cualquier otra operación
+        self.validate_target(target)
+
         # Configurar directorio de salida
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Validar perfil
         if profile_name not in self.PROFILES:
             raise ValueError(f"Perfil '{profile_name}' no existe. Perfiles disponibles: {', '.join(self.PROFILES.keys())}")
