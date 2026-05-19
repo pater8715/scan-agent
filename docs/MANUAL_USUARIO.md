@@ -1,6 +1,6 @@
 # Manual de Usuario — Scan Agent Lab
 
-**Versión:** 3.0  
+**Versión:** 3.1  
 **Audiencia:** Estudiantes de desarrollo de aplicaciones web y APIs REST  
 **Requisito previo:** Docker Desktop instalado y funcionando
 
@@ -20,6 +20,8 @@
 10. [Solución de problemas](#10-solución-de-problemas)
 11. [Referencia rápida](#11-referencia-rápida)
 12. [Ejercicios prácticos guiados](#12-ejercicios-prácticos-guiados)
+13. [Seguridad de la herramienta](#13-seguridad-de-la-herramienta)
+14. [Funcionalidades avanzadas](#14-funcionalidades-avanzadas)
 
 ---
 
@@ -224,15 +226,39 @@ make lab-scan-dvwa     # Escanea DVWA con perfil lab
 
 ### Opciones principales del CLI
 
+**Escaneo y análisis:**
+
 | Opción | Descripción | Ejemplo |
 |--------|-------------|---------|
 | `--target` | IP o hostname objetivo | `--target juice-shop` |
 | `--profile` | Perfil de escaneo | `--profile lab` |
 | `--format` | Formato del reporte | `--format html` |
-| `--description` | Descripción del escaneo | `--description "Clase 4"` |
 | `--output-dir` | Carpeta de salida | `--output-dir ./reports` |
 | `--update-db` | Actualizar base CVE/KEV | `--update-db` |
 | `--web` | Iniciar en modo web UI | `--web --port 8080` |
+
+**Formatos de reporte disponibles con `--format`:**
+
+| Valor | Formato generado | Descripción |
+|-------|-----------------|-------------|
+| `html` | `informe_tecnico.html` | Reporte visual interactivo |
+| `json` | `informe_tecnico.json` | Datos estructurados para integración |
+| `txt` | `informe_tecnico.txt` | Texto plano para terminales |
+| `md` | `informe_tecnico.md` | Markdown para documentación |
+| `educational` | `informe_educativo.html` | Reporte pedagógico con ejemplos y remediación |
+| `sarif` | `informe_tecnico.sarif.json` | SARIF 2.1.0 para GitHub Advanced Security |
+| `all` | todos los anteriores | Genera todos los formatos a la vez |
+
+**Funcionalidades avanzadas (Fase 7):**
+
+| Opción | Descripción | Ejemplo |
+|--------|-------------|---------|
+| `--dep-scan [DIR]` | Analizar dependencias Python/Node.js en busca de CVEs | `--dep-scan .` |
+| `--student-id ID` | ID del estudiante para tracking de progreso | `--student-id alumno01` |
+| `--ctf list` | Listar desafíos CTF disponibles | `--ctf list` |
+| `--ctf start --challenge-id ID` | Iniciar un desafío CTF | `--ctf start --challenge-id CTF-01` |
+| `--ctf scoreboard` | Ver ranking de puntuación CTF | `--ctf scoreboard` |
+| `--ctf-hint ID` | Pedir pista para un desafío (aplica penalización) | `--ctf-hint CTF-02` |
 
 ---
 
@@ -473,14 +499,28 @@ docker rmi scan-agent:3.0.0 bkimminich/juice-shop:v17.1.1
 ### Comandos Make
 
 ```bash
+# ── Laboratorio ───────────────────────────────────────────────────────
 make lab-start          # Iniciar el laboratorio completo
 make lab-stop           # Detener el laboratorio
 make lab-status         # Ver estado de los contenedores
 make lab-scan-juice     # Escanear Juice Shop (perfil lab)
 make lab-scan-dvwa      # Escanear DVWA (perfil lab)
+
+# ── Construcción ──────────────────────────────────────────────────────
 make build              # Reconstruir la imagen de Scan Agent
 make logs-web           # Ver logs de la interfaz web en tiempo real
 make help               # Listar todos los comandos disponibles
+
+# ── Tests ─────────────────────────────────────────────────────────────
+make test-unit          # Ejecutar suite pytest en local
+make test-unit-docker   # Ejecutar pytest dentro del contenedor
+
+# ── Funcionalidades avanzadas (Fase 7) ────────────────────────────────
+make dep-scan                          # Analizar dependencias del proyecto
+make sarif-report                      # Generar reporte SARIF para GitHub
+make ctf-list                          # Ver desafíos CTF disponibles
+make ctf-scoreboard                    # Ver ranking de estudiantes
+make ctf-start CHALLENGE_ID=CTF-01 STUDENT_ID=alumno01  # Iniciar desafío
 ```
 
 ### URLs del laboratorio
@@ -1138,6 +1178,479 @@ docker run --rm --network scan-agent-network \
 
 ---
 
+---
+
+## 13. Seguridad de la herramienta
+
+Esta sección describe cómo configurar las funciones de seguridad de la propia herramienta cuando se despliega en entornos compartidos o semi-públicos (por ejemplo, en un servidor de clase).
+
+### 13.1 Autenticación por API key
+
+Por defecto la API no requiere autenticación (modo desarrollo). Para activarla:
+
+```bash
+# Definir la clave en el entorno del contenedor
+docker compose -f docker/docker-compose.yml --profile web up -d \
+  -e SCAN_AGENT_API_KEY=mi_clave_secreta
+```
+
+Una vez activada, todas las peticiones a `/api/scans/*` y `/api/reports/*` deben incluir el header:
+
+```http
+X-API-Key: mi_clave_secreta
+```
+
+Sin el header, la API responde `403 Forbidden`.
+
+**Desde Postman o curl:**
+```bash
+curl -H "X-API-Key: mi_clave_secreta" http://localhost:8080/api/scans/list
+```
+
+**Desde la Web UI:** la interfaz web incluye el header automáticamente si la variable `SCAN_AGENT_API_KEY` está configurada.
+
+> Para el laboratorio local (uso personal) no es necesario activar la API key. Es útil cuando se comparte el servidor web entre varios estudiantes.
+
+### 13.2 Validación de targets
+
+La herramienta rechaza escaneos a IPs públicas por defecto. Solo se permiten:
+
+| Rango permitido | Descripción |
+|----------------|-------------|
+| `10.0.0.0/8` | Red privada clase A |
+| `172.16.0.0/12` | Red privada clase B |
+| `192.168.0.0/16` | Red privada clase C |
+| `127.0.0.0/8` | Loopback |
+| `*.local`, `*.internal`, `*.corp` | Hostnames locales |
+| `juice-shop`, `dvwa`, `localhost` | Objetivos del lab |
+
+Si intentas escanear una IP pública sin autorización:
+```
+ValueError: Target '8.8.8.8' es una IP pública. Solo se permiten IPs privadas/locales.
+Establece ALLOW_PUBLIC_TARGETS=true para habilitar IPs públicas.
+```
+
+Para habilitar escaneos a hosts externos (ej.: una práctica con un servidor propio):
+```bash
+docker run --rm -e ALLOW_PUBLIC_TARGETS=true \
+  scan-agent:3.0.0 --scan --target MI_SERVIDOR --profile quick
+```
+
+> **Nunca uses `ALLOW_PUBLIC_TARGETS=true` en sistemas sin autorización expresa del propietario.**
+
+### 13.3 Rate limiting
+
+La API limita automáticamente las peticiones de escaneo: **30 peticiones por minuto por IP**. Si se excede:
+
+```json
+HTTP 429 Too Many Requests
+{"detail": "Demasiadas peticiones. Espera un momento."}
+```
+
+Esto protege el servidor de abusos en un entorno de clase compartido.
+
+### 13.4 Logging estructurado
+
+Todos los eventos relevantes (inicio de escaneo, errores, intentos de autenticación fallidos) se registran en formato JSON estructurado en stderr:
+
+```json
+{"ts":"2026-05-19T14:32:01+00:00","level":"INFO","logger":"scan_agent.agent","msg":"Escaneo iniciado","target":"juice-shop","profile":"lab"}
+{"ts":"2026-05-19T14:32:02+00:00","level":"WARNING","logger":"scan_agent.web","msg":"Intento de acceso con API key inválida"}
+```
+
+Para ver los logs en tiempo real:
+```bash
+docker logs scan-agent-web -f
+```
+
+Para desactivar el formato JSON y usar texto legible (útil en desarrollo):
+```bash
+docker run -e JSON_LOGGING=false scan-agent:3.0.0 ...
+```
+
+---
+
+## 14. Funcionalidades avanzadas
+
+### 14.1 Análisis de dependencias (`--dep-scan`)
+
+Scan Agent puede analizar las dependencias de tu proyecto buscando CVEs conocidos, cubriendo **OWASP A06:2021 — Vulnerable and Outdated Components**.
+
+**Fuentes consultadas:**
+- **OSV API** (osv.dev) — base de datos de vulnerabilidades en paquetes Python, npm, Go, etc.
+- **npm audit** — análisis nativo de dependencias Node.js
+
+```bash
+# Analizar dependencias del directorio actual
+python3 scripts/scan-agent.py --dep-scan .
+
+# O desde Docker (monta tu proyecto)
+docker run --rm \
+  -v $(pwd):/scan-agent/project:ro \
+  scan-agent:3.0.0 --dep-scan /scan-agent/project
+
+# Con Make
+make dep-scan
+```
+
+**Salida de ejemplo:**
+```
+[DependencyScanner] Escaneando requirements.txt
+[!] 3 dependencias vulnerables encontradas:
+  [ALTA] requests: requests 2.27.1: Remote code execution via SSRF
+         CVEs: CVE-2023-32681
+  [MEDIA] urllib3: urllib3 1.26.5: Header injection
+         CVEs: CVE-2023-43804
+  [BAJA] certifi: certifi 2022.12.07: Weak root certificate
+         CVEs: CVE-2022-23491
+```
+
+Los hallazgos se mapean automáticamente a `OWASP A06:2021` y se incluyen si se ejecuta un análisis posterior con `--format educational`.
+
+### 14.2 Reporte SARIF para GitHub (`--format sarif`)
+
+SARIF (Static Analysis Results Interchange Format) es el estándar que usa GitHub Advanced Security para mostrar vulnerabilidades directamente en pull requests y en la pestaña "Security" del repositorio.
+
+```bash
+# Generar reporte SARIF después de un escaneo
+python3 scripts/scan-agent.py --format sarif
+
+# O directamente al escanear
+docker run --rm --network scan-agent-network \
+  scan-agent:3.0.0 --scan --target juice-shop:3000 --profile lab --format sarif
+
+# Con Make (requiere outputs/ previo)
+make sarif-report
+```
+
+El archivo `informe_tecnico.sarif.json` se puede subir a GitHub:
+
+```bash
+# Subir a GitHub Code Scanning
+gh code-scanning upload-results \
+  --sarif informe_tecnico.sarif.json \
+  --ref refs/heads/main \
+  --commit $(git rev-parse HEAD)
+```
+
+O adjuntarlo directamente desde la UI de GitHub en: **Settings → Code security → Code scanning → Upload SARIF file**.
+
+**Estructura del archivo SARIF generado:**
+- `runs[].tool.driver.rules[]` — regla por tipo de vulnerabilidad (ruleId, descripción, nivel, CWE, enlace OWASP)
+- `runs[].results[]` — hallazgo individual (mensaje, nivel, payload de ejemplo, remediación)
+- Compatible con VS Code [SARIF Viewer Extension](https://marketplace.visualstudio.com/items?itemName=MS-SarifVSCode.sarif-viewer)
+
+### 14.3 Notificaciones webhook
+
+Scan Agent puede enviar una notificación automática a un webhook cada vez que completa un escaneo con vulnerabilidades relevantes.
+
+**Configuración (variables de entorno):**
+
+| Variable | Descripción | Valor por defecto |
+|----------|-------------|-------------------|
+| `WEBHOOK_URL` | URL del endpoint receptor | — (desactivado) |
+| `WEBHOOK_SECRET` | Secreto HMAC-SHA256 para firma | — (sin firma) |
+| `WEBHOOK_FORMAT` | `generic` o `slack` | `generic` |
+| `WEBHOOK_MIN_SEV` | Severidad mínima para notificar | `alta` |
+
+**Activar con webhook genérico:**
+```bash
+docker run --rm --network scan-agent-network \
+  -e WEBHOOK_URL=https://mi-servidor.com/scan-webhook \
+  -e WEBHOOK_MIN_SEV=critica \
+  scan-agent:3.0.0 --scan --target juice-shop:3000 --profile lab
+```
+
+**Payload enviado (formato genérico):**
+```json
+{
+  "event": "scan_complete",
+  "timestamp": "2026-05-19T14:32:01+00:00",
+  "target": "juice-shop",
+  "profile": "lab",
+  "summary": {"critica": 2, "alta": 8, "media": 15},
+  "top_findings": [
+    {"tipo": "bola", "severidad": "critica", "owasp": "API1:2023"}
+  ]
+}
+```
+
+**Integración con Slack:**
+```bash
+# Obtén la URL del Incoming Webhook en: api.slack.com/apps → Incoming Webhooks
+docker run --rm --network scan-agent-network \
+  -e WEBHOOK_URL=https://hooks.slack.com/services/XXX/YYY/ZZZ \
+  -e WEBHOOK_FORMAT=slack \
+  scan-agent:3.0.0 --scan --target dvwa:80 --profile web
+```
+
+**Verificar firma HMAC (en tu servidor receptor):**
+```python
+import hmac, hashlib
+
+def verify_scan_agent_signature(body: bytes, header_sig: str, secret: str) -> bool:
+    expected = "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, header_sig)
+```
+
+### 14.4 Modo CTF — Gamificación del aprendizaje
+
+El modo CTF convierte el laboratorio en un juego de captura de banderas donde los estudiantes ganan puntos encontrando vulnerabilidades reales.
+
+#### Desafíos disponibles
+
+| ID | Título | OWASP | Dificultad | Puntos |
+|----|--------|-------|------------|--------|
+| CTF-01 | Headers de Seguridad Ausentes | A05:2021 | 🟢 Fácil | 100 |
+| CTF-02 | SQL Injection en Login | A03:2021 | 🟡 Medio | 200 |
+| CTF-03 | XSS Reflejado | A03:2021 | 🟡 Medio | 200 |
+| CTF-04 | Autenticación Rota — Fuerza Bruta | A07:2021 | 🟡 Medio | 250 |
+| CTF-05 | IDOR — Acceso a Datos de Otro Usuario | A01:2021 | 🔴 Difícil | 350 |
+| CTF-06 | Información Sensible Expuesta | A05:2021 | 🟢 Fácil | 150 |
+| CTF-07 | Componentes Vulnerables | A06:2021 | 🟡 Medio | 300 |
+| CTF-08 | SSRF | A10:2021 | 🔴 Difícil | 400 |
+
+**Puntuación máxima posible:** 1.950 puntos + bonificaciones por tiempo.
+
+#### Flujo de trabajo CTF
+
+```bash
+# 1. Registrar tu nombre de estudiante
+export STUDENT_ID="tu_nombre"
+
+# 2. Ver todos los desafíos y tu progreso actual
+make ctf-list STUDENT_ID=$STUDENT_ID
+
+# 3. Iniciar un desafío (activa el temporizador)
+make ctf-start CHALLENGE_ID=CTF-01 STUDENT_ID=$STUDENT_ID
+
+# 4. Ejecutar el escaneo para encontrar la vulnerabilidad
+docker run --rm --network scan-agent-network \
+  scan-agent:3.0.0 --scan --target juice-shop:3000 --profile quick \
+  --student-id $STUDENT_ID
+
+# 5. Pedir pista si es necesario (reduce puntos)
+docker run --rm -v $(pwd)/data:/scan-agent/data \
+  scan-agent:3.0.0 --ctf-hint CTF-01
+
+# 6. Ver el ranking
+make ctf-scoreboard
+```
+
+#### Sistema de puntuación
+
+| Concepto | Efecto |
+|----------|--------|
+| Puntos base | Fijos por desafío (100–400 pts) |
+| Bonus tiempo | +50% si resuelves en < 10 min; disminuye hasta 0% a los 60 min |
+| Penalización pista | Se descuenta del total al pedir pista (25–100 pts) |
+
+El progreso se guarda en `data/ctf_progress.db` — persiste entre sesiones.
+
+### 14.5 Tracking de progreso por estudiante
+
+Cada escaneo realizado con `--student-id` queda registrado en la base de datos con:
+
+- Target, perfil y fecha del escaneo
+- Conteo de vulnerabilidades por severidad
+- Cobertura de categorías OWASP detectadas
+
+```bash
+# Escanear identificándote como estudiante
+docker run --rm --network scan-agent-network \
+  -v $(pwd)/data:/scan-agent/data \
+  scan-agent:3.0.0 \
+  --scan --target juice-shop:3000 --profile lab \
+  --student-id alumno01
+
+# O con variable de entorno
+docker run --rm --network scan-agent-network \
+  -e STUDENT_ID=alumno01 \
+  -v $(pwd)/data:/scan-agent/data \
+  scan-agent:3.0.0 --scan --target juice-shop:3000 --profile lab
+```
+
+**Consultar el progreso directamente en SQLite:**
+
+```bash
+# Ver resumen de todos los estudiantes (últimos 30 días)
+docker exec scan-agent-web sqlite3 /scan-agent/data/scan_history.db \
+  "SELECT student_id, total_scans, total_vulns_found, last_scan \
+   FROM v_student_summary ORDER BY last_scan DESC;"
+
+# Ver detalle de escaneos de un estudiante
+docker exec scan-agent-web sqlite3 /scan-agent/data/scan_history.db \
+  "SELECT target, profile, total_vulns, criticas, altas, scan_date \
+   FROM student_progress WHERE student_id='alumno01' ORDER BY scan_date DESC;"
+```
+
+**Caso de uso en clase:** el profesor puede comparar la evolución de cada estudiante escaneando el mismo objetivo con el mismo perfil en distintos momentos — si el número de vulnerabilidades disminuye, el estudiante ha aplicado correcciones exitosamente.
+
+---
+
+### Ejercicio 11 — Análisis de dependencias vulnerables (20 min)
+
+**Objetivo:** identificar paquetes Python con CVEs usando el dependency scanner.  
+**OWASP:** A06:2021 — Vulnerable and Outdated Components  
+**CWE:** CWE-1104
+
+#### Paso 1 — Crear un requirements.txt de prueba con versiones vulnerables
+
+```bash
+# Crea un archivo temporal con versiones deliberadamente antiguas
+cat > /tmp/req_test.txt << 'EOF'
+requests==2.18.0
+urllib3==1.21.1
+flask==0.12.0
+django==2.0.0
+EOF
+```
+
+#### Paso 2 — Analizar con el dependency scanner
+
+```bash
+docker run --rm \
+  -v /tmp:/scan-agent/testdir:ro \
+  scan-agent:3.0.0 --dep-scan /scan-agent/testdir
+```
+
+#### Paso 3 — Interpretar los resultados
+
+Para cada paquete vulnerable que encuentres, anota:
+
+| Paquete | Versión afectada | CVE | Severidad | Remediación |
+|---------|-----------------|-----|-----------|-------------|
+| requests | 2.18.0 | ? | ? | Actualizar a >= ? |
+| flask | 0.12.0 | ? | ? | Actualizar a >= ? |
+
+#### Paso 4 — Reflexión
+
+1. ¿Cuántas vulnerabilidades se podrían haber evitado simplemente actualizando las dependencias?
+2. ¿Cómo automatizarías este escaneo en un pipeline CI/CD?
+
+---
+
+### Ejercicio 12 — Modo CTF completo (40 min)
+
+**Objetivo:** completar al menos 3 desafíos CTF y entender la gamificación de la seguridad.  
+**Requisito:** laboratorio completo arriba
+
+#### Paso 1 — Registrar tu identidad y ver los desafíos
+
+```bash
+export STUDENT_ID="tu_nombre_o_alias"
+make ctf-list STUDENT_ID=$STUDENT_ID
+```
+
+#### Paso 2 — Iniciar el desafío más fácil: CTF-01 (Headers)
+
+```bash
+make ctf-start CHALLENGE_ID=CTF-01 STUDENT_ID=$STUDENT_ID
+```
+
+Lee el objetivo del desafío. Tienes 10 minutos para máxima puntuación.
+
+#### Paso 3 — Ejecutar el escaneo para completar CTF-01
+
+```bash
+docker run --rm --network scan-agent-network \
+  -v $(pwd)/data:/scan-agent/data \
+  -e STUDENT_ID=$STUDENT_ID \
+  scan-agent:3.0.0 \
+  --scan --target juice-shop:3000 --profile quick
+```
+
+El sistema detectará automáticamente si los hallazgos completan el desafío.
+
+#### Paso 4 — Continuar con CTF-06 (Información expuesta)
+
+```bash
+make ctf-start CHALLENGE_ID=CTF-06 STUDENT_ID=$STUDENT_ID
+
+docker run --rm --network scan-agent-network \
+  -v $(pwd)/data:/scan-agent/data \
+  -e STUDENT_ID=$STUDENT_ID \
+  scan-agent:3.0.0 \
+  --scan --target juice-shop:3000 --profile api-owasp
+```
+
+#### Paso 5 — Intentar CTF-02 (SQL Injection) — pide pista si te bloqueas
+
+```bash
+make ctf-start CHALLENGE_ID=CTF-02 STUDENT_ID=$STUDENT_ID
+
+# Si necesitas orientación (aplica penalización de 50 pts):
+docker run --rm -v $(pwd)/data:/scan-agent/data \
+  scan-agent:3.0.0 --ctf-hint CTF-02
+
+# Ejecutar el escaneo sobre DVWA
+docker run --rm --network scan-agent-network \
+  -v $(pwd)/data:/scan-agent/data \
+  -e STUDENT_ID=$STUDENT_ID \
+  scan-agent:3.0.0 --scan --target dvwa:80 --profile web
+```
+
+#### Paso 6 — Ver el ranking final
+
+```bash
+make ctf-scoreboard
+```
+
+---
+
+### Ejercicio 13 — Exportar resultados a GitHub con SARIF (15 min)
+
+**Objetivo:** generar un reporte SARIF y entender cómo integrarlo con GitHub Security.  
+**Requisito:** haber ejecutado al menos un escaneo previo
+
+#### Paso 1 — Generar el reporte SARIF
+
+```bash
+# Si tienes un escaneo previo con outputs en ./outputs:
+docker run --rm \
+  -v $(pwd)/outputs:/scan-agent/outputs:ro \
+  -v $(pwd)/reports:/scan-agent/reports \
+  scan-agent:3.0.0 --format sarif
+
+# O escanear y generar SARIF en un solo paso:
+docker run --rm --network scan-agent-network \
+  scan-agent:3.0.0 \
+  --scan --target juice-shop:3000 --profile lab --format sarif
+```
+
+#### Paso 2 — Inspeccionar el archivo SARIF
+
+```bash
+# Ver la estructura del SARIF generado
+python3 -m json.tool reports/informe_tecnico.sarif.json | head -60
+```
+
+Verifica que tiene la estructura correcta:
+```json
+{
+  "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/...",
+  "version": "2.1.0",
+  "runs": [{
+    "tool": { "driver": { "name": "Scan Agent", ... }},
+    "results": [ ... ]
+  }]
+}
+```
+
+#### Paso 3 — Ver en VS Code (opcional)
+
+Si tienes VS Code con la extensión [SARIF Viewer](https://marketplace.visualstudio.com/items?itemName=MS-SarifVSCode.sarif-viewer):
+
+1. Abre el archivo `reports/informe_tecnico.sarif.json`
+2. La extensión lo detecta automáticamente y muestra los hallazgos en el panel "SARIF Explorer"
+3. Cada hallazgo muestra: descripción, nivel, OWASP category, ejemplo de remediación
+
+#### Paso 4 — Reflexión
+
+¿Cómo usarías el formato SARIF para que el equipo de desarrollo vea las vulnerabilidades directamente en el pull request sin necesidad de descargar un reporte separado?
+
+---
+
 ### Resumen de ejercicios
 
 | # | Ejercicio | OWASP | Tiempo | Dificultad |
@@ -1152,6 +1665,9 @@ docker run --rm --network scan-agent-network \
 | 8 | API REST de Scan Agent | — | 15 min | ⬤⬤○ Intermedio |
 | 9 | Ciclo completo detectar-verificar | múltiple | 40 min | ⬤⬤⬤ Avanzado |
 | 10 | Tu propia aplicación | múltiple | variable | ⬤⬤⬤ Avanzado |
+| 11 | Análisis de dependencias | A06 | 20 min | ⬤⬤○ Intermedio |
+| 12 | Modo CTF completo | múltiple | 40 min | ⬤⬤⬤ Avanzado |
+| 13 | Exportar SARIF a GitHub | — | 15 min | ⬤⬤○ Intermedio |
 
 ---
 
