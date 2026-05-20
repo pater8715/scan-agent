@@ -86,7 +86,6 @@ COPY src/ ./src/
 COPY webapp/ ./webapp/
 COPY config/ ./config/
 COPY scripts/ ./scripts/
-COPY docs/ ./docs/
 COPY README.md ./
 
 # Crear directorios necesarios con permisos correctos
