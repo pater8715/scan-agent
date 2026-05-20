@@ -74,7 +74,8 @@
 #
 # ============================================================================
 
-# NO hay dependencias Python externas - proyecto autosuficiente
+# Dependencias web (FastAPI, uvicorn, etc.)
+-r webapp/requirements.txt
 
 # ============================================================================
 # NOTA: Si en el futuro deseas agregar funcionalidades adicionales,
