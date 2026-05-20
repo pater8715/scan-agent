@@ -25,6 +25,9 @@
                     <button class="nav-btn" data-page="reports">
                         <span class="icon">📊</span> Reportes
                     </button>
+                    <button class="nav-btn" data-page="manual">
+                        <span class="icon">📖</span> Manual
+                    </button>
                 </nav>
             </div>
         </div>
@@ -206,6 +209,29 @@
 
                 <div class="card">
                     <p class="info-text">Selecciona un escaneo del historial para ver sus reportes</p>
+                </div>
+            </div>
+
+            <!-- Manual Page -->
+            <div id="manual-page" class="page">
+                <div class="page-header">
+                    <h2>Manual de Usuario</h2>
+                    <p class="subtitle">Documentación completa de Scan Agent v3.1</p>
+                </div>
+
+                <div class="manual-layout">
+                    <!-- TOC sidebar -->
+                    <aside class="manual-toc" id="manual-toc">
+                        <div class="toc-header">Contenido</div>
+                        <div id="toc-list"><div class="loading">Cargando...</div></div>
+                    </aside>
+
+                    <!-- Content area -->
+                    <div class="card manual-content-card">
+                        <div id="manual-content">
+                            <div class="loading">Cargando manual...</div>
+                        </div>
+                    </div>
                 </div>
             </div>
 

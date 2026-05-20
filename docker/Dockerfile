@@ -71,7 +71,8 @@ RUN pip3 install --break-system-packages --no-cache-dir \
     jinja2==3.1.4 \
     python-multipart==0.0.9 \
     pydantic==2.9.0 \
-    websockets==13.1 && \
+    websockets==13.1 \
+    markdown==3.7 && \
     # Limpiar cache de pip
     pip3 cache purge || true
 
@@ -85,6 +86,7 @@ COPY src/ ./src/
 COPY webapp/ ./webapp/
 COPY config/ ./config/
 COPY scripts/ ./scripts/
+COPY docs/ ./docs/
 COPY README.md ./
 
 # Crear directorios necesarios con permisos correctos

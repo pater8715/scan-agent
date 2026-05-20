@@ -163,6 +163,46 @@ async def index():
         return HTMLResponse(content=f.read())
 
 
+@app.get("/api/manual")
+async def get_manual():
+    """Devuelve el Manual de Usuario como HTML y secciones para el TOC."""
+    docs_paths = [
+        Path(__file__).parent.parent / "docs" / "MANUAL_USUARIO.md",
+        Path(__file__).parent.parent / "README.md",
+    ]
+    md_file = next((p for p in docs_paths if p.exists()), None)
+    if md_file is None:
+        return JSONResponse({"html": "<p>Manual no disponible.</p>", "toc": []})
+
+    raw = md_file.read_text(encoding="utf-8")
+
+    # Renderizar Markdown → HTML (con extensiones de tablas, código, y IDs en headings)
+    try:
+        import markdown as _md
+        html = _md.markdown(
+            raw,
+            extensions=["tables", "fenced_code", "toc", "attr_list"],
+            extension_configs={"toc": {"anchorlink": True}},
+        )
+    except ImportError:
+        # Fallback sin librería markdown: envuelve en <pre>
+        import html as _html_mod
+        html = f"<pre>{_html_mod.escape(raw)}</pre>"
+
+    # Extraer secciones de nivel 1 y 2 para el TOC lateral
+    import re
+    toc = []
+    for m in re.finditer(r'^(#{1,2})\s+(.+)$', raw, re.MULTILINE):
+        level = len(m.group(1))
+        title = m.group(2).strip()
+        # Generar anchor igual que python-markdown toc extension
+        anchor = re.sub(r'[^\w\s-]', '', title.lower())
+        anchor = re.sub(r'[\s_-]+', '-', anchor).strip('-')
+        toc.append({"level": level, "title": title, "anchor": anchor})
+
+    return JSONResponse({"html": html, "toc": toc})
+
+
 @app.websocket("/ws/{scan_id}")
 async def websocket_endpoint(websocket: WebSocket, scan_id: str):
     """WebSocket para recibir actualizaciones de progreso del escaneo"""

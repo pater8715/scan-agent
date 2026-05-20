@@ -9,6 +9,7 @@ const API_BASE = '/api';
 let currentScanId = null;
 let selectedProfile = null;
 let pollInterval = null;
+let manualLoaded = false;
 
 // ============================================
 // Inicialización
@@ -43,15 +44,59 @@ function initNavigation() {
 function showPage(pageId) {
     const pages = document.querySelectorAll('.page');
     pages.forEach(page => page.classList.remove('active'));
-    
+
     const targetPage = document.getElementById(`${pageId}-page`);
     if (targetPage) {
         targetPage.classList.add('active');
-        
-        // Cargar datos específicos de la página
+
         if (pageId === 'history') {
             loadScansHistory();
+        } else if (pageId === 'manual') {
+            loadManual();
         }
+    }
+}
+
+// ============================================
+// Manual de Usuario
+// ============================================
+
+async function loadManual() {
+    if (manualLoaded) return;
+
+    const content = document.getElementById('manual-content');
+    const tocList = document.getElementById('toc-list');
+
+    try {
+        const response = await fetch(`${API_BASE}/manual`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+
+        // Render HTML content
+        content.innerHTML = data.html || '<p class="info-text">Manual no disponible.</p>';
+
+        // Build TOC
+        if (data.toc && data.toc.length > 0) {
+            tocList.innerHTML = data.toc.map(item => `
+                <a class="toc-item toc-level-${item.level}" href="#${item.anchor}">
+                    ${item.title}
+                </a>
+            `).join('');
+        } else {
+            tocList.innerHTML = '';
+        }
+
+        manualLoaded = true;
+
+        // Highlight code blocks if any
+        content.querySelectorAll('pre code').forEach(block => {
+            block.classList.add('code-block');
+        });
+
+    } catch (error) {
+        console.error('Error cargando manual:', error);
+        content.innerHTML = '<p class="info-text">Error cargando el manual. Verifica que el servidor esté ejecutándose.</p>';
+        tocList.innerHTML = '';
     }
 }
 
