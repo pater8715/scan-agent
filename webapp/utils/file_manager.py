@@ -60,9 +60,10 @@ class FileRetentionManager:
     
     def _default_config(self) -> dict:
         """Configuración por defecto"""
+        base_dir = str(Path(__file__).parent.parent.parent / "data" / "storage")
         return {
             "retention": {"default_policy": "standard", "enable_auto_cleanup": True},
-            "storage": {"base_dir": "./storage", "max_size_gb": 20, "archive_threshold_days": 7, "delete_threshold_days": 90},
+            "storage": {"base_dir": base_dir, "max_size_gb": 20, "archive_threshold_days": 7, "delete_threshold_days": 90},
             "policies": {
                 "standard": {"active_days": 7, "archived_days": 30, "delete_after_days": 90}
             },

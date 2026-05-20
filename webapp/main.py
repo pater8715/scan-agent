@@ -190,15 +190,23 @@ async def get_manual():
         html = f"<pre>{_html_mod.escape(raw)}</pre>"
 
     # Extraer secciones de nivel 1 y 2 para el TOC lateral
+    # Ignorar líneas dentro de bloques de código (``` ... ```)
     import re
     toc = []
-    for m in re.finditer(r'^(#{1,2})\s+(.+)$', raw, re.MULTILINE):
-        level = len(m.group(1))
-        title = m.group(2).strip()
-        # Generar anchor igual que python-markdown toc extension
-        anchor = re.sub(r'[^\w\s-]', '', title.lower())
-        anchor = re.sub(r'[\s_-]+', '-', anchor).strip('-')
-        toc.append({"level": level, "title": title, "anchor": anchor})
+    in_code_block = False
+    for line in raw.splitlines():
+        if line.startswith("```"):
+            in_code_block = not in_code_block
+            continue
+        if in_code_block:
+            continue
+        m = re.match(r'^(#{1,2})\s+(.+)$', line)
+        if m:
+            level = len(m.group(1))
+            title = m.group(2).strip()
+            anchor = re.sub(r'[^\w\s-]', '', title.lower())
+            anchor = re.sub(r'[\s_-]+', '-', anchor).strip('-')
+            toc.append({"level": level, "title": title, "anchor": anchor})
 
     return JSONResponse({"html": html, "toc": toc})
 

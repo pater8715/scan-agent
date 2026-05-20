@@ -101,8 +101,9 @@ services:
       - ../reports:/scan-agent/reports:rw
       - ../data:/scan-agent/data:rw
       - ../logs:/scan-agent/logs:rw
+      - ../docs/MANUAL_USUARIO.md:/scan-agent/docs/MANUAL_USUARIO.md:ro
       - /etc/localtime:/etc/localtime:ro
-    
+
     # Variables de entorno para web
     environment:
       - TZ=Europe/Madrid
