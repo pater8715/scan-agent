@@ -495,6 +495,9 @@ class VulnerabilityScanner:
             return
         if any(target.lower().endswith(s) for s in cls._LOCAL_SUFFIXES):
             return
+        # Hostnames sin punto son siempre locales (Docker service names, /etc/hosts, LAN)
+        if "." not in target:
+            return
         if allow_public:
             return
 
