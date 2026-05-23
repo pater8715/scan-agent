@@ -4,9 +4,32 @@
     border-radius: 6px;
     cursor: pointer;
     border: 1px solid transparent;
+    border-left-width: 3px;
     margin-bottom: 6px;
     transition: background 0.15s;
 }
+.report-scan-item.risk-low      { border-left-color: #28a745; }
+.report-scan-item.risk-medium   { border-left-color: #ffc107; }
+.report-scan-item.risk-high     { border-left-color: #fd7e14; }
+.report-scan-item.risk-critical { border-left-color: #dc3545; }
+.report-scan-item.risk-unknown  { border-left-color: #475569; }
+
+/* Badges de nivel de riesgo */
+.risk-level-badge {
+    font-size: 0.63rem;
+    padding: 1px 7px;
+    border-radius: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+.risk-badge-low      { background: #14361f; color: #5bc98a; }
+.risk-badge-medium   { background: #3d2d00; color: #ffc107; }
+.risk-badge-high     { background: #3d1f00; color: #fd9a55; }
+.risk-badge-critical { background: #3d0d0d; color: #ff7070; }
+.risk-badge-unknown  { background: #2d3748; color: #94a3b8; }
 .report-scan-item:hover {
     background: #243447;
     border-color: #3498db44;

@@ -348,12 +348,24 @@
                     list.innerHTML = '<p class="info-text" style="font-size:0.82rem;padding:8px;">No hay reportes aún</p>';
                     return;
                 }
+
+                const riskCls = (level) => ({ LOW: 'low', MEDIUM: 'medium', HIGH: 'high', CRITICAL: 'critical' }[level] || 'unknown');
+                const riskBadge = (level, score) => {
+                    const cls = riskCls(level);
+                    const lbl = level || '?';
+                    const sc  = (score != null) ? ` · ${score}` : '';
+                    return `<span class="risk-level-badge risk-badge-${cls}">${lbl}${sc}</span>`;
+                };
+
                 list.innerHTML = scans.map(s => `
-                    <div class="report-scan-item" id="rsi-${s.scan_id}"
+                    <div class="report-scan-item risk-${riskCls(s.risk_level)}" id="rsi-${s.scan_id}"
                          data-scan-id="${s.scan_id}"
                          data-formats="${s.formats.join(',')}">
-                        <div class="rsi-target" title="${s.scan_id}">${s.scan_id}</div>
-                        <div class="rsi-meta">${new Date(s.created_at).toLocaleString('es-ES')}</div>
+                        <div style="display:flex;justify-content:space-between;align-items:center;gap:4px;min-width:0;">
+                            <div class="rsi-target" title="${s.target || s.scan_id}">${s.target || s.scan_id}</div>
+                            ${riskBadge(s.risk_level, s.risk_score)}
+                        </div>
+                        <div class="rsi-meta">${s.scan_id} · ${new Date(s.created_at).toLocaleString('es-ES')}</div>
                         <div class="rsi-badges">${s.formats.map(f => `<span class="fmt-badge">${f}</span>`).join('')}</div>
                     </div>`).join('');
 

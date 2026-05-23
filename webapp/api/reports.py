@@ -111,9 +111,25 @@ async def list_all_reports():
                 "formats": [],
                 "size_bytes": 0,
                 "created_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                "target": None,
+                "risk_score": None,
+                "risk_level": None,
             }
         scans[scan_id]["formats"].append(fmt)
         scans[scan_id]["size_bytes"] += stat.st_size
+
+    # Enriquecer con objetivo y nivel de riesgo desde el reporte JSON
+    for scan_id, scan_info in scans.items():
+        json_path = reports_dir / f"scan_{scan_id}.json"
+        if json_path.exists():
+            try:
+                with open(json_path, "r", encoding="utf-8") as jf:
+                    data = json.load(jf)
+                scan_info["target"] = data.get("target")
+                scan_info["risk_score"] = data.get("risk_score")
+                scan_info["risk_level"] = data.get("risk_level")
+            except Exception:
+                pass
 
     return list(scans.values())
 
