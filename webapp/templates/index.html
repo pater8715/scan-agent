@@ -330,6 +330,161 @@
     <!-- Toast Notifications -->
     <div id="toast-container"></div>
 
+    <!-- Modal: Detalle de Perfil de Escaneo -->
+    <div id="profile-detail-modal" class="pd-overlay" style="display:none;" onclick="if(event.target===this)closeProfileModal()">
+        <div class="pd-box">
+            <div class="pd-header">
+                <div>
+                    <div class="pd-title" id="pd-name"></div>
+                    <div id="pd-badge-row" style="margin-top:6px;display:flex;align-items:center;gap:8px;">
+                        <code id="pd-id" style="font-size:0.78rem;color:#94a3b8;"></code>
+                        <span id="pd-time" style="font-size:0.78rem;color:#64748b;"></span>
+                        <span id="pd-sudo" style="font-size:0.75rem;color:#fbbf24;"></span>
+                    </div>
+                </div>
+                <button class="pd-close-btn" onclick="closeProfileModal()">✕</button>
+            </div>
+            <div class="pd-body">
+                <p id="pd-description" class="pd-desc"></p>
+                <h4 class="pd-section-title">Herramientas y Comandos</h4>
+                <div id="pd-commands-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+    /* ── Modal Detalle de Perfil ─────────────────────────── */
+    .pd-overlay {
+        position: fixed; inset: 0;
+        background: rgba(0,0,0,0.65);
+        z-index: 1000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+    }
+    .pd-box {
+        background: #1a2332;
+        border: 1px solid #2d3748;
+        border-radius: 12px;
+        width: 100%;
+        max-width: 680px;
+        max-height: 85vh;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+    .pd-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        padding: 20px 22px 16px;
+        border-bottom: 1px solid #2d3748;
+        flex-shrink: 0;
+    }
+    .pd-title {
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: #e2e8f0;
+    }
+    .pd-close-btn {
+        background: #2d3748;
+        border: none;
+        color: #94a3b8;
+        width: 30px; height: 30px;
+        border-radius: 50%;
+        cursor: pointer;
+        font-size: 0.9rem;
+        display: flex; align-items: center; justify-content: center;
+        flex-shrink: 0;
+        transition: background 0.15s;
+    }
+    .pd-close-btn:hover { background: #3d4a5c; color: #e2e8f0; }
+    .pd-body {
+        padding: 18px 22px;
+        overflow-y: auto;
+        flex: 1;
+    }
+    .pd-desc {
+        font-size: 0.88rem;
+        color: #94a3b8;
+        margin-bottom: 18px;
+        line-height: 1.55;
+    }
+    .pd-section-title {
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.7px;
+        color: #64748b;
+        margin-bottom: 10px;
+        font-weight: 600;
+    }
+    .pd-command-row {
+        background: #0f1923;
+        border: 1px solid #2d3748;
+        border-radius: 8px;
+        padding: 12px 14px;
+        margin-bottom: 8px;
+    }
+    .pd-cmd-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 7px;
+        gap: 8px;
+    }
+    .pd-cmd-tool {
+        font-weight: 700;
+        font-size: 0.85rem;
+        color: #7eb8e8;
+    }
+    .pd-cmd-badges {
+        display: flex;
+        gap: 5px;
+        flex-shrink: 0;
+    }
+    .pd-badge {
+        font-size: 0.63rem;
+        padding: 1px 7px;
+        border-radius: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+    .pd-badge-req    { background: #14361f; color: #5bc98a; }
+    .pd-badge-opt    { background: #2d3748; color: #94a3b8; }
+    .pd-badge-sudo   { background: #3d2d00; color: #ffc107; }
+    .pd-badge-time   { background: #1a2332; color: #64748b; border: 1px solid #2d3748; }
+    .pd-cmd-full {
+        font-family: 'Consolas', 'Courier New', monospace;
+        font-size: 0.78rem;
+        color: #c0e4ff;
+        background: #162130;
+        padding: 7px 10px;
+        border-radius: 5px;
+        word-break: break-all;
+        white-space: pre-wrap;
+        margin-bottom: 5px;
+    }
+    .pd-cmd-output {
+        font-size: 0.72rem;
+        color: #475569;
+        margin-top: 4px;
+    }
+    .pd-info-btn {
+        background: transparent;
+        border: 1px solid #3498db44;
+        color: #7eb8e8;
+        border-radius: 6px;
+        padding: 2px 8px;
+        font-size: 0.72rem;
+        cursor: pointer;
+        transition: background 0.15s;
+        line-height: 1.5;
+    }
+    .pd-info-btn:hover { background: #243447; }
+    </style>
+
     <!-- Scripts -->
     <script src="/static/js/app.js"></script>
     <script>

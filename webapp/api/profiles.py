@@ -102,6 +102,65 @@ async def get_profile(profile_id: str):
     )
 
 
+@router.get("/{profile_id}/detail")
+async def get_profile_detail(profile_id: str):
+    """
+    Retorna información completa del perfil incluyendo los comandos exactos que ejecuta.
+    """
+    scanner = VulnerabilityScanner()
+
+    if profile_id not in scanner.PROFILES:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Perfil no encontrado")
+
+    profile = scanner.PROFILES[profile_id]
+
+    time_estimates = {
+        'quick': '5-10 minutos',
+        'standard': '15-20 minutos',
+        'full': '30-60 minutos',
+        'web': '20-30 minutos',
+        'stealth': '30-45 minutos',
+        'network': '40 minutos',
+        'compliance': '10 minutos',
+        'api': '15 minutos',
+        'api-owasp': '20-30 minutos',
+        'zap-passive': '10-15 minutos',
+        'zap-active': '30-60 minutos',
+        'lab': '10-15 minutos',
+    }
+
+    tool_icons = {
+        'nmap': '🔍',
+        'curl': '🌐',
+        'nikto': '🕷️',
+        'gobuster': '📂',
+        'dirb': '📂',
+        'zap': '🛡️',
+    }
+
+    return {
+        "id": profile_id,
+        "name": profile.name,
+        "description": profile.description,
+        "estimated_time": time_estimates.get(profile_id, 'Variable'),
+        "requires_sudo": profile.requires_sudo,
+        "commands": [
+            {
+                "tool": cmd["tool"],
+                "icon": tool_icons.get(cmd["tool"], "⚙️"),
+                "args": cmd["args"],
+                "full_command": f"{cmd['tool']} {cmd['args']}",
+                "output_file": cmd.get("output", ""),
+                "timeout_seconds": cmd.get("timeout", 300),
+                "required": cmd.get("required", True),
+                "sudo": cmd.get("sudo", False),
+            }
+            for cmd in profile.commands
+        ]
+    }
+
+
 @router.get("/{profile_id}/parameters", response_model=List[ProfileParameter])
 async def get_profile_parameters(profile_id: str):
     """

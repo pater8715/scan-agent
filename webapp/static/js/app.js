@@ -137,7 +137,11 @@ function createProfileCard(profile) {
     div.innerHTML = `
         <div class="profile-header">
             <div class="profile-name">${profile.name}</div>
-            <span class="profile-badge ${badgeClass}">${profile.id}</span>
+            <div style="display:flex;align-items:center;gap:6px;">
+                <span class="profile-badge ${badgeClass}">${profile.id}</span>
+                <button class="pd-info-btn" title="Ver herramientas y comandos"
+                        onclick="event.stopPropagation();showProfileDetail('${profile.id}')">ℹ️ Detalle</button>
+            </div>
         </div>
         <div class="profile-description">${profile.description}</div>
         <div class="profile-meta">
@@ -149,7 +153,7 @@ function createProfileCard(profile) {
             ${profile.tools.map(tool => `<span class="tool-tag">${tool}</span>`).join('')}
         </div>
     `;
-    
+
     div.addEventListener('click', () => selectProfile(profile.id, div));
     
     return div;
@@ -531,6 +535,7 @@ async function loadScansHistory() {
                 <td style="display:flex;gap:6px;flex-wrap:wrap;">
                     ${reportBtn}
                     ${cancelBtn}
+                    <button class="btn btn-secondary btn-sm" onclick="showProfileDetail('${scan.profile}')">ℹ️ Detalle</button>
                 </td>
             </tr>`;
         }).join('');
@@ -561,6 +566,69 @@ function formatDate(dateString) {
 async function viewScanReport(scanId) {
     window.open(`${API_BASE}/reports/${scanId}/download/html`, '_blank');
 }
+
+// ============================================
+// Modal Detalle de Perfil
+// ============================================
+
+async function showProfileDetail(profileId) {
+    const modal = document.getElementById('profile-detail-modal');
+    if (!modal) return;
+
+    // Reset
+    document.getElementById('pd-name').textContent = 'Cargando...';
+    document.getElementById('pd-description').textContent = '';
+    document.getElementById('pd-id').textContent = '';
+    document.getElementById('pd-time').textContent = '';
+    document.getElementById('pd-sudo').textContent = '';
+    document.getElementById('pd-commands-list').innerHTML = '<div style="color:#64748b;font-size:0.85rem;padding:8px 0;">Cargando comandos...</div>';
+    modal.style.display = 'flex';
+
+    try {
+        const r = await fetch(`${API_BASE}/profiles/${profileId}/detail`);
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const p = await r.json();
+
+        document.getElementById('pd-name').textContent = p.name;
+        document.getElementById('pd-description').textContent = p.description;
+        document.getElementById('pd-id').textContent = profileId;
+        document.getElementById('pd-time').textContent = '⏱️ ' + p.estimated_time;
+        document.getElementById('pd-sudo').textContent = p.requires_sudo ? '🔐 Requiere sudo' : '';
+
+        const list = document.getElementById('pd-commands-list');
+        if (!p.commands || !p.commands.length) {
+            list.innerHTML = '<div style="color:#64748b;font-size:0.85rem;">Sin comandos definidos</div>';
+            return;
+        }
+
+        list.innerHTML = p.commands.map((cmd, i) => `
+            <div class="pd-command-row">
+                <div class="pd-cmd-header">
+                    <span class="pd-cmd-tool">${cmd.icon} ${cmd.tool}</span>
+                    <span class="pd-cmd-badges">
+                        <span class="pd-badge ${cmd.required ? 'pd-badge-req' : 'pd-badge-opt'}">${cmd.required ? 'Requerido' : 'Opcional'}</span>
+                        ${cmd.sudo ? '<span class="pd-badge pd-badge-sudo">sudo</span>' : ''}
+                        <span class="pd-badge pd-badge-time">${cmd.timeout_seconds}s</span>
+                    </span>
+                </div>
+                <div class="pd-cmd-full">${cmd.tool} ${cmd.args}</div>
+                ${cmd.output_file ? `<div class="pd-cmd-output">📄 ${cmd.output_file}</div>` : ''}
+            </div>`).join('');
+
+    } catch (e) {
+        document.getElementById('pd-name').textContent = 'Error';
+        document.getElementById('pd-commands-list').innerHTML = `<div style="color:#f87171;font-size:0.85rem;">Error cargando detalle: ${e.message}</div>`;
+    }
+}
+
+function closeProfileModal() {
+    const modal = document.getElementById('profile-detail-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeProfileModal();
+});
 
 // ============================================
 // Notificaciones Toast
