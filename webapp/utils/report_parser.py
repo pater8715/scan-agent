@@ -610,6 +610,208 @@ class VulnerabilityAnalyzer:
             })
             self.risk_score += 3
 
+    @staticmethod
+    def _enrich_nikto_finding(finding: str):
+        """Devuelve (descripción explicativa, recomendaciones específicas) para un hallazgo de Nikto."""
+        fl = finding.lower()
+
+        # Software desactualizado
+        if "outdated" in fl or "deprecated" in fl:
+            m = re.search(r'^(?:\[\d+\]\s+)?([A-Za-z0-9_/\-\.]+(?:\s+[A-Za-z0-9_/\-\.]+)?)\s+appears to be outdated', finding, re.IGNORECASE)
+            prod = m.group(1) if m else "El software del servidor"
+            return (
+                f"{prod} está desactualizado. Las versiones antiguas contienen vulnerabilidades conocidas "
+                f"sin parche que pueden ser explotadas remotamente. Detalle: {finding}",
+                [
+                    f"Actualizar {prod} a la última versión estable disponible.",
+                    "Suscribirse a los boletines de seguridad del proveedor para recibir alertas de CVEs.",
+                    "Revisar el historial de CVEs de esta versión para verificar si el sistema pudo haber sido comprometido."
+                ]
+            )
+
+        # Listado de directorios habilitado
+        if "directory indexing" in fl or ("index of" in fl and "found" in fl):
+            m = re.search(r'(/[^\s:,]+)', finding)
+            path = m.group(1) if m else "un directorio del servidor"
+            return (
+                f"El listado de directorios está habilitado en '{path}'. Cualquier visitante puede ver y descargar "
+                f"todos los archivos del directorio, incluyendo potencialmente código fuente, backups o configuraciones. Detalle: {finding}",
+                [
+                    f"Deshabilitar el listado de directorios para '{path}'.",
+                    "En Apache: añadir 'Options -Indexes' en el bloque <Directory> correspondiente.",
+                    "En Nginx: eliminar 'autoindex on;' de la configuración del servidor."
+                ]
+            )
+
+        # Cookies inseguras
+        if "httponly" in fl or "secure flag" in fl or ("cookie" in fl and any(w in fl for w in ("insecure", "without", "no httponly", "no secure"))):
+            return (
+                "Las cookies del servidor carecen de atributos de seguridad. Sin 'HttpOnly', scripts JavaScript "
+                "maliciosos pueden robar la cookie de sesión (explotable con XSS). Sin 'Secure', las cookies "
+                f"se transmiten en texto plano por HTTP. Detalle: {finding}",
+                [
+                    "Añadir el atributo 'HttpOnly' a todas las cookies de sesión para bloquear el acceso desde JavaScript.",
+                    "Añadir el atributo 'Secure' para que las cookies solo viajen por conexiones HTTPS.",
+                    "Configurar 'SameSite=Strict' o 'SameSite=Lax' para proteger contra ataques CSRF."
+                ]
+            )
+
+        # XSS
+        if "xss" in fl or "cross-site scripting" in fl:
+            return (
+                "Posible vulnerabilidad de Cross-Site Scripting (XSS). Un atacante podría inyectar código "
+                "JavaScript que se ejecuta en el navegador de otros usuarios, permitiendo robo de cookies, "
+                f"suplantación de identidad o redireccionamiento malicioso. Detalle: {finding}",
+                [
+                    "Escapar todos los datos de entrada antes de incluirlos en el HTML de respuesta.",
+                    "Implementar una política Content-Security-Policy (CSP) que restrinja la ejecución de scripts inline.",
+                    "Usar funciones de escape según el contexto: HTML, atributos, JavaScript o URL."
+                ]
+            )
+
+        # SQL Injection
+        if "sql injection" in fl or "sqli" in fl:
+            return (
+                "Posible vulnerabilidad de inyección SQL. Un atacante podría manipular las consultas a la base de datos "
+                f"para extraer, modificar o eliminar datos, e incluso ejecutar comandos en el sistema operativo. Detalle: {finding}",
+                [
+                    "Usar consultas parametrizadas (prepared statements) en lugar de concatenar strings en SQL.",
+                    "Validar estrictamente el tipo y formato de todos los parámetros de entrada.",
+                    "Aplicar el principio de menor privilegio: las cuentas de base de datos no deben tener permisos de DROP o ALTER."
+                ]
+            )
+
+        # Directory Traversal / LFI / RFI
+        if any(k in fl for k in ("directory traversal", "path traversal", " lfi", " rfi", "local file", "remote file")):
+            return (
+                "Posible vulnerabilidad de Directory Traversal o inclusión de archivos (LFI/RFI). Un atacante podría "
+                "acceder a archivos fuera del directorio web, como /etc/passwd, claves SSH o archivos de configuración "
+                f"con credenciales de base de datos. Detalle: {finding}",
+                [
+                    "Validar que las rutas de archivo no contengan '../', './/' ni variantes codificadas (%2e%2e).",
+                    "Usar rutas absolutas definidas en el código y listas blancas de archivos permitidos.",
+                    "Asegurarse de que el proceso del servidor web solo tenga acceso al directorio necesario."
+                ]
+            )
+
+        # RCE / ejecución remota de código
+        if any(k in fl for k in ("remote code execution", " rce", "arbitrary code", "arbitrary file", "arbitrary command")):
+            return (
+                "Posible vulnerabilidad de ejecución remota de código (RCE). Esta es una de las vulnerabilidades "
+                "más críticas: un atacante podría ejecutar comandos arbitrarios en el servidor y tomar control completo "
+                f"del sistema. Detalle: {finding}",
+                [
+                    "Aplicar el parche o actualización del proveedor de forma inmediata — esta vulnerabilidad es de prioridad máxima.",
+                    "Revisar logs de acceso para detectar si ya ha sido explotada.",
+                    "Considerar aislar o apagar el servidor afectado hasta aplicar la corrección."
+                ]
+            )
+
+        # Divulgación de servidor / tecnología
+        if "x-powered-by" in fl or ("retrieved" in fl and "header" in fl) or \
+                ("server" in fl and any(k in fl for k in ("apache", "nginx", "iis", "php", "tomcat"))):
+            return (
+                "El servidor está revelando información sobre su tecnología y versión exacta a través de cabeceras HTTP. "
+                "Esta información facilita a los atacantes identificar exploits específicos para la versión detectada. "
+                f"Detalle: {finding}",
+                [
+                    "Ocultar o generalizar la cabecera 'Server': en Apache → ServerTokens Prod; en Nginx → server_tokens off.",
+                    "Eliminar la cabecera 'X-Powered-By': en PHP → expose_php = Off; en Express.js → app.disable('x-powered-by').",
+                    "Usar un WAF para filtrar cabeceras de respuesta que revelen información de versión."
+                ]
+            )
+
+        # Archivos de backup o datos sensibles
+        if any(k in fl for k in (".bak", ".old", ".backup", ".sql", ".tar", ".zip", ".gz", "backup", "dump", ".orig", ".copy")):
+            m = re.search(r'(/[^\s:,]+)', finding)
+            path = m.group(1) if m else "el servidor"
+            return (
+                f"Se encontró un archivo potencialmente sensible accesible en '{path}'. Archivos de backup, "
+                "volcados de base de datos o copias de código pueden contener credenciales, datos de usuarios "
+                f"o configuraciones de producción. Detalle: {finding}",
+                [
+                    f"Eliminar o restringir el acceso al archivo '{path}' de forma inmediata.",
+                    "Revisar el contenido del archivo para determinar qué datos pudieron haberse expuesto.",
+                    "Configurar el servidor para bloquear extensiones sensibles: .bak, .sql, .tar, .orig, .copy."
+                ]
+            )
+
+        # Panel de administración o login
+        if any(k in fl for k in ("admin", "login", "panel", "phpmyadmin", "wp-admin", "dashboard", "manager")):
+            m = re.search(r'(/[^\s:,]+)', finding)
+            path = m.group(1) if m else "una ruta de administración"
+            return (
+                f"Se encontró una interfaz de administración o página de login en '{path}'. Las interfaces "
+                "administrativas expuestas son objetivos frecuentes de ataques de fuerza bruta y pueden ser "
+                f"punto de entrada para comprometer el sistema. Detalle: {finding}",
+                [
+                    f"Restringir el acceso a '{path}' con autenticación multifactor (MFA) o lista blanca de IPs.",
+                    "Configurar bloqueo de cuenta tras múltiples intentos fallidos consecutivos.",
+                    "Considerar mover la URL de administración a una ruta no predecible."
+                ]
+            )
+
+        # Métodos HTTP peligrosos
+        if any(k in fl for k in ("http put", "http delete", "http trace", "http options", "allowed methods", "allow: ")):
+            return (
+                "El servidor tiene habilitados métodos HTTP potencialmente peligrosos. PUT permite subir archivos "
+                "arbitrarios, DELETE eliminar recursos del servidor, TRACE puede usarse para robar cookies (XST). "
+                f"Detalle: {finding}",
+                [
+                    "Deshabilitar los métodos HTTP innecesarios (PUT, DELETE, TRACE, OPTIONS, CONNECT).",
+                    "En Apache: usar <LimitExcept GET POST> Deny from all </LimitExcept> en la configuración.",
+                    "Verificar que el servidor no permita la subida de archivos ejecutables mediante PUT."
+                ]
+            )
+
+        # Open redirect
+        if "redirect" in fl and any(k in fl for k in ("open", "unvalidated", "external")):
+            return (
+                "Posible vulnerabilidad de redirección abierta. Un atacante puede usar el servidor como trampolín "
+                "para redirigir a víctimas hacia sitios maliciosos, con una URL aparentemente legítima "
+                f"para mayor credibilidad en ataques de phishing. Detalle: {finding}",
+                [
+                    "Validar que las redirecciones solo apunten a dominios en una lista blanca de confianza.",
+                    "Evitar usar parámetros de URL sin validar para determinar el destino de redirecciones.",
+                    "Mostrar una página de confirmación antes de redirigir a URLs externas."
+                ]
+            )
+
+        # Referencias OSVDB explícitas
+        osvdb_nums = re.findall(r'OSVDB-(\d+)', finding, re.IGNORECASE)
+        if osvdb_nums:
+            refs = ", ".join(f"OSVDB-{n}" for n in osvdb_nums)
+            return (
+                f"Nikto identificó una vulnerabilidad o configuración insegura con referencia a {refs}. "
+                f"Descripción del hallazgo: {finding}",
+                [
+                    f"Buscar las referencias {refs} en la base de datos NVD (nvd.nist.gov) o MITRE para conocer el impacto exacto.",
+                    "Aplicar el parche o la configuración correctiva recomendada por el proveedor.",
+                    "Verificar si la versión actual del software ya incluye la corrección."
+                ]
+            )
+
+        # Exposición de información genérica
+        if any(k in fl for k in ("disclosure", "exposed", "reveals", "information", "leaks", "found")):
+            return (
+                f"El servidor está exponiendo información que podría ser aprovechada por un atacante para planificar "
+                f"un ataque más dirigido. Detalle: {finding}",
+                [
+                    "Revisar la configuración del servidor para minimizar la información expuesta en respuestas HTTP.",
+                    "Aplicar el principio de mínima exposición: no revelar versiones, rutas internas ni mensajes de error detallados.",
+                    "Consultar la guía OWASP de configuración segura del servidor web."
+                ]
+            )
+
+        # Fallback: al menos explica el origen y proporciona el hallazgo completo
+        return (
+            f"Nikto reportó el siguiente hallazgo de seguridad en el servidor web: {finding}",
+            [
+                "Investigar este hallazgo para determinar su impacto real en el sistema.",
+                "Consultar la documentación del servidor web y las guías de hardening de OWASP para mitigarlo."
+            ]
+        )
+
     def _analyze_nikto_findings(self):
         """Analiza hallazgos de Nikto con clasificación mejorada"""
         nikto_findings = self.results.get("nikto_findings", [])
@@ -625,19 +827,17 @@ class VulnerabilityAnalyzer:
                     score_add = score
                     break
 
+            description, recommendations = self._enrich_nikto_finding(finding)
             self.risk_score += score_add
             self.findings.append({
                 "severity": severity,
                 "title": f"Hallazgo Nikto: {finding[:80]}",
-                "description": finding,
+                "description": description,
                 "port": 80,
                 "service": "http",
                 "version": "",
                 "category": "web-nikto",
-                "recommendations": [
-                    "Revisar la configuración del servidor web para mitigar este hallazgo.",
-                    "Aplicar las mejores prácticas de hardening del servidor web (CIS Benchmark)."
-                ],
+                "recommendations": recommendations,
                 "cves": []
             })
 
