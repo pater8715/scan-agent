@@ -604,13 +604,28 @@ class VulnerabilityScanner:
         http_target = f"{hostname}:{port}" if port else hostname
 
         args_template = command['args']
-        # Herramientas HTTP (curl, gobuster, nikto con -host) necesitan hostname:port
-        # Herramientas de red (nmap) solo aceptan hostname sin puerto
+        # Herramientas HTTP (curl, gobuster, nikto) necesitan hostname:port
+        # Herramientas de red (nmap) solo aceptan hostname; el puerto se inyecta en -p
         _http_tools = {"curl", "wget", "gobuster", "dirb", "whatweb", "nikto"}
         if tool in _http_tools:
             args = args_template.format(target=http_target)
         else:
             args = args_template.format(target=hostname)
+            # Si el target especifica un puerto concreto, añadirlo a la lista -p de nmap
+            # para que el servicio no quede excluido por los puertos fijos del perfil.
+            # Lookbehind negativo evita engancharse en --top-ports (donde "-p" está
+            # precedido por una letra/guion, no por espacio o inicio de cadena).
+            if port:
+                _PORT_RE = re.compile(r'(?<![a-zA-Z\-])-p(\S+)')
+                def _inject_port(m):
+                    ports = m.group(1).split(',')
+                    if str(port) not in ports:
+                        ports.append(str(port))
+                    return f"-p{','.join(ports)}"
+                if _PORT_RE.search(args):
+                    args = _PORT_RE.sub(_inject_port, args, count=1)
+                else:
+                    args += f' -p{port}'
 
         # Nombre de archivo seguro: sin "://" ni barras (CIDR usa "/")
         safe_target = hostname.replace("/", "_") + (f"_{port}" if port else "")
