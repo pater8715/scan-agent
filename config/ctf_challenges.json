@@ -1,0 +1,164 @@
+{
+  "version": "1.0",
+  "title": "Scan Agent CTF — Desafíos de Seguridad Web",
+  "description": "Encuentra las vulnerabilidades ocultas en los objetivos de práctica.",
+  "targets": {
+    "juice_shop": "http://juice-shop:3000",
+    "dvwa": "http://dvwa:80"
+  },
+  "challenges": [
+    {
+      "id": "CTF-01",
+      "title": "Headers de Seguridad Ausentes",
+      "category": "Security Misconfiguration",
+      "owasp": "A05:2021",
+      "difficulty": "facil",
+      "points": 100,
+      "target": "juice_shop",
+      "description": "Juice Shop no envía las cabeceras HTTP de seguridad recomendadas. Encuéntralas.",
+      "hint": "Usa curl -I o el perfil 'quick' de Scan Agent y revisa la sección de headers.",
+      "hint_penalty": 25,
+      "validation": {
+        "type": "vulnerability_found",
+        "tipo_matches": ["missing_security_headers", "header_ausente"],
+        "min_count": 1
+      },
+      "learning_objective": "Comprender la importancia de X-Frame-Options, CSP y HSTS."
+    },
+    {
+      "id": "CTF-02",
+      "title": "SQL Injection en Login",
+      "category": "Injection",
+      "owasp": "A03:2021",
+      "difficulty": "medio",
+      "points": 200,
+      "target": "dvwa",
+      "description": "El formulario de login de DVWA es vulnerable a SQL Injection. Demuéstralo.",
+      "hint": "Prueba con el payload clásico: ' OR '1'='1 en el campo de usuario.",
+      "hint_penalty": 50,
+      "validation": {
+        "type": "vulnerability_found",
+        "tipo_matches": ["sqli", "sql_injection", "A03:2021"],
+        "min_count": 1
+      },
+      "learning_objective": "Identificar y explotar SQLi básico; entender por qué las consultas parametrizadas son esenciales."
+    },
+    {
+      "id": "CTF-03",
+      "title": "XSS Reflejado",
+      "category": "Injection",
+      "owasp": "A03:2021",
+      "difficulty": "medio",
+      "points": 200,
+      "target": "dvwa",
+      "description": "Encuentra el punto de entrada XSS reflejado en DVWA (nivel low).",
+      "hint": "Busca parámetros de búsqueda o campos de texto que reflejen el input sin sanitizar.",
+      "hint_penalty": 50,
+      "validation": {
+        "type": "vulnerability_found",
+        "tipo_matches": ["xss", "cross_site_scripting"],
+        "min_count": 1
+      },
+      "learning_objective": "Distinguir XSS reflejado de almacenado; entender el impacto en la sesión del usuario."
+    },
+    {
+      "id": "CTF-04",
+      "title": "Autenticación Rota — Fuerza Bruta",
+      "category": "Broken Authentication",
+      "owasp": "A07:2021",
+      "difficulty": "medio",
+      "points": 250,
+      "target": "juice_shop",
+      "description": "Juice Shop no limita los intentos de login. Verifica con el perfil api-owasp.",
+      "hint": "El checker de API2:2023 prueba fuerza bruta automáticamente.",
+      "hint_penalty": 60,
+      "validation": {
+        "type": "vulnerability_found",
+        "tipo_matches": ["broken_auth", "API2:2023", "rate_limit_ausente"],
+        "min_count": 1
+      },
+      "learning_objective": "Entender por qué se necesita bloqueo de cuenta y rate limiting en endpoints de autenticación."
+    },
+    {
+      "id": "CTF-05",
+      "title": "IDOR — Acceso a Datos de Otro Usuario",
+      "category": "Broken Access Control",
+      "owasp": "A01:2021",
+      "difficulty": "dificil",
+      "points": 350,
+      "target": "juice_shop",
+      "description": "Juice Shop expone pedidos de otros usuarios cambiando el ID en la URL.",
+      "hint": "El checker BOLA (API1:2023) prueba IDs 1-100 automáticamente.",
+      "hint_penalty": 80,
+      "validation": {
+        "type": "vulnerability_found",
+        "tipo_matches": ["bola", "idor", "API1:2023"],
+        "min_count": 1
+      },
+      "learning_objective": "Comprender la diferencia entre autenticación y autorización a nivel de objeto."
+    },
+    {
+      "id": "CTF-06",
+      "title": "Información Sensible Expuesta",
+      "category": "Security Misconfiguration",
+      "owasp": "A05:2021",
+      "difficulty": "facil",
+      "points": 150,
+      "target": "juice_shop",
+      "description": "Juice Shop expone endpoints de documentación y rutas sensibles públicamente.",
+      "hint": "Usa gobuster o el perfil 'api-owasp' y busca /api-docs, /swagger, /metrics.",
+      "hint_penalty": 30,
+      "validation": {
+        "type": "vulnerability_found",
+        "tipo_matches": ["ruta_sensible_expuesta", "information_disclosure", "API9:2023"],
+        "min_count": 1
+      },
+      "learning_objective": "Identificar rutas de administración y documentación que no deberían ser públicas."
+    },
+    {
+      "id": "CTF-07",
+      "title": "Componentes Vulnerables",
+      "category": "Vulnerable Components",
+      "owasp": "A06:2021",
+      "difficulty": "medio",
+      "points": 300,
+      "target": "juice_shop",
+      "description": "Identifica al menos una dependencia con CVE conocido en el proyecto Juice Shop.",
+      "hint": "Usa el comando --dep-scan con el directorio del proyecto Juice Shop.",
+      "hint_penalty": 70,
+      "validation": {
+        "type": "vulnerability_found",
+        "tipo_matches": ["dependencia_vulnerable"],
+        "min_count": 1
+      },
+      "learning_objective": "Usar herramientas de análisis de dependencias; entender el concepto de supply chain security."
+    },
+    {
+      "id": "CTF-08",
+      "title": "SSRF — Falsificación de Petición del Servidor",
+      "category": "SSRF",
+      "owasp": "A10:2021",
+      "difficulty": "dificil",
+      "points": 400,
+      "target": "juice_shop",
+      "description": "Encuentra el parámetro vulnerable a SSRF en Juice Shop usando el checker API7:2023.",
+      "hint": "Busca parámetros que acepten URLs: imageUrl, webhookUrl, callback, redirect.",
+      "hint_penalty": 100,
+      "validation": {
+        "type": "vulnerability_found",
+        "tipo_matches": ["ssrf", "API7:2023"],
+        "min_count": 1
+      },
+      "learning_objective": "Entender cómo SSRF puede usarse para acceder a metadata de cloud (AWS IMDSv1, GCP)."
+    }
+  ],
+  "scoring": {
+    "time_bonus": {
+      "enabled": true,
+      "max_bonus_pct": 50,
+      "full_bonus_minutes": 10,
+      "zero_bonus_minutes": 60
+    },
+    "hint_penalty_applies": true
+  }
+}

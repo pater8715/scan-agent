@@ -1,0 +1,275 @@
+/* ── Visor de Reportes ──────────────────────────────────── */
+.report-scan-item {
+    padding: 10px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    margin-bottom: 6px;
+    transition: background 0.15s;
+}
+.report-scan-item:hover {
+    background: #243447;
+    border-color: #3498db44;
+}
+.report-scan-item.active {
+    background: #1e3a5f;
+    border-color: #3498db;
+}
+.report-scan-item .rsi-target {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: #e2e8f0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.report-scan-item .rsi-meta {
+    font-size: 0.73rem;
+    color: #94a3b8;
+    margin-top: 2px;
+}
+.report-scan-item .rsi-badges {
+    display: flex;
+    gap: 4px;
+    margin-top: 4px;
+    flex-wrap: wrap;
+}
+.fmt-badge {
+    font-size: 0.68rem;
+    padding: 1px 6px;
+    border-radius: 10px;
+    background: #2d4a6a;
+    color: #7eb8e8;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+/* ── Layout de Reportes ─────────────────────────────────── */
+.reports-layout {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+}
+.reports-sidebar {
+    width: 300px;
+    flex-shrink: 0;
+}
+.reports-sidebar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-color, #2d3748);
+}
+#reports-scan-list {
+    max-height: calc(100vh - 260px);
+    overflow-y: auto;
+}
+.reports-viewer-wrap {
+    flex: 1;
+    min-width: 0;
+}
+.report-viewer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border-color, #2d3748);
+    background: #1a2332;
+}
+.report-viewer-id {
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: #e2e8f0;
+    font-family: monospace;
+}
+.report-viewer-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.report-view-tabs {
+    display: flex;
+    gap: 4px;
+    background: #0f1923;
+    border-radius: 6px;
+    padding: 3px;
+}
+.report-tab-btn {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    padding: 5px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.82rem;
+    font-weight: 600;
+    transition: background 0.15s, color 0.15s;
+}
+.report-tab-btn:hover {
+    background: #243447;
+    color: #e2e8f0;
+}
+.report-tab-btn.active {
+    background: #3498db;
+    color: #fff;
+}
+
+/* ── Panel de Escaneos Activos ─────────────────────────── */
+.active-scan-chip {
+    background: #243447;
+    border: 1px solid #3498db44;
+    border-radius: 8px;
+    padding: 6px 12px;
+    min-width: 220px;
+    flex: 1;
+    max-width: 340px;
+}
+.active-scan-chip .chip-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    margin-bottom: 4px;
+    color: #adb5bd;
+}
+.active-scan-chip .chip-target {
+    color: #e2e8f0;
+    font-weight: 600;
+    font-size: 0.85rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.active-scan-chip .chip-msg {
+    color: #94a3b8;
+    font-size: 0.75rem;
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.mini-progress {
+    height: 5px;
+    background: #2d3748;
+    border-radius: 3px;
+    margin-top: 5px;
+    overflow: hidden;
+}
+.mini-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #3498db, #2ecc71);
+    border-radius: 3px;
+    transition: width 0.5s ease;
+}
+.chip-pct {
+    color: #3498db;
+    font-weight: bold;
+    font-size: 0.8rem;
+}
+
+/* ── Tarjetas de Hosts Descubiertos ─────────────────────────── */
+.discovered-host-card {
+    background: #1a2332;
+    border: 1px solid #2d3748;
+    border-radius: 10px;
+    padding: 14px 16px;
+    min-width: 220px;
+    max-width: 280px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: border-color 0.15s;
+}
+.discovered-host-card:hover {
+    border-color: #3498db66;
+}
+.discovered-host-card .dhc-ip {
+    font-family: monospace;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #e2e8f0;
+}
+.discovered-host-card .dhc-hostname {
+    font-size: 0.78rem;
+    color: #94a3b8;
+    word-break: break-all;
+}
+.discovered-host-card .dhc-latency {
+    font-size: 0.75rem;
+    color: #64748b;
+}
+.discovered-host-card .dhc-ports {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+.dhc-port-badge {
+    font-size: 0.68rem;
+    padding: 2px 6px;
+    border-radius: 8px;
+    background: #243447;
+    color: #7eb8e8;
+    font-weight: 600;
+    font-family: monospace;
+}
+.discovered-host-card .dhc-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 4px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.dhc-profile-select {
+    flex: 1;
+    min-width: 100px;
+    padding: 4px 8px;
+    background: #243447;
+    border: 1px solid #3498db44;
+    border-radius: 6px;
+    color: #e2e8f0;
+    font-size: 0.78rem;
+    cursor: pointer;
+}
+.dhc-scan-btn {
+    padding: 5px 12px;
+    background: #3498db;
+    border: none;
+    border-radius: 6px;
+    color: #fff;
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.15s;
+    white-space: nowrap;
+}
+.dhc-scan-btn:hover {
+    background: #2980b9;
+}
+
+/* ── Botones de objetivos del laboratorio ──────────────────── */
+.lab-target-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    color: #e2e8f0;
+    font-size: 0.8rem;
+    font-weight: 600;
+    transition: transform 0.12s, box-shadow 0.12s;
+    min-width: 160px;
+}
+.lab-target-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+}
+.lab-target-btn:disabled {
+    pointer-events: none;
+}

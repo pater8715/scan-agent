@@ -1,0 +1,446 @@
+{
+  "metadata": {
+    "generated_at": "2025-11-12T20:47:26.507618",
+    "generator": "Scan Agent v1.0.0",
+    "target_ip": "10.1.11.177",
+    "total_vulnerabilities": 20
+  },
+  "executive_summary": {
+    "nivel_riesgo_general": "MEDIO",
+    "indicador_color": "amarillo",
+    "total_vulnerabilidades": 20,
+    "vulnerabilidades_criticas": 0,
+    "vulnerabilidades_altas": 2,
+    "puertos_expuestos": 3,
+    "endpoints_descubiertos": 0,
+    "principales_riesgos": [
+      "Vulnerabilidad: vulnerabilidad_nikto",
+      "Uncommon header 'x-xss-protection' found, with contents: 0",
+      "Vulnerabilidad: http-sql-injection"
+    ],
+    "recomendacion_general": "Se recomienda planificar la remediación de vulnerabilidades detectadas. Aunque el riesgo no es crítico, debe abordarse en el mediano plazo."
+  },
+  "attack_surface": {
+    "puertos_expuestos": 3,
+    "servicios_activos": 4,
+    "endpoints_descubiertos": 0,
+    "detalles_puertos": [
+      {
+        "puerto": 443,
+        "servicio": "http",
+        "version": "Apache httpd 2.4.58",
+        "critico": false,
+        "razon": null
+      },
+      {
+        "puerto": 8000,
+        "servicio": "http",
+        "version": "Ajenti http control panel",
+        "critico": false,
+        "razon": null
+      },
+      {
+        "puerto": 8081,
+        "servicio": "blackice-icecap?",
+        "version": "1 service unrecognized despite returning data. If you know the service/version, please submit the following fingerprint at https://nmap.org/cgi-bin/submit.cgi?new-service :",
+        "critico": false,
+        "razon": null
+      }
+    ],
+    "rutas_criticas": []
+  },
+  "technologies": {
+    "servidor_web": {
+      "nombre": "Apache",
+      "version": "Apache/2.4.58 (Ubuntu)",
+      "potencialmente_vulnerable": false
+    },
+    "lenguajes": [],
+    "frameworks": [],
+    "bases_datos": [],
+    "ssl_tls": null,
+    "otros": []
+  },
+  "vulnerabilities": [
+    {
+      "id": "IND-1",
+      "titulo": "Vulnerabilidad: http-sql-injection",
+      "descripcion": "# Nmap 7.94SVN scan initiated Wed Nov 12 18:10:19 2025 as: nmap --script=http-enum,http-auth,http-sql-injection -p 8081 -oN nmap_nse_10.1.11.177.txt 10.1.11.177\nNmap scan report for 10.1.11.177\nHost is up (0.0019s latency).\n\nPORT     STATE SERVICE\n8081/tcp open  blackice-icecap\n\n# Nmap done at Wed Nov 12 18:10",
+      "severidad": "media",
+      "cvss_score": 5.0,
+      "owasp_category": "A05:2021 - Security Misconfiguration",
+      "fuente": "nmap_nse",
+      "evidencia": {
+        "fuente": "nmap_nse",
+        "tipo": "http-sql-injection",
+        "contexto": "# Nmap 7.94SVN scan initiated Wed Nov 12 18:10:19 2025 as: nmap --script=http-enum,http-auth,http-sql-injection -p 8081 -oN nmap_nse_10.1.11.177.txt 10.1.11.177\nNmap scan report for 10.1.11.177\nHost is up (0.0019s latency).\n\nPORT     STATE SERVICE\n8081/tcp open  blackice-icecap\n\n# Nmap done at Wed Nov 12 18:10"
+      },
+      "recomendacion": "Revisar y remediar según mejores prácticas de seguridad"
+    },
+    {
+      "id": "IND-2",
+      "titulo": "Headers de Seguridad HTTP Faltantes",
+      "descripcion": "",
+      "severidad": "media",
+      "cvss_score": 5.0,
+      "owasp_category": "A05:2021 - Security Misconfiguration",
+      "fuente": "headers_http",
+      "evidencia": {
+        "fuente": "headers_http",
+        "tipo": "missing_security_headers",
+        "headers_faltantes": [
+          "Strict-Transport-Security",
+          "X-Frame-Options",
+          "X-Content-Type-Options",
+          "Content-Security-Policy",
+          "X-XSS-Protection"
+        ],
+        "severidad": "media",
+        "owasp_category": "A05:2021 - Security Misconfiguration"
+      },
+      "recomendacion": "Agregar headers: Strict-Transport-Security, X-Frame-Options, X-Content-Type-Options, Content-Security-Policy"
+    },
+    {
+      "id": "IND-3",
+      "titulo": "Vulnerabilidad: vulnerabilidad_nikto",
+      "descripcion": "10.1.11.177",
+      "severidad": "media",
+      "cvss_score": 5.0,
+      "owasp_category": "A05:2021 - Security Misconfiguration",
+      "fuente": "nikto",
+      "evidencia": {
+        "fuente": "nikto",
+        "tipo": "vulnerabilidad_nikto",
+        "osvdb_id": "N/A",
+        "descripcion": "10.1.11.177",
+        "ubicacion": "Target Host",
+        "severidad": "media"
+      },
+      "recomendacion": "Revisar y remediar según mejores prácticas de seguridad"
+    },
+    {
+      "id": "IND-4",
+      "titulo": "Vulnerabilidad: vulnerabilidad_nikto",
+      "descripcion": "8081",
+      "severidad": "media",
+      "cvss_score": 5.0,
+      "owasp_category": "A05:2021 - Security Misconfiguration",
+      "fuente": "nikto",
+      "evidencia": {
+        "fuente": "nikto",
+        "tipo": "vulnerabilidad_nikto",
+        "osvdb_id": "N/A",
+        "descripcion": "8081",
+        "ubicacion": "Target Port",
+        "severidad": "media"
+      },
+      "recomendacion": "Revisar y remediar según mejores prácticas de seguridad"
+    },
+    {
+      "id": "IND-5",
+      "titulo": "Vulnerabilidad: vulnerabilidad_nikto",
+      "descripcion": "Uncommon header 'x-content-type-options' found, with contents: nosniff",
+      "severidad": "media",
+      "cvss_score": 5.0,
+      "owasp_category": "A05:2021 - Security Misconfiguration",
+      "fuente": "nikto",
+      "evidencia": {
+        "fuente": "nikto",
+        "tipo": "vulnerabilidad_nikto",
+        "osvdb_id": "N/A",
+        "descripcion": "Uncommon header 'x-content-type-options' found, with contents: nosniff",
+        "ubicacion": "GET /",
+        "severidad": "media"
+      },
+      "recomendacion": "Revisar y remediar según mejores prácticas de seguridad"
+    },
+    {
+      "id": "IND-6",
+      "titulo": "Vulnerabilidad: vulnerabilidad_nikto",
+      "descripcion": "Uncommon header 'x-xss-protection' found, with contents: 0",
+      "severidad": "alta",
+      "cvss_score": 7.5,
+      "owasp_category": "A05:2021 - Security Misconfiguration",
+      "fuente": "nikto",
+      "evidencia": {
+        "fuente": "nikto",
+        "tipo": "vulnerabilidad_nikto",
+        "osvdb_id": "N/A",
+        "descripcion": "Uncommon header 'x-xss-protection' found, with contents: 0",
+        "ubicacion": "GET /",
+        "severidad": "alta"
+      },
+      "recomendacion": "Revisar y remediar según mejores prácticas de seguridad"
+    },
+    {
+      "id": "IND-7",
+      "titulo": "Vulnerabilidad: vulnerabilidad_nikto",
+      "descripcion": "Uncommon header 'x-frame-options' found, with contents: DENY",
+      "severidad": "media",
+      "cvss_score": 5.0,
+      "owasp_category": "A05:2021 - Security Misconfiguration",
+      "fuente": "nikto",
+      "evidencia": {
+        "fuente": "nikto",
+        "tipo": "vulnerabilidad_nikto",
+        "osvdb_id": "N/A",
+        "descripcion": "Uncommon header 'x-frame-options' found, with contents: DENY",
+        "ubicacion": "GET /",
+        "severidad": "media"
+      },
+      "recomendacion": "Revisar y remediar según mejores prácticas de seguridad"
+    },
+    {
+      "id": "IND-8",
+      "titulo": "Vulnerabilidad: vulnerabilidad_nikto",
+      "descripcion": "Cookie JSESSIONID created without the httponly flag",
+      "severidad": "media",
+      "cvss_score": 5.0,
+      "owasp_category": "A05:2021 - Security Misconfiguration",
+      "fuente": "nikto",
+      "evidencia": {
+        "fuente": "nikto",
+        "tipo": "vulnerabilidad_nikto",
+        "osvdb_id": "N/A",
+        "descripcion": "Cookie JSESSIONID created without the httponly flag",
+        "ubicacion": "GET /",
+        "severidad": "media"
+      },
+      "recomendacion": "Revisar y remediar según mejores prácticas de seguridad"
+    },
+    {
+      "id": "IND-9",
+      "titulo": "Vulnerabilidad: vulnerabilidad_nikto",
+      "descripcion": "Allowed HTTP Methods: GET, HEAD, POST, PUT, DELETE, OPTIONS",
+      "severidad": "media",
+      "cvss_score": 5.0,
+      "owasp_category": "A05:2021 - Security Misconfiguration",
+      "fuente": "nikto",
+      "evidencia": {
+        "fuente": "nikto",
+        "tipo": "vulnerabilidad_nikto",
+        "osvdb_id": "N/A",
+        "descripcion": "Allowed HTTP Methods: GET, HEAD, POST, PUT, DELETE, OPTIONS",
+        "ubicacion": "OPTIONS /",
+        "severidad": "media"
+      },
+      "recomendacion": "Revisar y remediar según mejores prácticas de seguridad"
+    },
+    {
+      "id": "IND-10",
+      "titulo": "Vulnerabilidad: vulnerabilidad_nikto",
+      "descripcion": "GET /: HTTP method ('Allow' Header): 'PUT' method could allow clients to save files on the web server.",
+      "severidad": "media",
+      "cvss_score": 5.0,
+      "owasp_category": "A05:2021 - Security Misconfiguration",
+      "fuente": "nikto",
+      "evidencia": {
+        "fuente": "nikto",
+        "tipo": "vulnerabilidad_nikto",
+        "osvdb_id": "N/A",
+        "descripcion": "GET /: HTTP method ('Allow' Header): 'PUT' method could allow clients to save files on the web server.",
+        "ubicacion": "-397",
+        "severidad": "media"
+      },
+      "recomendacion": "Revisar y remediar según mejores prácticas de seguridad"
+    },
+    {
+      "id": "IND-11",
+      "titulo": "Vulnerabilidad: vulnerabilidad_nikto",
+      "descripcion": "GET /: HTTP method ('Allow' Header): 'DELETE' may allow clients to remove files on the web server.",
+      "severidad": "media",
+      "cvss_score": 5.0,
+      "owasp_category": "A05:2021 - Security Misconfiguration",
+      "fuente": "nikto",
+      "evidencia": {
+        "fuente": "nikto",
+        "tipo": "vulnerabilidad_nikto",
+        "osvdb_id": "N/A",
+        "descripcion": "GET /: HTTP method ('Allow' Header): 'DELETE' may allow clients to remove files on the web server.",
+        "ubicacion": "-5646",
+        "severidad": "media"
+      },
+      "recomendacion": "Revisar y remediar según mejores prácticas de seguridad"
+    },
+    {
+      "id": "N/A",
+      "titulo": "10.1.11.177",
+      "descripcion": "10.1.11.177",
+      "severidad": "baja",
+      "cvss_score": 2.5,
+      "owasp_category": "A05:2021 - Security Misconfiguration",
+      "fuente": "nikto",
+      "ubicacion": "Target Host",
+      "evidencia": {
+        "id_osvdb": "N/A",
+        "ubicacion": "Target Host",
+        "descripcion": "10.1.11.177",
+        "fuente": "nikto"
+      },
+      "recomendacion": "Revisar y remediar según la naturaleza específica de la vulnerabilidad"
+    },
+    {
+      "id": "N/A",
+      "titulo": "8081",
+      "descripcion": "8081",
+      "severidad": "baja",
+      "cvss_score": 2.5,
+      "owasp_category": "A05:2021 - Security Misconfiguration",
+      "fuente": "nikto",
+      "ubicacion": "Target Port",
+      "evidencia": {
+        "id_osvdb": "N/A",
+        "ubicacion": "Target Port",
+        "descripcion": "8081",
+        "fuente": "nikto"
+      },
+      "recomendacion": "Revisar y remediar según la naturaleza específica de la vulnerabilidad"
+    },
+    {
+      "id": "N/A",
+      "titulo": "Uncommon header 'x-content-type-options' found, with contents: nosniff",
+      "descripcion": "Uncommon header 'x-content-type-options' found, with contents: nosniff",
+      "severidad": "baja",
+      "cvss_score": 2.5,
+      "owasp_category": "A05:2021 - Security Misconfiguration",
+      "fuente": "nikto",
+      "ubicacion": "GET /",
+      "evidencia": {
+        "id_osvdb": "N/A",
+        "ubicacion": "GET /",
+        "descripcion": "Uncommon header 'x-content-type-options' found, with contents: nosniff",
+        "fuente": "nikto"
+      },
+      "recomendacion": "Revisar y remediar según la naturaleza específica de la vulnerabilidad"
+    },
+    {
+      "id": "N/A",
+      "titulo": "Uncommon header 'x-xss-protection' found, with contents: 0",
+      "descripcion": "Uncommon header 'x-xss-protection' found, with contents: 0",
+      "severidad": "alta",
+      "cvss_score": 7.5,
+      "owasp_category": "A03:2021 - Injection",
+      "fuente": "nikto",
+      "ubicacion": "GET /",
+      "evidencia": {
+        "id_osvdb": "N/A",
+        "ubicacion": "GET /",
+        "descripcion": "Uncommon header 'x-xss-protection' found, with contents: 0",
+        "fuente": "nikto"
+      },
+      "recomendacion": "Revisar y remediar según la naturaleza específica de la vulnerabilidad"
+    },
+    {
+      "id": "N/A",
+      "titulo": "Uncommon header 'x-frame-options' found, with contents: DENY",
+      "descripcion": "Uncommon header 'x-frame-options' found, with contents: DENY",
+      "severidad": "baja",
+      "cvss_score": 2.5,
+      "owasp_category": "A05:2021 - Security Misconfiguration",
+      "fuente": "nikto",
+      "ubicacion": "GET /",
+      "evidencia": {
+        "id_osvdb": "N/A",
+        "ubicacion": "GET /",
+        "descripcion": "Uncommon header 'x-frame-options' found, with contents: DENY",
+        "fuente": "nikto"
+      },
+      "recomendacion": "Revisar y remediar según la naturaleza específica de la vulnerabilidad"
+    },
+    {
+      "id": "N/A",
+      "titulo": "Cookie JSESSIONID created without the httponly flag",
+      "descripcion": "Cookie JSESSIONID created without the httponly flag",
+      "severidad": "baja",
+      "cvss_score": 2.5,
+      "owasp_category": "A05:2021 - Security Misconfiguration",
+      "fuente": "nikto",
+      "ubicacion": "GET /",
+      "evidencia": {
+        "id_osvdb": "N/A",
+        "ubicacion": "GET /",
+        "descripcion": "Cookie JSESSIONID created without the httponly flag",
+        "fuente": "nikto"
+      },
+      "recomendacion": "Revisar y remediar según la naturaleza específica de la vulnerabilidad"
+    },
+    {
+      "id": "N/A",
+      "titulo": "Allowed HTTP Methods: GET, HEAD, POST, PUT, DELETE, OPTIONS",
+      "descripcion": "Allowed HTTP Methods: GET, HEAD, POST, PUT, DELETE, OPTIONS",
+      "severidad": "baja",
+      "cvss_score": 2.5,
+      "owasp_category": "A05:2021 - Security Misconfiguration",
+      "fuente": "nikto",
+      "ubicacion": "OPTIONS /",
+      "evidencia": {
+        "id_osvdb": "N/A",
+        "ubicacion": "OPTIONS /",
+        "descripcion": "Allowed HTTP Methods: GET, HEAD, POST, PUT, DELETE, OPTIONS",
+        "fuente": "nikto"
+      },
+      "recomendacion": "Revisar y remediar según la naturaleza específica de la vulnerabilidad"
+    },
+    {
+      "id": "N/A",
+      "titulo": "GET /: HTTP method ('Allow' Header): 'PUT' method could allow clients to save files on the web serve...",
+      "descripcion": "GET /: HTTP method ('Allow' Header): 'PUT' method could allow clients to save files on the web server.",
+      "severidad": "baja",
+      "cvss_score": 2.5,
+      "owasp_category": "A05:2021 - Security Misconfiguration",
+      "fuente": "nikto",
+      "ubicacion": "-397",
+      "evidencia": {
+        "id_osvdb": "N/A",
+        "ubicacion": "-397",
+        "descripcion": "GET /: HTTP method ('Allow' Header): 'PUT' method could allow clients to save files on the web server.",
+        "fuente": "nikto"
+      },
+      "recomendacion": "Revisar y remediar según la naturaleza específica de la vulnerabilidad"
+    },
+    {
+      "id": "N/A",
+      "titulo": "GET /: HTTP method ('Allow' Header): 'DELETE' may allow clients to remove files on the web server.",
+      "descripcion": "GET /: HTTP method ('Allow' Header): 'DELETE' may allow clients to remove files on the web server.",
+      "severidad": "baja",
+      "cvss_score": 2.5,
+      "owasp_category": "A05:2021 - Security Misconfiguration",
+      "fuente": "nikto",
+      "ubicacion": "-5646",
+      "evidencia": {
+        "id_osvdb": "N/A",
+        "ubicacion": "-5646",
+        "descripcion": "GET /: HTTP method ('Allow' Header): 'DELETE' may allow clients to remove files on the web server.",
+        "fuente": "nikto"
+      },
+      "recomendacion": "Revisar y remediar según la naturaleza específica de la vulnerabilidad"
+    }
+  ],
+  "risk_summary": {
+    "critica": 0,
+    "alta": 2,
+    "media": 10,
+    "baja": 8,
+    "total": 20
+  },
+  "recommendations": {
+    "corto_plazo": [],
+    "mediano_plazo": [
+      "Remediar 2 vulnerabilidad(es) de severidad alta",
+      "Actualizar componentes de software a versiones más recientes",
+      "Implementar autenticación multifactor (MFA) en paneles administrativos",
+      "Realizar auditoría de configuraciones de seguridad",
+      "Implementar rate limiting en endpoints críticos"
+    ],
+    "largo_plazo": [
+      "Implementar un programa de gestión de vulnerabilidades continuo",
+      "Establecer políticas de hardening para servidores y aplicaciones",
+      "Implementar WAF (Web Application Firewall)",
+      "Desarrollar plan de respuesta a incidentes",
+      "Implementar monitoreo y logging centralizado",
+      "Realizar pentesting periódico (trimestral o semestral)",
+      "Capacitación en seguridad para el equipo de desarrollo",
+      "Implementar análisis de seguridad en CI/CD pipeline"
+    ]
+  }
+}

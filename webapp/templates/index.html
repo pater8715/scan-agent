@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scan Agent Web - Interfaz de Escaneo de Seguridad</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <link rel="stylesheet" href="/static/css/active-scans.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <h1 class="logo">
+                    <span class="logo-icon">🛡️</span>
+                    Scan Agent Web
+                </h1>
+                <nav class="nav">
+                    <button class="nav-btn active" data-page="scanner">
+                        <span class="icon">🔍</span> Nuevo Escaneo
+                    </button>
+                    <button class="nav-btn" data-page="history">
+                        <span class="icon">📋</span> Historial
+                    </button>
+                    <button class="nav-btn" data-page="reports">
+                        <span class="icon">📊</span> Reportes
+                    </button>
+                    <button class="nav-btn" data-page="manual">
+                        <span class="icon">📖</span> Manual
+                    </button>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <!-- Panel de Escaneos Activos (visible en todas las páginas) -->
+    <div id="active-scans-bar" style="display:none; background:#1a2332; border-bottom:2px solid #3498db; padding:10px 0;">
+        <div class="container">
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                <span style="color:#3498db; font-weight:bold; white-space:nowrap;">⚡ Escaneos en curso:</span>
+                <div id="active-scans-list" style="display:flex; gap:12px; flex-wrap:wrap; flex:1;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            
+            <!-- Scanner Page -->
+            <div id="scanner-page" class="page active">
+                <div class="page-header">
+                    <h2>Nuevo Escaneo de Seguridad</h2>
+                    <p class="subtitle">Selecciona el perfil de escaneo y configura los parámetros</p>
+                </div>
+
+                <!-- Profile Selection -->
+                <section class="card">
+                    <h3 class="card-title">1. Selecciona el Perfil de Escaneo</h3>
+                    <div id="profiles-grid" class="profiles-grid">
+                        <!-- Los perfiles se cargarán dinámicamente -->
+                        <div class="loading">Cargando perfiles...</div>
+                    </div>
+                </section>
+
+                <!-- Scan Configuration -->
+                <section class="card" id="scan-config-section" style="display: none;">
+                    <h3 class="card-title">2. Configurar Parámetros</h3>
+                    <form id="scan-form">
+                        <div class="form-group">
+                            <label for="target" class="required">Objetivo</label>
+                            <input
+                                type="text"
+                                id="target"
+                                name="target"
+                                placeholder="Ej: 192.168.1.1, ejemplo.com o juice-shop:3000"
+                                required
+                                pattern="^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$|^(?:[0-9]{1,3}\.){3}[0-9]{1,3}(?:/[0-9]{1,2})?$|^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(?::[0-9]{1,5})?$"
+                            >
+                            <small class="help-text">IP, dominio, rango CIDR (ej: 192.168.1.0/24) o host:puerto (ej: juice-shop:3000)</small>
+                            <div class="error-message" id="target-error"></div>
+                        </div>
+
+                        <!-- Panel de Objetivos de Laboratorio -->
+                        <div class="form-group" id="lab-targets-panel">
+                            <label style="display:flex; align-items:center; gap:8px;">
+                                🧪 Objetivos del Laboratorio
+                                <span id="lab-status-badge" style="font-size:0.72rem; background:#1a2332; color:#64748b; padding:2px 8px; border-radius:8px;">cargando...</span>
+                            </label>
+                            <div id="lab-targets-grid" style="display:flex; flex-wrap:wrap; gap:8px; margin-top:6px;">
+                                <span style="color:#64748b; font-size:0.82rem;">Cargando objetivos...</span>
+                            </div>
+                            <small class="help-text">Haz clic en un objetivo para seleccionarlo. 🟢 = activo · 🔴 = inactivo</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Formatos de Reporte</label>
+                            <div class="checkbox-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="format" value="json" checked>
+                                    <span>JSON</span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="format" value="html" checked>
+                                    <span>HTML</span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="format" value="txt">
+                                    <span>TXT</span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="format" value="md">
+                                    <span>Markdown</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="save-to-db" name="save_to_db" checked>
+                                <span>Guardar resultados en base de datos</span>
+                            </label>
+                            <small class="help-text">Permite acceder al historial de escaneos</small>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary" id="start-scan-btn">
+                                <span class="icon">▶️</span> Iniciar Escaneo
+                            </button>
+                            <button type="button" class="btn btn-secondary" id="reset-form-btn">
+                                <span class="icon">🔄</span> Restablecer
+                            </button>
+                        </div>
+                    </form>
+                </section>
+
+                <!-- Scan Progress -->
+                <section class="card" id="scan-progress-section" style="display: none;">
+                    <h3 class="card-title">Progreso del Escaneo</h3>
+                    <div class="progress-info">
+                        <div class="progress-header">
+                            <span id="scan-status-text">Iniciando...</span>
+                            <span id="scan-percentage">0%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progress-fill"></div>
+                        </div>
+                        <div class="progress-details">
+                            <div class="detail-item">
+                                <strong>ID:</strong> <span id="current-scan-id">-</span>
+                            </div>
+                            <div class="detail-item">
+                                <strong>Objetivo:</strong> <span id="current-target">-</span>
+                            </div>
+                            <div class="detail-item">
+                                <strong>Perfil:</strong> <span id="current-profile">-</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button class="btn btn-danger" id="cancel-scan-btn">
+                            <span class="icon">⛔</span> Cancelar Escaneo
+                        </button>
+                    </div>
+                </section>
+
+                <!-- Scan Results -->
+                <section class="card" id="scan-results-section" style="display: none;">
+                    <h3 class="card-title">Resultados del Escaneo</h3>
+                    <div id="scan-results-content"></div>
+                    <div class="form-actions">
+                        <button class="btn btn-primary" id="view-report-btn">
+                            <span class="icon">📄</span> Ver Reporte Completo
+                        </button>
+                        <button class="btn btn-secondary" id="new-scan-btn">
+                            <span class="icon">🔍</span> Nuevo Escaneo
+                        </button>
+                    </div>
+                </section>
+
+                <!-- Hosts Descubiertos (visible solo tras escaneos de red con hosts múltiples) -->
+                <section class="card" id="discovered-hosts-section" style="display: none;">
+                    <h3 class="card-title">🖥️ Hosts Activos Descubiertos</h3>
+                    <p style="color:var(--text-secondary, #94a3b8); margin-bottom:14px; font-size:0.88rem;">
+                        El escaneo de red encontró los siguientes equipos activos. Selecciona un host y elige el perfil para analizarlo en detalle.
+                    </p>
+                    <div id="discovered-hosts-grid" style="display:flex; flex-wrap:wrap; gap:12px;"></div>
+                </section>
+            </div>
+
+            <!-- History Page -->
+            <div id="history-page" class="page">
+                <div class="page-header">
+                    <h2>Historial de Escaneos</h2>
+                    <p class="subtitle">Revisa todos los escaneos realizados</p>
+                </div>
+
+                <div class="card">
+                    <div class="filter-bar">
+                        <input type="text" id="search-scans" placeholder="🔍 Buscar por objetivo o ID...">
+                        <select id="filter-status">
+                            <option value="">Todos los estados</option>
+                            <option value="completed">Completados</option>
+                            <option value="running">En ejecución</option>
+                            <option value="failed">Fallidos</option>
+                        </select>
+                        <button class="btn btn-secondary" id="refresh-history-btn">
+                            <span class="icon">🔄</span> Actualizar
+                        </button>
+                    </div>
+
+                    <div id="scans-table-container">
+                        <table class="scans-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Objetivo</th>
+                                    <th>Perfil</th>
+                                    <th>Estado</th>
+                                    <th>Fecha</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="scans-tbody">
+                                <tr>
+                                    <td colspan="6" class="loading">Cargando historial...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reports Page -->
+            <div id="reports-page" class="page">
+                <div class="page-header">
+                    <h2>Reportes de Escaneos</h2>
+                    <p class="subtitle">Visualiza y descarga los reportes generados</p>
+                </div>
+
+                <div class="reports-layout">
+
+                    <!-- Panel izquierdo: lista de escaneos -->
+                    <div class="reports-sidebar card">
+                        <div class="reports-sidebar-header">
+                            <span class="card-title" style="margin:0; font-size:1rem;">Escaneos disponibles</span>
+                            <button class="btn btn-secondary btn-sm" id="refresh-reports-btn">🔄 Actualizar</button>
+                        </div>
+                        <div id="reports-scan-list">
+                            <div class="loading">Cargando...</div>
+                        </div>
+                    </div>
+
+                    <!-- Panel derecho: visor -->
+                    <div class="reports-viewer-wrap">
+
+                        <!-- Placeholder -->
+                        <div class="card" id="report-placeholder" style="text-align:center; padding:60px 20px;">
+                            <div style="font-size:3rem; margin-bottom:16px;">📊</div>
+                            <p style="color:var(--text-secondary); font-size:1rem;">
+                                Selecciona un escaneo de la lista para visualizar su reporte
+                            </p>
+                        </div>
+
+                        <!-- Visor activo -->
+                        <div class="card" id="report-viewer-card" style="display:none; padding:0; overflow:hidden;">
+
+                            <!-- Cabecera del visor -->
+                            <div class="report-viewer-header">
+                                <div class="report-viewer-info">
+                                    <span class="report-viewer-id" id="report-viewer-title">—</span>
+                                </div>
+                                <div class="report-viewer-actions">
+                                    <!-- Tabs de vista -->
+                                    <div class="report-view-tabs">
+                                        <button class="report-tab-btn" id="view-html-btn" data-fmt="html">🌐 HTML</button>
+                                        <button class="report-tab-btn" id="view-txt-btn"  data-fmt="txt">📄 Texto</button>
+                                        <button class="report-tab-btn" id="view-json-btn" data-fmt="json">🔧 JSON</button>
+                                    </div>
+                                    <!-- Descargas -->
+                                    <div id="report-format-btns" style="display:flex; gap:6px; flex-wrap:wrap;"></div>
+                                </div>
+                            </div>
+
+                            <!-- Área de contenido -->
+                            <div id="report-view-area">
+                                <iframe id="report-iframe"    style="width:100%; height:75vh; border:none; display:none;"></iframe>
+                                <pre   id="report-text-view" style="display:none; margin:0; padding:20px; overflow:auto; height:75vh; font-size:0.82rem; background:#0f1923; color:#e2e8f0; white-space:pre-wrap; word-break:break-word;"></pre>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- Manual Page -->
+            <div id="manual-page" class="page">
+                <div class="page-header">
+                    <h2>Manual de Usuario</h2>
+                    <p class="subtitle">Documentación completa de Scan Agent v3.1</p>
+                </div>
+
+                <div class="manual-layout">
+                    <!-- TOC sidebar -->
+                    <aside class="manual-toc" id="manual-toc">
+                        <div class="toc-header">Contenido</div>
+                        <div id="toc-list"><div class="loading">Cargando...</div></div>
+                    </aside>
+
+                    <!-- Content area -->
+                    <div class="card manual-content-card">
+                        <div id="manual-content">
+                            <div class="loading">Cargando manual...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <p>Scan Agent Web v1.0 | Desarrollado para análisis de seguridad</p>
+        </div>
+    </footer>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container"></div>
+
+    <!-- Scripts -->
+    <script src="/static/js/app.js"></script>
+    <script>
+        // ── Visor de Reportes ──────────────────────────────────────────────
+        let _currentReportId = null;
+        let _currentView = 'html';
+
+        async function loadReportsList() {
+            const list = document.getElementById('reports-scan-list');
+            list.innerHTML = '<div class="loading">Cargando...</div>';
+            try {
+                const r = await fetch('/api/reports/');
+                if (!r.ok) throw new Error('Error ' + r.status);
+                const scans = await r.json();
+                if (!scans.length) {
+                    list.innerHTML = '<p class="info-text" style="font-size:0.82rem;padding:8px;">No hay reportes aún</p>';
+                    return;
+                }
+                list.innerHTML = scans.map(s => `
+                    <div class="report-scan-item" id="rsi-${s.scan_id}"
+                         data-scan-id="${s.scan_id}"
+                         data-formats="${s.formats.join(',')}">
+                        <div class="rsi-target" title="${s.scan_id}">${s.scan_id}</div>
+                        <div class="rsi-meta">${new Date(s.created_at).toLocaleString('es-ES')}</div>
+                        <div class="rsi-badges">${s.formats.map(f => `<span class="fmt-badge">${f}</span>`).join('')}</div>
+                    </div>`).join('');
+
+                // Adjuntar listeners después de inyectar el HTML
+                list.querySelectorAll('.report-scan-item').forEach(el => {
+                    el.addEventListener('click', () => {
+                        const id  = el.dataset.scanId;
+                        const fmts = el.dataset.formats.split(',').filter(Boolean);
+                        selectReport(id, fmts);
+                    });
+                });
+            } catch (e) {
+                list.innerHTML = '<p class="info-text" style="color:var(--danger-color);font-size:0.82rem;padding:8px;">Error cargando reportes</p>';
+            }
+        }
+
+        async function selectReport(scanId, formats) {
+            _currentReportId = scanId;
+            document.querySelectorAll('.report-scan-item').forEach(el => el.classList.remove('active'));
+            document.getElementById('rsi-' + scanId)?.classList.add('active');
+
+            document.getElementById('report-placeholder').style.display = 'none';
+            document.getElementById('report-viewer-card').style.display = 'block';
+            document.getElementById('report-viewer-title').textContent = 'Escaneo: ' + scanId;
+
+            // Botones de descarga
+            const fmtIcons = {html:'🌐', json:'🔧', txt:'📄', md:'📝'};
+            document.getElementById('report-format-btns').innerHTML = formats.map(f => `
+                <a href="/api/reports/${scanId}/download/${f}" download class="btn btn-secondary btn-sm">
+                    ⬇️ ${(fmtIcons[f]||'') + f.toUpperCase()}
+                </a>`).join('');
+
+            // Mostrar/ocultar tabs según formatos disponibles
+            ['html','txt','json'].forEach(f => {
+                const btn = document.getElementById('view-' + f + '-btn');
+                if (btn) btn.style.display = formats.includes(f) ? '' : 'none';
+            });
+
+            // Activar tab preferido
+            const preferred = ['html', 'txt', 'json'].find(f => formats.includes(f)) || formats[0];
+            document.querySelectorAll('.report-tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('view-' + preferred + '-btn')?.classList.add('active');
+            showReportView(preferred);
+        }
+
+        async function showReportView(fmt) {
+            if (!_currentReportId) return;
+            _currentView = fmt;
+            const iframe = document.getElementById('report-iframe');
+            const pre    = document.getElementById('report-text-view');
+
+            if (fmt === 'html') {
+                iframe.style.display = 'block';
+                pre.style.display    = 'none';
+                iframe.src = `/api/reports/${_currentReportId}/view/html`;
+            } else if (fmt === 'txt') {
+                iframe.style.display = 'none';
+                pre.style.display    = 'block';
+                pre.textContent      = 'Cargando...';
+                const r = await fetch(`/api/reports/${_currentReportId}/view/txt`);
+                pre.textContent = r.ok ? await r.text() : 'No disponible';
+            } else if (fmt === 'json') {
+                iframe.style.display = 'none';
+                pre.style.display    = 'block';
+                pre.textContent      = 'Cargando...';
+                const r = await fetch(`/api/reports/${_currentReportId}/preview`);
+                pre.textContent = r.ok ? JSON.stringify(await r.json(), null, 2) : 'No disponible';
+            }
+        }
+
+        // Botón refresh
+        document.getElementById('refresh-reports-btn')?.addEventListener('click', loadReportsList);
+
+        // Tabs de vista con resaltado activo
+        document.querySelectorAll('.report-tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                showReportView(btn.dataset.fmt);
+                document.querySelectorAll('.report-tab-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+            });
+        });
+
+        // Cargar reportes al entrar en la pestaña
+        document.querySelectorAll('.nav-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (btn.dataset.page === 'reports') loadReportsList();
+            });
+        });
+
+        // ── Panel de Escaneos Activos ──────────────────────────────────────
+        (function () {
+            const bar  = document.getElementById('active-scans-bar');
+            const list = document.getElementById('active-scans-list');
+
+            function herramienta(msg) {
+                const m = msg && msg.match(/—\s*(\S+)/);
+                return m ? m[1] : '';
+            }
+
+            function renderChip(scan) {
+                const pct  = scan.progress || 0;
+                return `
+                <div class="active-scan-chip">
+                    <div class="chip-header">
+                        <span>${scan.profile}</span>
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            <span class="chip-pct">${pct}%</span>
+                            <button
+                                onclick="cancelScanFromBar('${scan.scan_id}')"
+                                title="Cancelar escaneo"
+                                style="background:none;border:1px solid #e7433566;border-radius:4px;color:#e74335;cursor:pointer;font-size:0.72rem;padding:1px 6px;line-height:1.4;"
+                            >⛔</button>
+                        </div>
+                    </div>
+                    <div class="chip-target" title="${scan.target}">${scan.target}</div>
+                    <div class="chip-msg" title="${scan.message || ''}">${scan.message || 'En progreso...'}</div>
+                    <div class="mini-progress">
+                        <div class="mini-progress-fill" style="width:${pct}%"></div>
+                    </div>
+                </div>`;
+            }
+
+            async function cancelScanFromBar(scanId) {
+                try {
+                    const r = await fetch(`/api/scans/${scanId}`, { method: 'DELETE' });
+                    const data = await r.json();
+                    if (r.ok) {
+                        showToast(`Escaneo ${scanId} cancelado`, 'warning');
+                        pollActiveScans();
+                        // Si es el escaneo actual, restablecer la UI
+                        if (typeof cancelScan === 'function' && typeof currentScanId !== 'undefined' && currentScanId === scanId) {
+                            if (typeof pollInterval !== 'undefined' && pollInterval) clearInterval(pollInterval);
+                            document.getElementById('scan-progress-section').style.display = 'none';
+                            document.getElementById('scan-config-section').style.display = 'block';
+                            const btn = document.getElementById('start-scan-btn');
+                            if (btn) { btn.disabled = false; btn.innerHTML = '<span class="icon">▶️</span> Iniciar Escaneo'; }
+                        }
+                    } else {
+                        showToast(data.detail || 'Error al cancelar', 'error');
+                    }
+                } catch (e) {
+                    showToast('Error al cancelar', 'error');
+                }
+            }
+
+            async function pollActiveScans() {
+                try {
+                    const r = await fetch('/api/scans/list');
+                    if (!r.ok) return;
+                    const scans = await r.json();
+                    const running = scans.filter(s => s.status === 'running' || s.status === 'pending');
+                    if (running.length === 0) {
+                        bar.style.display = 'none';
+                    } else {
+                        list.innerHTML = running.map(renderChip).join('');
+                        bar.style.display = 'block';
+                    }
+                } catch (_) {}
+            }
+
+            // Exponer globalmente para que cancelScan() en app.js pueda refrescar el bar
+            window.pollActiveScans = pollActiveScans;
+
+            // Arrancar polling cada 3 segundos
+            pollActiveScans();
+            setInterval(pollActiveScans, 3000);
+        })();
+
+        // ── Hosts Descubiertos (escaneos de red CIDR) ─────────────────────────
+        const SCAN_PROFILES_QUICK = [
+            { value: 'web',        label: '🌐 Web' },
+            { value: 'network',    label: '🖧 Red' },
+            { value: 'api-owasp', label: '🔌 API OWASP' },
+            { value: 'compliance', label: '✅ Compliance' },
+            { value: 'quick',      label: '⚡ Rápido' },
+            { value: 'standard',   label: '🔍 Estándar' },
+            { value: 'full',       label: '🔬 Completo' },
+        ];
+
+        function renderDiscoveredHosts(hosts, originScanId) {
+            const section = document.getElementById('discovered-hosts-section');
+            const grid    = document.getElementById('discovered-hosts-grid');
+            if (!section || !grid) return;
+
+            if (!hosts || hosts.length === 0) {
+                section.style.display = 'none';
+                return;
+            }
+
+            section.style.display = 'block';
+
+            const profileOptions = SCAN_PROFILES_QUICK.map(p =>
+                `<option value="${p.value}">${p.label}</option>`
+            ).join('');
+
+            grid.innerHTML = hosts.map(h => {
+                const portBadges = (h.open_ports || []).slice(0, 8).map(p =>
+                    `<span class="dhc-port-badge">${p.port}/${p.protocol}</span>`
+                ).join('');
+                const morePorts = (h.open_ports || []).length > 8
+                    ? `<span class="dhc-port-badge" style="background:#0f1923;">+${(h.open_ports||[]).length-8}</span>`
+                    : '';
+                const latency = h.latency_ms != null ? `⏱ ${h.latency_ms} ms` : '';
+                const hostname = h.hostname ? `<div class="dhc-hostname">${h.hostname}</div>` : '';
+
+                return `
+                <div class="discovered-host-card">
+                    <div class="dhc-ip">${h.ip}</div>
+                    ${hostname}
+                    <div class="dhc-latency">${latency}</div>
+                    <div class="dhc-ports">${portBadges}${morePorts}</div>
+                    <div class="dhc-actions">
+                        <select class="dhc-profile-select" id="dhc-prof-${h.ip.replace(/\./g,'-')}">
+                            ${profileOptions}
+                        </select>
+                        <button class="dhc-scan-btn"
+                            onclick="launchHostScan('${h.ip}', '${h.ip.replace(/\./g,'-')}')">
+                            ▶ Escanear
+                        </button>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        async function loadDiscoveredHosts(scanId) {
+            try {
+                const r = await fetch(`/api/scans/${scanId}/hosts`);
+                if (!r.ok) return;
+                const data = await r.json();
+                renderDiscoveredHosts(data.hosts || [], scanId);
+            } catch (_) {}
+        }
+
+        function launchHostScan(ip, ipKey) {
+            const profileSel = document.getElementById(`dhc-prof-${ipKey}`);
+            const profile = profileSel ? profileSel.value : 'network';
+            const targetInput = document.getElementById('target');
+            if (targetInput) targetInput.value = ip;
+
+            // Seleccionar perfil en la UI de perfiles
+            const profCard = document.querySelector(`.profile-card[data-profile="${profile}"]`);
+            if (profCard) {
+                document.querySelectorAll('.profile-card').forEach(c => c.classList.remove('selected'));
+                profCard.classList.add('selected');
+                const radio = profCard.querySelector('input[type="radio"]');
+                if (radio) radio.checked = true;
+            }
+
+            // Ocultar panel de hosts y mostrar configuración
+            document.getElementById('discovered-hosts-section').style.display = 'none';
+            document.getElementById('scan-results-section').style.display = 'none';
+            const configSection = document.getElementById('scan-config-section');
+            if (configSection) configSection.style.display = 'block';
+
+            // Scroll hasta el formulario
+            configSection && configSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+            showToast(`Host ${ip} listo para escanear con perfil ${profile}`, 'info');
+        }
+
+        // ── Objetivos de Laboratorio ──────────────────────────────────────────
+        (async function loadLabTargets() {
+            const grid = document.getElementById('lab-targets-grid');
+            const badge = document.getElementById('lab-status-badge');
+            const targetInput = document.getElementById('target');
+            if (!grid) return;
+
+            const PROFILE_COLORS = {
+                web: '#1e5f8a',
+                'api-owasp': '#6d28d9',
+                network: '#065f46',
+                compliance: '#92400e',
+            };
+
+            try {
+                const r = await fetch('/api/lab/targets');
+                if (!r.ok) throw new Error('no disponible');
+                const targets = await r.json();
+                const active = targets.filter(t => t.reachable);
+                badge.textContent = `${active.length}/${targets.length} activos`;
+                badge.style.color = active.length > 0 ? '#22c55e' : '#ef4444';
+
+                grid.innerHTML = targets.map(t => {
+                    const statusDot = t.reachable ? '🟢' : '🔴';
+                    const profileColor = PROFILE_COLORS[t.profile] || '#1a2332';
+                    const disabledStyle = t.reachable ? '' : 'opacity:0.5; cursor:not-allowed;';
+                    return `<button
+                        type="button"
+                        class="lab-target-btn"
+                        title="${t.description}\nIP fija: ${t.ip}:${t.port}"
+                        data-hostname="${t.hostname}"
+                        data-port="${t.port}"
+                        data-profile="${t.profile}"
+                        style="background:${profileColor}; border:1px solid ${t.reachable ? '#3498db55' : '#ffffff22'}; ${disabledStyle}"
+                        ${t.reachable ? '' : 'disabled'}
+                    >
+                        <span>${t.icon} ${t.name}</span>
+                        <span style="font-size:0.68rem; opacity:0.8;">${statusDot} ${t.hostname}:${t.port}</span>
+                    </button>`;
+                }).join('');
+
+                // Manejador de clic: rellena el campo target y sugiere el perfil
+                grid.querySelectorAll('.lab-target-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const h = btn.dataset.hostname;
+                        const p = btn.dataset.port;
+                        const prof = btn.dataset.profile;
+                        // Rellenar target
+                        if (targetInput) {
+                            targetInput.value = `${h}:${p}`;
+                            targetInput.dispatchEvent(new Event('input'));
+                        }
+                        // Seleccionar perfil recomendado si existe
+                        const profCard = document.querySelector(`.profile-card[data-profile="${prof}"]`);
+                        if (profCard) {
+                            document.querySelectorAll('.profile-card').forEach(c => c.classList.remove('selected'));
+                            profCard.classList.add('selected');
+                            profCard.querySelector('input[type="radio"]').checked = true;
+                        }
+                        // Resaltar botón seleccionado
+                        grid.querySelectorAll('.lab-target-btn').forEach(b => b.style.outline = '');
+                        btn.style.outline = '2px solid #3498db';
+                    });
+                });
+
+            } catch (e) {
+                grid.innerHTML = '<span style="color:#64748b; font-size:0.82rem;">No disponible (solo en entorno Docker)</span>';
+                badge.textContent = 'sin red Docker';
+            }
+        })();
+    </script>
+</body>
+</html>

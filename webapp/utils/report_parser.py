@@ -1,0 +1,930 @@
+"""
+Report Parser
+=============
+Parsea archivos raw de escaneo y extrae información estructurada.
+
+Autor: Scan Agent Team
+Versión: 2.0.0
+"""
+
+import re
+from typing import Dict, List, Optional
+from pathlib import Path
+
+
+class ScanResultParser:
+    """Parser inteligente de resultados de escaneo"""
+
+    def __init__(self):
+        self.results = {
+            "target": "",
+            "scan_date": "",
+            "host_up": False,
+            "latency_ms": None,
+            "ports": [],
+            "os": "Unknown",
+            "os_cpe": "",
+            "http_info": {},
+            "headers": {},
+            "nikto_findings": [],
+            "directories": [],
+            "raw_files": [],
+            "nse_findings": [],
+            "active_hosts": []
+        }
+
+    def parse_all_files(self, output_path: Path, target: str) -> Dict:
+        self.results["target"] = target
+
+        if not output_path.exists():
+            return self.results
+
+        for file in output_path.glob("*"):
+            if not file.is_file():
+                continue
+
+            try:
+                with open(file, 'r', encoding='utf-8', errors='ignore') as f:
+                    content = f.read()
+
+                filename_lower = file.name.lower()
+
+                if 'nmap' in filename_lower:
+                    self.parse_nmap_output(content)
+                    if 'nse' in filename_lower:
+                        self.parse_nse_output(content, file.name)
+                elif 'header' in filename_lower or 'curl' in filename_lower:
+                    self.parse_headers(content)
+                elif 'nikto' in filename_lower:
+                    self.parse_nikto_output(content)
+                elif 'gobuster' in filename_lower or 'dirb' in filename_lower:
+                    self.parse_directory_scan(content)
+
+                self.results["raw_files"].append({
+                    "filename": file.name,
+                    "content": content[:3000]
+                })
+
+            except Exception as e:
+                print(f"⚠️  Error procesando {file.name}: {e}")
+
+        return self.results
+
+    def _parse_nmap_hosts(self, content: str):
+        """Extrae lista de hosts activos del output nmap (para escaneos CIDR o multi-host)."""
+        host_re = re.compile(
+            r'Nmap scan report for (?:([^\s(]+) \()?([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)\)?'
+        )
+        matches = list(host_re.finditer(content))
+        if not matches:
+            return
+
+        for i, m in enumerate(matches):
+            hostname = m.group(1) or ""
+            ip = m.group(2)
+            block_start = m.start()
+            block_end = matches[i + 1].start() if i + 1 < len(matches) else len(content)
+            block = content[block_start:block_end]
+
+            if "Host is up" not in block:
+                continue
+
+            latency_ms = None
+            lat_m = re.search(r'Host is up \(([0-9.]+)s latency\)', block)
+            if lat_m:
+                latency_ms = round(float(lat_m.group(1)) * 1000, 1)
+
+            ports = []
+            for pm in re.finditer(r'(\d+)/(tcp|udp)\s+open\s+(\S+)', block):
+                ports.append({
+                    "port": int(pm.group(1)),
+                    "protocol": pm.group(2),
+                    "service": pm.group(3)
+                })
+
+            if not any(h["ip"] == ip for h in self.results["active_hosts"]):
+                self.results["active_hosts"].append({
+                    "ip": ip,
+                    "hostname": hostname,
+                    "latency_ms": latency_ms,
+                    "open_ports": ports
+                })
+
+    def parse_nmap_output(self, content: str):
+        # Extraer hosts activos (escaneos CIDR / multi-host)
+        self._parse_nmap_hosts(content)
+
+        if "Host is up" in content:
+            self.results["host_up"] = True
+            latency_match = re.search(r'Host is up \(([0-9.]+)s latency\)', content)
+            if latency_match:
+                self.results["latency_ms"] = int(float(latency_match.group(1)) * 1000)
+
+        port_pattern = r'(\d+)/(tcp|udp)\s+(\w+)\s+(\S+)(?:\s+(.+?))?(?:\n|$)'
+        for match in re.finditer(port_pattern, content):
+            port_num = match.group(1)
+            protocol = match.group(2)
+            state = match.group(3)
+            service = match.group(4)
+            version_info = match.group(5).strip() if match.group(5) else ""
+
+            if state.lower() == 'open':
+                port_data = {
+                    "port": int(port_num),
+                    "protocol": protocol,
+                    "state": state,
+                    "service": service,
+                    "version": version_info if version_info else "Unknown",
+                    "product": "",
+                    "extra_info": ""
+                }
+                version_match = re.search(r'([A-Za-z0-9\-\.]+)\s+([\d\.]+)', version_info) if version_info else None
+                if version_match:
+                    port_data["product"] = version_match.group(1)
+                    port_data["version"] = version_match.group(2)
+
+                if not any(p["port"] == int(port_num) for p in self.results["ports"]):
+                    self.results["ports"].append(port_data)
+
+        os_patterns = [
+            r'Service Info: OS: ([^;]+)',
+            r'Running: ([^,\n]+)',
+            r'OS details: ([^\n]+)'
+        ]
+        for pattern in os_patterns:
+            os_match = re.search(pattern, content)
+            if os_match and self.results["os"] == "Unknown":
+                self.results["os"] = os_match.group(1).strip()
+                break
+
+        cpe_match = re.search(r'CPE: (cpe:[^\s]+)', content)
+        if cpe_match:
+            self.results["os_cpe"] = cpe_match.group(1)
+
+    def parse_nse_output(self, content: str, filename: str):
+        """Parsea output de scripts NSE de nmap y extrae hallazgos estructurados."""
+        current_script = None
+        current_lines = []
+
+        nse_block_pattern = re.compile(r'^\| ([a-z][a-z0-9\-]+):', re.MULTILINE)
+
+        for match in nse_block_pattern.finditer(content):
+            script_name = match.group(1)
+            start = match.start()
+            end_match = nse_block_pattern.search(content, match.end())
+            block_end = end_match.start() if end_match else len(content)
+            block = content[start:block_end]
+
+            self.results["nse_findings"].append({
+                "script": script_name,
+                "output": block[:500],
+                "filename": filename
+            })
+
+        # Cabecera de servidor desde NSE
+        server_match = re.search(r'\|_http-server-header:\s*(.+)', content)
+        if server_match:
+            self.results["http_info"]["server"] = server_match.group(1).strip()
+
+    def parse_headers(self, content: str):
+        """
+        Parsea cabeceras HTTP de output curl verbose o nmap http-headers.
+        Solo extrae cabeceras reales de la respuesta HTTP, ignorando cuerpo y metadata.
+        """
+        lines = content.split('\n')
+        in_response = False
+
+        for line in lines:
+            # curl verbose: inicio de respuesta HTTP
+            if line.startswith('< HTTP/') or line.startswith('HTTP/1') or line.startswith('HTTP/2'):
+                in_response = True
+                continue
+
+            # Cabeceras nmap: formato "| http-headers:" con "|   Header: value"
+            if line.strip().startswith('| http-headers:'):
+                in_response = True
+                continue
+
+            # Fin de cabeceras curl verbose: línea "<" sola o línea vacía después de estar en headers
+            if in_response and line.strip() in ('< ', '<', ''):
+                in_response = False
+                continue
+
+            # Solo procesar líneas de respuesta curl verbose (empiezan con "<")
+            if in_response and line.startswith('< '):
+                line = line[2:].strip()
+            elif in_response and line.startswith('|   '):
+                # Formato nmap http-headers
+                line = line[4:].strip()
+            elif in_response and line.startswith('*') or (in_response and line.startswith('>')):
+                # Metadata o request headers de curl verbose — ignorar
+                continue
+            elif not in_response:
+                continue
+
+            if ':' in line:
+                try:
+                    key, _, value = line.partition(':')
+                    key = key.strip()
+                    value = value.strip()
+                    # Filtrar líneas que no son cabeceras HTTP reales
+                    if key and value and len(key) < 60 and not key.startswith(('*', '>', '<', ' ')):
+                        self.results["headers"][key] = value
+                        if key.lower() == 'server':
+                            self.results["http_info"]["server"] = value
+                        if key.lower() == 'x-powered-by':
+                            self.results["http_info"]["powered_by"] = value
+                except Exception:
+                    pass
+
+    def parse_nikto_output(self, content: str):
+        lines = content.split('\n')
+        for line in lines:
+            line = line.strip()
+            if line.startswith('+'):
+                finding = line[1:].strip()
+                # Omitir líneas de error, advertencia o muy cortas
+                if (finding and not finding.startswith('-') and len(finding) > 15
+                        and not finding.upper().startswith('ERROR:')
+                        and not finding.upper().startswith('WARNING:')
+                        and not finding.upper().startswith('NOTICE:')):
+                    self.results["nikto_findings"].append(finding)
+
+    def parse_directory_scan(self, content: str):
+        lines = content.split('\n')
+        for line in lines:
+            line = line.strip()
+            if '(Status:' in line or 'CODE:' in line:
+                self.results["directories"].append(line)
+
+
+class VulnerabilityAnalyzer:
+    """Analiza resultados y clasifica severidad según perfil de escaneo"""
+
+    HIGH_RISK_PORTS = {
+        21: "FTP - Protocolo inseguro",
+        23: "Telnet - Sin cifrado",
+        25: "SMTP - Potencial relay abierto",
+        110: "POP3 - Sin cifrado",
+        143: "IMAP - Sin cifrado",
+        445: "SMB - Vulnerable a ataques de red",
+        3306: "MySQL - Base de datos expuesta",
+        3389: "RDP - Expuesto a ataques de fuerza bruta",
+        5432: "PostgreSQL - Base de datos expuesta",
+        6379: "Redis - Sin autenticación por defecto",
+        27017: "MongoDB - Base de datos expuesta",
+        2049: "NFS - Compartición de archivos insegura",
+        161: "SNMP - Posible información del sistema"
+    }
+
+    MEDIUM_RISK_PORTS = {
+        22: "SSH - Puerto de administración remota",
+        80: "HTTP - Comunicación sin cifrado",
+        8080: "HTTP-ALT - Sin cifrado",
+        8000: "HTTP-DEV - Posible servidor de desarrollo",
+        8443: "HTTPS-ALT - Puerto alternativo HTTPS"
+    }
+
+    VULNERABLE_VERSIONS = {
+        "OpenSSH": {
+            "6.6": ["CVE-2016-0777", "CVE-2016-0778"],
+            "7.2": ["CVE-2016-10009", "CVE-2016-10010"]
+        },
+        "Apache": {
+            "2.4.7": ["CVE-2017-15710", "CVE-2017-15715"],
+            "2.4.49": ["CVE-2021-41773", "CVE-2021-42013"]
+        }
+    }
+
+    SECURITY_HEADERS = {
+        "Strict-Transport-Security": {
+            "severity": "HIGH",
+            "title": "Cabecera HSTS ausente (Strict-Transport-Security)",
+            "description": "La cabecera HTTP Strict-Transport-Security no está configurada. Esto permite ataques de degradación de protocolo (SSL stripping) y robo de cookies en tránsito.",
+            "recommendation": "Configurar: Strict-Transport-Security: max-age=31536000; includeSubDomains; preload"
+        },
+        "Content-Security-Policy": {
+            "severity": "HIGH",
+            "title": "Política de Seguridad de Contenido ausente (CSP)",
+            "description": "La cabecera Content-Security-Policy no está definida. Sin CSP, la aplicación es vulnerable a ataques de Cross-Site Scripting (XSS) e inyección de contenido malicioso.",
+            "recommendation": "Definir una política CSP estricta que restrinja fuentes de scripts, estilos, imágenes e iframes. Ejemplo: Content-Security-Policy: default-src 'self'; script-src 'self'"
+        },
+        "X-Frame-Options": {
+            "severity": "MEDIUM",
+            "title": "Protección contra Clickjacking ausente (X-Frame-Options)",
+            "description": "Sin la cabecera X-Frame-Options, la aplicación puede ser embebida en iframes de sitios maliciosos, habilitando ataques de clickjacking y robo de credenciales.",
+            "recommendation": "Configurar: X-Frame-Options: DENY (recomendado) o SAMEORIGIN"
+        },
+        "X-Content-Type-Options": {
+            "severity": "MEDIUM",
+            "title": "Protección contra MIME-Sniffing ausente (X-Content-Type-Options)",
+            "description": "Sin esta cabecera, los navegadores pueden interpretar archivos con un tipo MIME diferente al declarado, lo que puede permitir ataques de ejecución de contenido.",
+            "recommendation": "Configurar: X-Content-Type-Options: nosniff"
+        },
+        "X-XSS-Protection": {
+            "severity": "LOW",
+            "title": "Filtro XSS del navegador no configurado (X-XSS-Protection)",
+            "description": "Esta cabecera activa el filtro XSS integrado en navegadores legacy. Su ausencia puede facilitar ataques XSS reflejados en clientes con navegadores antiguos.",
+            "recommendation": "Configurar: X-XSS-Protection: 1; mode=block"
+        },
+        "Referrer-Policy": {
+            "severity": "LOW",
+            "title": "Política de Referrer no configurada (Referrer-Policy)",
+            "description": "Sin esta cabecera, el navegador puede enviar la URL completa como referrer a sitios externos, filtrando parámetros sensibles de la URL como tokens o IDs de sesión.",
+            "recommendation": "Configurar: Referrer-Policy: strict-origin-when-cross-origin"
+        },
+        "Permissions-Policy": {
+            "severity": "LOW",
+            "title": "Política de Permisos del navegador ausente (Permissions-Policy)",
+            "description": "Sin esta cabecera, no se controla el acceso de la página a APIs sensibles del navegador como cámara, micrófono o geolocalización.",
+            "recommendation": "Configurar: Permissions-Policy: geolocation=(), microphone=(), camera=()"
+        }
+    }
+
+    SENSITIVE_PATHS = {
+        "/.git": "CRITICAL",
+        "/.env": "CRITICAL",
+        "/.env.local": "CRITICAL",
+        "/.env.production": "CRITICAL",
+        "/backup": "HIGH",
+        "/backups": "HIGH",
+        "/dump": "HIGH",
+        "/db": "HIGH",
+        "/admin": "HIGH",
+        "/administrator": "HIGH",
+        "/wp-admin": "HIGH",
+        "/wp-login.php": "HIGH",
+        "/phpmyadmin": "HIGH",
+        "/console": "HIGH",
+        "/manager": "HIGH",
+        "/server-status": "HIGH",
+        "/server-info": "HIGH",
+        "/config": "MEDIUM",
+        "/configuration": "MEDIUM",
+        "/swagger": "MEDIUM",
+        "/swagger-ui": "MEDIUM",
+        "/api-docs": "MEDIUM",
+        "/openapi": "MEDIUM",
+        "/.htaccess": "MEDIUM",
+        "/.htpasswd": "HIGH",
+        "/logs": "MEDIUM",
+        "/log": "MEDIUM",
+        "/debug": "MEDIUM",
+        "/test": "LOW",
+        "/api/v1": "INFO",
+        "/api/v2": "INFO",
+    }
+
+    def __init__(self, scan_results: Dict, profile: str = "web"):
+        self.results = scan_results
+        self.profile = profile.lower() if profile else "web"
+        self.findings = []
+        self.risk_score = 0
+
+    def analyze(self) -> Dict:
+        # Análisis de infraestructura (todos los perfiles)
+        self._analyze_ports()
+        self._analyze_versions()
+
+        # Análisis web (web, api-owasp, compliance)
+        if self.profile in ("web", "api-owasp", "compliance"):
+            self._analyze_web_security_headers()
+            self._analyze_nikto_findings()
+            self._analyze_sensitive_directories()
+            self._analyze_nse_web_scripts()
+
+        # Análisis específico API OWASP
+        if self.profile == "api-owasp":
+            self._analyze_api_owasp()
+
+        # Para network, análisis de Nikto se omite pero NSE sí se incluye
+        if self.profile == "network":
+            self._analyze_nse_web_scripts()
+
+        risk_level = self._calculate_risk_level()
+        return {
+            "findings": self.findings,
+            "risk_score": self.risk_score,
+            "risk_level": risk_level,
+            "summary": self._generate_summary(),
+            "recommendations": self._generate_recommendations()
+        }
+
+    def _analyze_ports(self):
+        for port in self.results.get("ports", []):
+            port_num = port["port"]
+            service = port["service"]
+
+            severity = "INFO"
+            title = f"Puerto {port_num}/{port['protocol']} abierto ({service})"
+            description = f"Se detectó el servicio {service} escuchando en el puerto {port_num}."
+            recommendations = []
+
+            if port_num in self.HIGH_RISK_PORTS:
+                severity = "CRITICAL"
+                title = f"Puerto de alto riesgo expuesto: {port_num} - {self.HIGH_RISK_PORTS[port_num]}"
+                description = f"El puerto {port_num} ({service}) está abierto y representa un riesgo alto de seguridad. {self.HIGH_RISK_PORTS[port_num]}."
+                recommendations = [
+                    f"Cerrar el puerto {port_num} si el servicio no es estrictamente necesario.",
+                    "Implementar reglas de firewall para restringir el acceso solo a IPs autorizadas.",
+                    "Usar VPN o túnel cifrado para acceso a servicios administrativos."
+                ]
+                self.risk_score += 30
+            elif port_num in self.MEDIUM_RISK_PORTS:
+                severity = "MEDIUM"
+                title = f"Puerto de riesgo medio expuesto: {port_num} - {self.MEDIUM_RISK_PORTS[port_num]}"
+                description = f"El puerto {port_num} ({service}) está abierto. {self.MEDIUM_RISK_PORTS[port_num]}."
+                recommendations = [
+                    "Implementar cifrado (HTTPS/TLS) si aún no está habilitado.",
+                    "Restringir el acceso por IP mediante firewall.",
+                    "Usar autenticación robusta con múltiples factores."
+                ]
+                self.risk_score += 15
+            else:
+                severity = "LOW" if port_num > 1024 else "MEDIUM"
+                recommendations = [
+                    "Verificar que el servicio sea estrictamente necesario.",
+                    "Mantener el software del servicio actualizado."
+                ]
+                self.risk_score += 5
+
+            self.findings.append({
+                "severity": severity,
+                "title": title,
+                "description": description,
+                "port": port_num,
+                "service": service,
+                "version": port.get("version", "Unknown"),
+                "category": "infrastructure",
+                "recommendations": recommendations,
+                "cves": []
+            })
+
+    def _analyze_versions(self):
+        for port in self.results.get("ports", []):
+            version_info = port.get("version", "")
+            for product, vuln_versions in self.VULNERABLE_VERSIONS.items():
+                if product in version_info:
+                    for version, cves in vuln_versions.items():
+                        if version in version_info:
+                            self.findings.append({
+                                "severity": "CRITICAL",
+                                "title": f"Versión vulnerable detectada: {product} {version}",
+                                "description": f"Se detectó {product} versión {version} con vulnerabilidades conocidas y explotables.",
+                                "port": port["port"],
+                                "service": port["service"],
+                                "version": version_info,
+                                "category": "vulnerable-software",
+                                "recommendations": [
+                                    f"Actualizar {product} a la última versión estable de forma inmediata.",
+                                    "Aplicar parches de seguridad del proveedor.",
+                                    "Revisar logs del sistema para detectar posibles explotaciones previas."
+                                ],
+                                "cves": cves
+                            })
+                            self.risk_score += 50
+
+    def _analyze_web_security_headers(self):
+        """Analiza cabeceras de seguridad HTTP"""
+        headers = self.results.get("headers", {})
+        if not headers:
+            return
+
+        headers_lower = {k.lower(): v for k, v in headers.items()}
+
+        for header, info in self.SECURITY_HEADERS.items():
+            if header.lower() not in headers_lower:
+                severity = info["severity"]
+                score_map = {"HIGH": 15, "MEDIUM": 8, "LOW": 3}
+                self.risk_score += score_map.get(severity, 2)
+                self.findings.append({
+                    "severity": severity,
+                    "title": info["title"],
+                    "description": info["description"],
+                    "port": 443 if "strict-transport-security" in headers_lower else 80,
+                    "service": "https" if "strict-transport-security" in headers_lower else "http",
+                    "version": "",
+                    "category": "web-headers",
+                    "recommendations": [info["recommendation"]],
+                    "cves": []
+                })
+
+        # Divulgación de tecnología del servidor
+        server = headers_lower.get("server", "")
+        powered_by = headers_lower.get("x-powered-by", "")
+
+        if server and any(c.isdigit() for c in server):
+            self.findings.append({
+                "severity": "LOW",
+                "title": f"Divulgación de versión del servidor web: {server}",
+                "description": f"La cabecera 'Server' revela la tecnología y versión exacta del servidor: '{server}'. Esta información es útil para atacantes que buscan exploits específicos.",
+                "port": 80,
+                "service": "http",
+                "version": server,
+                "category": "web-headers",
+                "recommendations": [
+                    "Configurar el servidor para ocultar o reemplazar la cabecera 'Server' con un valor genérico.",
+                    "Ejemplo en Apache: ServerTokens Prod | En Nginx: server_tokens off;"
+                ],
+                "cves": []
+            })
+            self.risk_score += 3
+
+        if powered_by:
+            self.findings.append({
+                "severity": "LOW",
+                "title": f"Divulgación de tecnología backend: X-Powered-By: {powered_by}",
+                "description": f"La cabecera 'X-Powered-By' revela el framework o lenguaje backend: '{powered_by}'. Esto facilita la identificación de vulnerabilidades específicas.",
+                "port": 80,
+                "service": "http",
+                "version": powered_by,
+                "category": "web-headers",
+                "recommendations": [
+                    "Eliminar la cabecera X-Powered-By de las respuestas HTTP.",
+                    "Ejemplo en PHP: expose_php = Off | En Express.js: app.disable('x-powered-by')"
+                ],
+                "cves": []
+            })
+            self.risk_score += 3
+
+    def _analyze_nikto_findings(self):
+        """Analiza hallazgos de Nikto con clasificación mejorada"""
+        nikto_findings = self.results.get("nikto_findings", [])
+
+        keyword_severity = {
+            "CRITICAL": (["sql injection", "remote code execution", "rce", "arbitrary file"], 35),
+            "HIGH": (["vulnerable", "exploit", "xss", "cross-site scripting", "directory traversal", "lfi", "rfi"], 20),
+            "MEDIUM": (["security", "warning", "disclosure", "exposed", "insecure cookie", "missing"], 8),
+            "LOW": ([], 3),
+        }
+
+        for finding in nikto_findings[:20]:
+            finding_lower = finding.lower()
+            severity = "LOW"
+            score_add = 3
+
+            for sev, (keywords, score) in keyword_severity.items():
+                if any(kw in finding_lower for kw in keywords):
+                    severity = sev
+                    score_add = score
+                    break
+
+            self.risk_score += score_add
+            self.findings.append({
+                "severity": severity,
+                "title": f"Hallazgo Nikto: {finding[:80]}",
+                "description": finding,
+                "port": 80,
+                "service": "http",
+                "version": "",
+                "category": "web-nikto",
+                "recommendations": [
+                    "Revisar la configuración del servidor web para mitigar este hallazgo.",
+                    "Aplicar las mejores prácticas de hardening del servidor web (CIS Benchmark)."
+                ],
+                "cves": []
+            })
+
+    def _analyze_sensitive_directories(self):
+        """Analiza directorios/rutas sensibles encontradas"""
+        directories = self.results.get("directories", [])
+        if not directories:
+            return
+
+        score_map = {"CRITICAL": 40, "HIGH": 20, "MEDIUM": 10, "LOW": 5, "INFO": 2}
+
+        for dir_entry in directories:
+            dir_lower = dir_entry.lower()
+            for sensitive_path, severity in self.SENSITIVE_PATHS.items():
+                if sensitive_path.lower() in dir_lower:
+                    self.risk_score += score_map.get(severity, 2)
+
+                    descriptions = {
+                        "CRITICAL": f"Se encontró acceso al recurso altamente sensible '{sensitive_path}'. Esto puede exponer código fuente, credenciales o configuración de la aplicación.",
+                        "HIGH": f"Se encontró acceso al recurso '{sensitive_path}'. Este recurso puede permitir acceso administrativo no autorizado o exposición de datos.",
+                        "MEDIUM": f"Se encontró el recurso '{sensitive_path}' accesible. Podría exponer información de configuración o documentación interna.",
+                        "LOW": f"Se encontró el recurso '{sensitive_path}'. Revisar si su exposición es intencional.",
+                        "INFO": f"Se encontró el endpoint '{sensitive_path}'. Documentar y verificar su protección."
+                    }
+
+                    self.findings.append({
+                        "severity": severity,
+                        "title": f"Recurso sensible expuesto: {sensitive_path}",
+                        "description": descriptions.get(severity, f"Recurso encontrado: {sensitive_path}. Detalle: {dir_entry}"),
+                        "port": 80,
+                        "service": "http",
+                        "version": "",
+                        "category": "web-directories",
+                        "recommendations": [
+                            f"Bloquear el acceso público a '{sensitive_path}' mediante reglas del servidor o WAF.",
+                            "Verificar que no exista información sensible en este recurso y eliminarlo si no es necesario."
+                        ],
+                        "cves": []
+                    })
+                    break
+
+    def _analyze_nse_web_scripts(self):
+        """Extrae hallazgos de scripts NSE de nmap"""
+        nse_findings = self.results.get("nse_findings", [])
+
+        vuln_indicators = [
+            ("VULNERABLE", "CRITICAL", 40, "Vulnerabilidad confirmada por script NSE"),
+            ("sql injection", "CRITICAL", 35, "Posible inyección SQL detectada"),
+            ("cross-site scripting", "HIGH", 25, "Posible XSS detectado"),
+            ("xss", "HIGH", 25, "Posible XSS detectado"),
+            ("directory listing", "MEDIUM", 10, "Listado de directorios habilitado"),
+            ("email disclosure", "LOW", 5, "Exposición de direcciones de email"),
+            ("open redirect", "MEDIUM", 10, "Posible redirección abierta"),
+        ]
+
+        reported_scripts = set()
+        for nse in nse_findings:
+            script = nse.get("script", "")
+            output = nse.get("output", "").lower()
+            filename = nse.get("filename", "")
+
+            if script in reported_scripts:
+                continue
+
+            for indicator, severity, score, label in vuln_indicators:
+                if indicator.lower() in output:
+                    reported_scripts.add(script)
+                    self.risk_score += score
+                    self.findings.append({
+                        "severity": severity,
+                        "title": f"Script NSE '{script}': {label}",
+                        "description": f"El script NSE de nmap '{script}' reportó: {label}. Salida (extracto): {nse.get('output', '')[:300]}",
+                        "port": 80,
+                        "service": "http",
+                        "version": "",
+                        "category": "nse-scripts",
+                        "recommendations": [
+                            "Validar manualmente este hallazgo en el entorno de la aplicación.",
+                            "Consultar la documentación del script NSE para detalles de la vulnerabilidad."
+                        ],
+                        "cves": []
+                    })
+                    break
+
+    def _analyze_api_owasp(self):
+        """Mapea hallazgos al OWASP API Security Top 10 2023"""
+        headers = self.results.get("headers", {})
+        headers_lower = {k.lower(): v for k, v in headers.items()}
+        directories = self.results.get("directories", [])
+        dirs_text = " ".join(directories).lower()
+
+        # API7 - CORS Wildcard
+        cors = headers_lower.get("access-control-allow-origin", "")
+        if cors == "*":
+            self.findings.append({
+                "severity": "HIGH",
+                "title": "OWASP API7 - CORS Wildcard: Access-Control-Allow-Origin: *",
+                "description": "La API permite solicitudes de cualquier origen (CORS wildcard '*'). Esto puede permitir que scripts maliciosos de cualquier dominio accedan a datos de la API en nombre de usuarios autenticados.",
+                "port": 80,
+                "service": "http",
+                "version": "",
+                "category": "api-owasp",
+                "owasp_category": "API7:2023 - Security Misconfiguration",
+                "recommendations": [
+                    "Restringir Access-Control-Allow-Origin a dominios específicos de confianza.",
+                    "Nunca usar '*' en APIs que manejan datos sensibles o requieren autenticación.",
+                    "Implementar una whitelist de orígenes permitidos en la configuración CORS."
+                ],
+                "cves": []
+            })
+            self.risk_score += 20
+
+        # API2 - Autenticación
+        has_auth_header = any(h in headers_lower for h in ["www-authenticate", "x-api-key"])
+        has_auth_scheme = "authorization" in headers_lower
+        if not has_auth_header and not has_auth_scheme:
+            self.findings.append({
+                "severity": "MEDIUM",
+                "title": "OWASP API2 - Sin indicadores de autenticación en respuestas",
+                "description": "No se detectaron cabeceras de autenticación (WWW-Authenticate, X-Api-Key) en las respuestas del servidor. Esto puede indicar endpoints sin protección de autenticación.",
+                "port": 80,
+                "service": "http",
+                "version": "",
+                "category": "api-owasp",
+                "owasp_category": "API2:2023 - Broken Authentication",
+                "recommendations": [
+                    "Implementar autenticación JWT u OAuth 2.0 para todos los endpoints de la API.",
+                    "Validar tokens en cada solicitud y verificar su expiración.",
+                    "Implementar autenticación multifactor para operaciones críticas de la API."
+                ],
+                "cves": []
+            })
+            self.risk_score += 10
+
+        # API4 - Rate Limiting
+        has_rate_limit = any(h in headers_lower for h in [
+            "x-ratelimit-limit", "x-rate-limit-limit", "retry-after",
+            "ratelimit-limit", "x-ratelimit-remaining"
+        ])
+        if not has_rate_limit:
+            self.findings.append({
+                "severity": "MEDIUM",
+                "title": "OWASP API4 - Sin Rate Limiting detectado",
+                "description": "No se detectaron cabeceras de limitación de solicitudes (X-RateLimit-Limit, Retry-After). Sin rate limiting, la API es vulnerable a ataques de fuerza bruta, enumeración de recursos y denegación de servicio.",
+                "port": 80,
+                "service": "http",
+                "version": "",
+                "category": "api-owasp",
+                "owasp_category": "API4:2023 - Unrestricted Resource Consumption",
+                "recommendations": [
+                    "Implementar rate limiting por IP y por usuario/API key.",
+                    "Añadir cabeceras de respuesta: X-RateLimit-Limit, X-RateLimit-Remaining, Retry-After.",
+                    "Considerar API gateway con rate limiting integrado (Kong, AWS API Gateway, Nginx)."
+                ],
+                "cves": []
+            })
+            self.risk_score += 10
+
+        # API9 - Documentación expuesta
+        doc_paths = ["/swagger", "/swagger-ui", "/api-docs", "/openapi", "/redoc"]
+        for doc_path in doc_paths:
+            if doc_path in dirs_text:
+                self.findings.append({
+                    "severity": "MEDIUM",
+                    "title": f"OWASP API9 - Documentación API expuesta: {doc_path}",
+                    "description": f"Se encontró documentación de la API accesible públicamente en '{doc_path}'. La exposición pública de Swagger/OpenAPI revela todos los endpoints, parámetros y modelos de datos de la API a potenciales atacantes.",
+                    "port": 80,
+                    "service": "http",
+                    "version": "",
+                    "category": "api-owasp",
+                    "owasp_category": "API9:2023 - Improper Inventory Management",
+                    "recommendations": [
+                        "Restringir el acceso a la documentación de la API solo a usuarios autenticados.",
+                        "Deshabilitar o proteger el acceso a swagger/openapi en entornos de producción.",
+                        "Implementar autenticación básica o token ante de acceder a /swagger-ui y /api-docs."
+                    ],
+                    "cves": []
+                })
+                self.risk_score += 8
+                break
+
+        # API8 - Cabeceras de seguridad (ya analizadas pero con contexto OWASP)
+        missing_security_headers = [
+            h for h in ["content-security-policy", "strict-transport-security"]
+            if h not in headers_lower
+        ]
+        if missing_security_headers:
+            self.findings.append({
+                "severity": "MEDIUM",
+                "title": "OWASP API8 - Configuración de seguridad HTTP incompleta",
+                "description": f"Faltan cabeceras de seguridad críticas: {', '.join(missing_security_headers)}. Las APIs mal configuradas son vulnerables a ataques de inyección de contenido y robo de sesión.",
+                "port": 80,
+                "service": "http",
+                "version": "",
+                "category": "api-owasp",
+                "owasp_category": "API8:2023 - Security Misconfiguration",
+                "recommendations": [
+                    "Aplicar todas las cabeceras de seguridad HTTP recomendadas (OWASP Secure Headers Project).",
+                    "Usar HTTPS exclusivamente y configurar HSTS.",
+                    "Revisar la configuración de CORS, autenticación y autorización en todos los endpoints."
+                ],
+                "cves": []
+            })
+
+    def _generate_recommendations(self) -> List[str]:
+        """Genera recomendaciones según el perfil de escaneo"""
+        recommendations = []
+        port_numbers = {p["port"] for p in self.results.get("ports", [])}
+        high_risk_open = [p for p in self.results.get("ports", []) if p["port"] in self.HIGH_RISK_PORTS]
+        has_critical = any(f["severity"] == "CRITICAL" for f in self.findings)
+        has_high = any(f["severity"] == "HIGH" for f in self.findings)
+        has_nikto = bool(self.results.get("nikto_findings"))
+        headers = self.results.get("headers", {})
+        headers_lower = {k.lower() for k in headers}
+
+        if self.risk_score >= 100:
+            recommendations.append(
+                "URGENTE: Se detectaron vulnerabilidades críticas. Tomar acción inmediata antes de continuar operando el sistema en producción."
+            )
+
+        if has_critical:
+            recommendations.append(
+                "Parchear o mitigar de inmediato todas las vulnerabilidades críticas identificadas en este reporte."
+            )
+            recommendations.append(
+                "Revisar los registros (logs) del sistema para detectar posibles compromisos o accesos no autorizados previos."
+            )
+
+        if has_high:
+            recommendations.append(
+                "Planificar la remediación de vulnerabilidades de severidad alta en un plazo máximo de 30 días."
+            )
+
+        # Recomendaciones por perfil
+        if self.profile in ("web", "api-owasp", "compliance"):
+            if "content-security-policy" not in headers_lower:
+                recommendations.append(
+                    "Implementar una política Content-Security-Policy (CSP) estricta para prevenir ataques XSS e inyección de contenido."
+                )
+            if "strict-transport-security" not in headers_lower:
+                recommendations.append(
+                    "Habilitar HTTPS y configurar la cabecera HSTS (Strict-Transport-Security) para forzar conexiones cifradas."
+                )
+            if has_nikto or any(f["category"] == "web-headers" for f in self.findings):
+                recommendations.append(
+                    "Aplicar el conjunto completo de cabeceras de seguridad HTTP recomendadas por OWASP Secure Headers Project."
+                )
+            if any(f["category"] == "web-directories" for f in self.findings):
+                recommendations.append(
+                    "Revisar y bloquear el acceso a recursos sensibles encontrados durante el escaneo de directorios."
+                )
+            recommendations.append(
+                "Implementar un Web Application Firewall (WAF) para filtrar tráfico malicioso y proteger la aplicación."
+            )
+
+        if self.profile == "api-owasp":
+            recommendations.append(
+                "Implementar autenticación OAuth 2.0 o JWT con validación estricta en todos los endpoints de la API."
+            )
+            recommendations.append(
+                "Aplicar rate limiting y throttling para prevenir abuso de la API y ataques de fuerza bruta."
+            )
+            recommendations.append(
+                "Realizar una revisión de código orientada a las vulnerabilidades del OWASP API Security Top 10 2023."
+            )
+            recommendations.append(
+                "Implementar logging y monitoreo de todas las solicitudes a la API para detectar patrones de ataque."
+            )
+
+        if self.profile == "network":
+            if high_risk_open:
+                port_list = ", ".join(str(p["port"]) for p in high_risk_open)
+                recommendations.append(
+                    f"Cerrar o proteger mediante firewall los puertos de alto riesgo expuestos: {port_list}."
+                )
+            recommendations.append(
+                "Usar VPN o túnel cifrado para el acceso a servicios administrativos en lugar de exponerlos directamente."
+            )
+            if 22 in port_numbers:
+                recommendations.append(
+                    "Configurar SSH para autenticación exclusivamente por clave pública y deshabilitar el acceso mediante contraseña (PasswordAuthentication no)."
+                )
+            if 80 in port_numbers:
+                recommendations.append(
+                    "Migrar servicios HTTP (puerto 80) a HTTPS e implementar redirección automática."
+                )
+            recommendations.append(
+                "Implementar un sistema de detección de intrusiones (IDS/IPS) para monitorear el tráfico de red."
+            )
+            recommendations.append(
+                "Segmentar la red mediante VLANs para aislar servicios críticos de la infraestructura general."
+            )
+
+        if self.profile == "compliance":
+            recommendations.append(
+                "Deshabilitar cifrados SSL/TLS débiles (SSLv3, TLSv1.0, TLSv1.1, RC4, DES, 3DES) y permitir solo TLS 1.2 y TLS 1.3."
+            )
+            recommendations.append(
+                "Verificar la validez y configuración del certificado SSL/TLS (cadena de confianza, nombre de host, fecha de expiración)."
+            )
+            recommendations.append(
+                "Implementar Perfect Forward Secrecy (PFS) usando suites de cifrado ECDHE."
+            )
+            recommendations.append(
+                "Generar un informe de cumplimiento basado en PCI-DSS, NIST o ISO 27001 según los requerimientos de la organización."
+            )
+
+        recommendations.append(
+            "Establecer un proceso regular de actualizaciones y parcheo de seguridad para todos los servicios expuestos."
+        )
+        recommendations.append(
+            "Realizar escaneos de vulnerabilidades periódicos (mínimo mensual) y pruebas de penetración anuales."
+        )
+        recommendations.append(
+            "Implementar monitoreo continuo y alertas tempranas para detectar actividad anómala en los sistemas."
+        )
+
+        return recommendations
+
+    def _calculate_risk_level(self) -> str:
+        if self.risk_score >= 100:
+            return "CRITICAL"
+        elif self.risk_score >= 50:
+            return "HIGH"
+        elif self.risk_score >= 20:
+            return "MEDIUM"
+        else:
+            return "LOW"
+
+    def _generate_summary(self) -> Dict:
+        categories = {}
+        for f in self.findings:
+            cat = f.get("category", "general")
+            categories[cat] = categories.get(cat, 0) + 1
+
+        return {
+            "total_findings": len(self.findings),
+            "critical": sum(1 for f in self.findings if f["severity"] == "CRITICAL"),
+            "high": sum(1 for f in self.findings if f["severity"] == "HIGH"),
+            "medium": sum(1 for f in self.findings if f["severity"] == "MEDIUM"),
+            "low": sum(1 for f in self.findings if f["severity"] == "LOW"),
+            "info": sum(1 for f in self.findings if f["severity"] == "INFO"),
+            "open_ports": len(self.results.get("ports", [])),
+            "host_status": "activo" if self.results.get("host_up") else "desconocido",
+            "categories": categories
+        }

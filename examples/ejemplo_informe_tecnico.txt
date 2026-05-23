@@ -1,0 +1,386 @@
+================================================================================
+INFORME TÉCNICO DE ANÁLISIS DE VULNERABILIDADES
+================================================================================
+
+Fecha de Generación: 2025-11-12 20:47:26
+Target IP: 10.1.11.177
+Total de Vulnerabilidades: 20
+
+================================================================================
+1. RESUMEN EJECUTIVO
+================================================================================
+
+Nivel de Riesgo General: MEDIO
+Indicador: AMARILLO
+
+Distribución de Vulnerabilidades:
+  - Críticas: 0
+  - Altas:    2
+  - Medias:   10
+  - Bajas:    8
+
+Recomendación General:
+  Se recomienda planificar la remediación de vulnerabilidades detectadas. Aunque el riesgo no es crítico, debe abordarse en el mediano plazo.
+
+Principales Riesgos Identificados:
+  1. Vulnerabilidad: vulnerabilidad_nikto
+  2. Uncommon header 'x-xss-protection' found, with contents: 0
+  3. Vulnerabilidad: http-sql-injection
+
+================================================================================
+2. MAPA DE SUPERFICIE DE ATAQUE
+================================================================================
+
+Puertos Expuestos: 3
+Servicios Activos: 4
+Endpoints Descubiertos: 0
+
+Puertos Detectados:
+--------------------------------------------------------------------------------
+  Puerto 443/tcp - http 
+    Versión: Apache httpd 2.4.58
+  Puerto 8000/tcp - http 
+    Versión: Ajenti http control panel
+  Puerto 8081/tcp - blackice-icecap? 
+    Versión: 1 service unrecognized despite returning data. If you know the service/version, please submit the following fingerprint at https://nmap.org/cgi-bin/submit.cgi?new-service :
+
+================================================================================
+3. TECNOLOGÍAS DETECTADAS
+================================================================================
+
+Servidor Web: Apache 
+  Versión: Apache/2.4.58 (Ubuntu)
+
+================================================================================
+4. VULNERABILIDADES DETALLADAS
+================================================================================
+
+
+ALTA - 2 vulnerabilidad(es)
+--------------------------------------------------------------------------------
+
+ID: IND-6
+Título: Vulnerabilidad: vulnerabilidad_nikto
+CVSS Score: 7.5 / 10.0
+Categoría OWASP: A05:2021 - Security Misconfiguration
+Fuente: nikto
+
+Descripción:
+  Uncommon header 'x-xss-protection' found, with contents: 0
+
+Recomendación:
+  Revisar y remediar según mejores prácticas de seguridad
+
+
+ID: N/A
+Título: Uncommon header 'x-xss-protection' found, with contents: 0
+CVSS Score: 7.5 / 10.0
+Categoría OWASP: A03:2021 - Injection
+Fuente: nikto
+Ubicación: GET /
+
+Descripción:
+  Uncommon header 'x-xss-protection' found, with contents: 0
+
+Recomendación:
+  Revisar y remediar según la naturaleza específica de la vulnerabilidad
+
+
+MEDIA - 10 vulnerabilidad(es)
+--------------------------------------------------------------------------------
+
+ID: IND-1
+Título: Vulnerabilidad: http-sql-injection
+CVSS Score: 5.0 / 10.0
+Categoría OWASP: A05:2021 - Security Misconfiguration
+Fuente: nmap_nse
+
+Descripción:
+  # Nmap 7.94SVN scan initiated Wed Nov 12 18:10:19 2025 as: nmap --script=http-enum,http-auth,http-sql-injection -p 8081 -oN nmap_nse_10.1.11.177.txt 10.1.11.177
+Nmap scan report for 10.1.11.177
+Host is up (0.0019s latency).
+
+PORT     STATE SERVICE
+8081/tcp open  blackice-icecap
+
+# Nmap done at Wed Nov 12 18:10
+
+Recomendación:
+  Revisar y remediar según mejores prácticas de seguridad
+
+
+ID: IND-2
+Título: Headers de Seguridad HTTP Faltantes
+CVSS Score: 5.0 / 10.0
+Categoría OWASP: A05:2021 - Security Misconfiguration
+Fuente: headers_http
+
+Descripción:
+  
+
+Recomendación:
+  Agregar headers: Strict-Transport-Security, X-Frame-Options, X-Content-Type-Options, Content-Security-Policy
+
+
+ID: IND-3
+Título: Vulnerabilidad: vulnerabilidad_nikto
+CVSS Score: 5.0 / 10.0
+Categoría OWASP: A05:2021 - Security Misconfiguration
+Fuente: nikto
+
+Descripción:
+  10.1.11.177
+
+Recomendación:
+  Revisar y remediar según mejores prácticas de seguridad
+
+
+ID: IND-4
+Título: Vulnerabilidad: vulnerabilidad_nikto
+CVSS Score: 5.0 / 10.0
+Categoría OWASP: A05:2021 - Security Misconfiguration
+Fuente: nikto
+
+Descripción:
+  8081
+
+Recomendación:
+  Revisar y remediar según mejores prácticas de seguridad
+
+
+ID: IND-5
+Título: Vulnerabilidad: vulnerabilidad_nikto
+CVSS Score: 5.0 / 10.0
+Categoría OWASP: A05:2021 - Security Misconfiguration
+Fuente: nikto
+
+Descripción:
+  Uncommon header 'x-content-type-options' found, with contents: nosniff
+
+Recomendación:
+  Revisar y remediar según mejores prácticas de seguridad
+
+
+ID: IND-7
+Título: Vulnerabilidad: vulnerabilidad_nikto
+CVSS Score: 5.0 / 10.0
+Categoría OWASP: A05:2021 - Security Misconfiguration
+Fuente: nikto
+
+Descripción:
+  Uncommon header 'x-frame-options' found, with contents: DENY
+
+Recomendación:
+  Revisar y remediar según mejores prácticas de seguridad
+
+
+ID: IND-8
+Título: Vulnerabilidad: vulnerabilidad_nikto
+CVSS Score: 5.0 / 10.0
+Categoría OWASP: A05:2021 - Security Misconfiguration
+Fuente: nikto
+
+Descripción:
+  Cookie JSESSIONID created without the httponly flag
+
+Recomendación:
+  Revisar y remediar según mejores prácticas de seguridad
+
+
+ID: IND-9
+Título: Vulnerabilidad: vulnerabilidad_nikto
+CVSS Score: 5.0 / 10.0
+Categoría OWASP: A05:2021 - Security Misconfiguration
+Fuente: nikto
+
+Descripción:
+  Allowed HTTP Methods: GET, HEAD, POST, PUT, DELETE, OPTIONS
+
+Recomendación:
+  Revisar y remediar según mejores prácticas de seguridad
+
+
+ID: IND-10
+Título: Vulnerabilidad: vulnerabilidad_nikto
+CVSS Score: 5.0 / 10.0
+Categoría OWASP: A05:2021 - Security Misconfiguration
+Fuente: nikto
+
+Descripción:
+  GET /: HTTP method ('Allow' Header): 'PUT' method could allow clients to save files on the web server.
+
+Recomendación:
+  Revisar y remediar según mejores prácticas de seguridad
+
+
+ID: IND-11
+Título: Vulnerabilidad: vulnerabilidad_nikto
+CVSS Score: 5.0 / 10.0
+Categoría OWASP: A05:2021 - Security Misconfiguration
+Fuente: nikto
+
+Descripción:
+  GET /: HTTP method ('Allow' Header): 'DELETE' may allow clients to remove files on the web server.
+
+Recomendación:
+  Revisar y remediar según mejores prácticas de seguridad
+
+
+BAJA - 8 vulnerabilidad(es)
+--------------------------------------------------------------------------------
+
+ID: N/A
+Título: 10.1.11.177
+CVSS Score: 2.5 / 10.0
+Categoría OWASP: A05:2021 - Security Misconfiguration
+Fuente: nikto
+Ubicación: Target Host
+
+Descripción:
+  10.1.11.177
+
+Recomendación:
+  Revisar y remediar según la naturaleza específica de la vulnerabilidad
+
+
+ID: N/A
+Título: 8081
+CVSS Score: 2.5 / 10.0
+Categoría OWASP: A05:2021 - Security Misconfiguration
+Fuente: nikto
+Ubicación: Target Port
+
+Descripción:
+  8081
+
+Recomendación:
+  Revisar y remediar según la naturaleza específica de la vulnerabilidad
+
+
+ID: N/A
+Título: Uncommon header 'x-content-type-options' found, with contents: nosniff
+CVSS Score: 2.5 / 10.0
+Categoría OWASP: A05:2021 - Security Misconfiguration
+Fuente: nikto
+Ubicación: GET /
+
+Descripción:
+  Uncommon header 'x-content-type-options' found, with contents: nosniff
+
+Recomendación:
+  Revisar y remediar según la naturaleza específica de la vulnerabilidad
+
+
+ID: N/A
+Título: Uncommon header 'x-frame-options' found, with contents: DENY
+CVSS Score: 2.5 / 10.0
+Categoría OWASP: A05:2021 - Security Misconfiguration
+Fuente: nikto
+Ubicación: GET /
+
+Descripción:
+  Uncommon header 'x-frame-options' found, with contents: DENY
+
+Recomendación:
+  Revisar y remediar según la naturaleza específica de la vulnerabilidad
+
+
+ID: N/A
+Título: Cookie JSESSIONID created without the httponly flag
+CVSS Score: 2.5 / 10.0
+Categoría OWASP: A05:2021 - Security Misconfiguration
+Fuente: nikto
+Ubicación: GET /
+
+Descripción:
+  Cookie JSESSIONID created without the httponly flag
+
+Recomendación:
+  Revisar y remediar según la naturaleza específica de la vulnerabilidad
+
+
+ID: N/A
+Título: Allowed HTTP Methods: GET, HEAD, POST, PUT, DELETE, OPTIONS
+CVSS Score: 2.5 / 10.0
+Categoría OWASP: A05:2021 - Security Misconfiguration
+Fuente: nikto
+Ubicación: OPTIONS /
+
+Descripción:
+  Allowed HTTP Methods: GET, HEAD, POST, PUT, DELETE, OPTIONS
+
+Recomendación:
+  Revisar y remediar según la naturaleza específica de la vulnerabilidad
+
+
+ID: N/A
+Título: GET /: HTTP method ('Allow' Header): 'PUT' method could allow clients to save files on the web serve...
+CVSS Score: 2.5 / 10.0
+Categoría OWASP: A05:2021 - Security Misconfiguration
+Fuente: nikto
+Ubicación: -397
+
+Descripción:
+  GET /: HTTP method ('Allow' Header): 'PUT' method could allow clients to save files on the web server.
+
+Recomendación:
+  Revisar y remediar según la naturaleza específica de la vulnerabilidad
+
+
+ID: N/A
+Título: GET /: HTTP method ('Allow' Header): 'DELETE' may allow clients to remove files on the web server.
+CVSS Score: 2.5 / 10.0
+Categoría OWASP: A05:2021 - Security Misconfiguration
+Fuente: nikto
+Ubicación: -5646
+
+Descripción:
+  GET /: HTTP method ('Allow' Header): 'DELETE' may allow clients to remove files on the web server.
+
+Recomendación:
+  Revisar y remediar según la naturaleza específica de la vulnerabilidad
+
+================================================================================
+5. RESUMEN DE RIESGOS CLASIFICADOS (CVSS 3.1)
+================================================================================
+
+Total de Vulnerabilidades: 20
+
+Distribución por Severidad:
+  CRÍTICA (9.0-10.0): 0 vulnerabilidades
+  ALTA    (7.0-8.9):  2 vulnerabilidades
+  MEDIA   (4.0-6.9):  10 vulnerabilidades
+  BAJA    (0.1-3.9):  8 vulnerabilidades
+
+================================================================================
+6. RECOMENDACIONES DE MITIGACIÓN
+================================================================================
+
+CORTO PLAZO (Inmediato - 1 semana):
+--------------------------------------------------------------------------------
+
+MEDIANO PLAZO (1-4 semanas):
+--------------------------------------------------------------------------------
+  • Remediar 2 vulnerabilidad(es) de severidad alta
+  • Actualizar componentes de software a versiones más recientes
+  • Implementar autenticación multifactor (MFA) en paneles administrativos
+  • Realizar auditoría de configuraciones de seguridad
+  • Implementar rate limiting en endpoints críticos
+
+LARGO PLAZO (1-6 meses):
+--------------------------------------------------------------------------------
+  • Implementar un programa de gestión de vulnerabilidades continuo
+  • Establecer políticas de hardening para servidores y aplicaciones
+  • Implementar WAF (Web Application Firewall)
+  • Desarrollar plan de respuesta a incidentes
+  • Implementar monitoreo y logging centralizado
+  • Realizar pentesting periódico (trimestral o semestral)
+  • Capacitación en seguridad para el equipo de desarrollo
+  • Implementar análisis de seguridad en CI/CD pipeline
+
+================================================================================
+FIN DEL INFORME
+================================================================================
+
+Generado por Scan Agent v1.0.0
+Fecha: 2025-11-12 20:47:26
