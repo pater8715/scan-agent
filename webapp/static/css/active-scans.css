@@ -45,11 +45,22 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    flex: 1;
+    min-width: 0;
 }
 .report-scan-item .rsi-meta {
     font-size: 0.73rem;
     color: #94a3b8;
     margin-top: 2px;
+}
+.report-scan-item.active .rsi-target {
+    color: #ffffff;
+}
+.report-scan-item.active .rsi-meta {
+    color: #b8cfe8;
+}
+.report-scan-item.active .risk-level-badge {
+    filter: brightness(1.15);
 }
 .report-scan-item .rsi-badges {
     display: flex;
@@ -70,11 +81,11 @@
 /* ── Layout de Reportes ─────────────────────────────────── */
 .reports-layout {
     display: flex;
-    gap: 16px;
+    gap: 20px;
     align-items: flex-start;
 }
 .reports-sidebar {
-    width: 300px;
+    width: 340px;
     flex-shrink: 0;
 }
 .reports-sidebar-header {
