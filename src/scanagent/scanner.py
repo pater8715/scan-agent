@@ -113,14 +113,14 @@ class VulnerabilityScanner:
                 },
                 {
                     'tool': 'nikto',
-                    'args': '-h http://{target} -Format txt',
+                    'args': '-h http://{target}',
                     'output': 'nikto_{target}.txt',
                     'timeout': 1800,
                     'required': False
                 },
                 {
                     'tool': 'gobuster',
-                    'args': 'dir -u http://{target} -w /usr/share/wordlists/dirb/common.txt -q',
+                    'args': 'dir -u http://{target} -w /usr/share/dirb/wordlists/common.txt -q',
                     'output': 'gobuster_{target}.txt',
                     'timeout': 600,
                     'required': False
@@ -162,14 +162,14 @@ class VulnerabilityScanner:
                 },
                 {
                     'tool': 'nikto',
-                    'args': '-h http://{target} -Format txt -Tuning 123456789ab',
+                    'args': '-h http://{target} -Tuning 123456789ab',
                     'output': 'nikto_{target}.txt',
                     'timeout': 1800,
                     'required': False
                 },
                 {
                     'tool': 'gobuster',
-                    'args': 'dir -u http://{target} -w /usr/share/wordlists/dirb/common.txt -x php,html,txt -q',
+                    'args': 'dir -u http://{target} -w /usr/share/dirb/wordlists/common.txt -x php,html,txt -q',
                     'output': 'gobuster_{target}.txt',
                     'timeout': 1200,
                     'required': False
@@ -319,7 +319,7 @@ class VulnerabilityScanner:
                 },
                 {
                     'tool': 'gobuster',
-                    'args': 'dir -u http://{target} -w /usr/share/wordlists/dirb/common.txt -q -t 20 -x json',
+                    'args': 'dir -u http://{target} -w /usr/share/dirb/wordlists/common.txt -q -t 20 -x json',
                     'output': 'gobuster_{target}.txt',
                     'timeout': 300,
                     'required': False
@@ -391,14 +391,14 @@ class VulnerabilityScanner:
                 },
                 {
                     'tool': 'nikto',
-                    'args': '-h http://{target} -Format txt -timeout 3',
+                    'args': '-h http://{target} -timeout 3',
                     'output': 'nikto_{target}.txt',
                     'timeout': 600,
                     'required': False
                 },
                 {
                     'tool': 'gobuster',
-                    'args': 'dir -u http://{target} -w /usr/share/wordlists/dirb/common.txt -q -t 20',
+                    'args': 'dir -u http://{target} -w /usr/share/dirb/wordlists/common.txt -q -t 20',
                     'output': 'gobuster_{target}.txt',
                     'timeout': 300,
                     'required': False

@@ -7,6 +7,7 @@ Autor: Scan Agent Team
 Versión: 2.0.0
 """
 
+import json
 import re
 from typing import Dict, List, Optional
 from pathlib import Path
@@ -380,6 +381,62 @@ class VulnerabilityAnalyzer:
         self.profile = profile.lower() if profile else "web"
         self.findings = []
         self.risk_score = 0
+        self._catalog = self._load_catalog()
+        # Instance-level copies; catalog overrides on top of class defaults
+        self._high_risk_ports = dict(self.HIGH_RISK_PORTS)
+        self._medium_risk_ports = dict(self.MEDIUM_RISK_PORTS)
+        self._security_headers = {k: dict(v) for k, v in self.SECURITY_HEADERS.items()}
+        self._sensitive_paths = dict(self.SENSITIVE_PATHS)
+        self._nikto_keywords: Dict = {
+            "CRITICAL": (["sql injection", "remote code execution", "rce", "arbitrary file"], 35),
+            "HIGH": (["vulnerable", "exploit", "xss", "cross-site scripting", "directory traversal", "lfi", "rfi"], 20),
+            "MEDIUM": (["security", "warning", "disclosure", "exposed", "insecure cookie", "missing"], 8),
+            "LOW": ([], 3),
+        }
+        if self._catalog:
+            self._apply_catalog()
+
+    @staticmethod
+    def _load_catalog() -> Optional[Dict]:
+        catalog_path = Path(__file__).parent.parent.parent / "data" / "recommendations_catalog.json"
+        try:
+            with open(catalog_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return None
+
+    def _apply_catalog(self):
+        catalog = self._catalog
+        for port_str, port_data in catalog.get("ports", {}).items():
+            try:
+                port_num = int(port_str)
+                risk = port_data.get("risk_level", "")
+                desc = port_data.get("description", "")
+                if risk == "HIGH" and desc:
+                    self._high_risk_ports[port_num] = desc
+                    self._medium_risk_ports.pop(port_num, None)
+                elif risk == "MEDIUM" and desc:
+                    self._medium_risk_ports[port_num] = desc
+                    self._high_risk_ports.pop(port_num, None)
+            except (ValueError, KeyError):
+                pass
+
+        for header, header_data in catalog.get("security_headers", {}).items():
+            if header in self._security_headers:
+                self._security_headers[header].update(header_data)
+            else:
+                self._security_headers[header] = dict(header_data)
+
+        for path, path_data in catalog.get("sensitive_paths", {}).items():
+            severity = path_data.get("severity")
+            if severity:
+                self._sensitive_paths[path] = severity
+
+        for sev in ("CRITICAL", "HIGH", "MEDIUM", "LOW"):
+            kw = catalog.get("nikto_severity_keywords", {}).get(sev)
+            if kw is not None:
+                _, score = self._nikto_keywords[sev]
+                self._nikto_keywords[sev] = (kw, score)
 
     def analyze(self) -> Dict:
         # Análisis de infraestructura (todos los perfiles)
@@ -411,30 +468,36 @@ class VulnerabilityAnalyzer:
         }
 
     def _analyze_ports(self):
+        catalog_ports = self._catalog.get("ports", {}) if self._catalog else {}
+
         for port in self.results.get("ports", []):
             port_num = port["port"]
             service = port["service"]
+            catalog_entry = catalog_ports.get(str(port_num), {})
 
             severity = "INFO"
             title = f"Puerto {port_num}/{port['protocol']} abierto ({service})"
             description = f"Se detectó el servicio {service} escuchando en el puerto {port_num}."
             recommendations = []
+            cves = catalog_entry.get("cves", [])
 
-            if port_num in self.HIGH_RISK_PORTS:
+            if port_num in self._high_risk_ports:
                 severity = "CRITICAL"
-                title = f"Puerto de alto riesgo expuesto: {port_num} - {self.HIGH_RISK_PORTS[port_num]}"
-                description = f"El puerto {port_num} ({service}) está abierto y representa un riesgo alto de seguridad. {self.HIGH_RISK_PORTS[port_num]}."
-                recommendations = [
+                desc_tag = self._high_risk_ports[port_num]
+                title = f"Puerto de alto riesgo expuesto: {port_num} - {desc_tag}"
+                description = f"El puerto {port_num} ({service}) está abierto y representa un riesgo alto de seguridad. {desc_tag}."
+                recommendations = catalog_entry.get("recommendations") or [
                     f"Cerrar el puerto {port_num} si el servicio no es estrictamente necesario.",
                     "Implementar reglas de firewall para restringir el acceso solo a IPs autorizadas.",
                     "Usar VPN o túnel cifrado para acceso a servicios administrativos."
                 ]
                 self.risk_score += 30
-            elif port_num in self.MEDIUM_RISK_PORTS:
+            elif port_num in self._medium_risk_ports:
                 severity = "MEDIUM"
-                title = f"Puerto de riesgo medio expuesto: {port_num} - {self.MEDIUM_RISK_PORTS[port_num]}"
-                description = f"El puerto {port_num} ({service}) está abierto. {self.MEDIUM_RISK_PORTS[port_num]}."
-                recommendations = [
+                desc_tag = self._medium_risk_ports[port_num]
+                title = f"Puerto de riesgo medio expuesto: {port_num} - {desc_tag}"
+                description = f"El puerto {port_num} ({service}) está abierto. {desc_tag}."
+                recommendations = catalog_entry.get("recommendations") or [
                     "Implementar cifrado (HTTPS/TLS) si aún no está habilitado.",
                     "Restringir el acceso por IP mediante firewall.",
                     "Usar autenticación robusta con múltiples factores."
@@ -442,7 +505,7 @@ class VulnerabilityAnalyzer:
                 self.risk_score += 15
             else:
                 severity = "LOW" if port_num > 1024 else "MEDIUM"
-                recommendations = [
+                recommendations = catalog_entry.get("recommendations") or [
                     "Verificar que el servicio sea estrictamente necesario.",
                     "Mantener el software del servicio actualizado."
                 ]
@@ -457,7 +520,7 @@ class VulnerabilityAnalyzer:
                 "version": port.get("version", "Unknown"),
                 "category": "infrastructure",
                 "recommendations": recommendations,
-                "cves": []
+                "cves": cves
             })
 
     def _analyze_versions(self):
@@ -492,7 +555,7 @@ class VulnerabilityAnalyzer:
 
         headers_lower = {k.lower(): v for k, v in headers.items()}
 
-        for header, info in self.SECURITY_HEADERS.items():
+        for header, info in self._security_headers.items():
             if header.lower() not in headers_lower:
                 severity = info["severity"]
                 score_map = {"HIGH": 15, "MEDIUM": 8, "LOW": 3}
@@ -551,19 +614,12 @@ class VulnerabilityAnalyzer:
         """Analiza hallazgos de Nikto con clasificación mejorada"""
         nikto_findings = self.results.get("nikto_findings", [])
 
-        keyword_severity = {
-            "CRITICAL": (["sql injection", "remote code execution", "rce", "arbitrary file"], 35),
-            "HIGH": (["vulnerable", "exploit", "xss", "cross-site scripting", "directory traversal", "lfi", "rfi"], 20),
-            "MEDIUM": (["security", "warning", "disclosure", "exposed", "insecure cookie", "missing"], 8),
-            "LOW": ([], 3),
-        }
-
         for finding in nikto_findings[:20]:
             finding_lower = finding.lower()
             severity = "LOW"
             score_add = 3
 
-            for sev, (keywords, score) in keyword_severity.items():
+            for sev, (keywords, score) in self._nikto_keywords.items():
                 if any(kw in finding_lower for kw in keywords):
                     severity = sev
                     score_add = score
@@ -593,9 +649,11 @@ class VulnerabilityAnalyzer:
 
         score_map = {"CRITICAL": 40, "HIGH": 20, "MEDIUM": 10, "LOW": 5, "INFO": 2}
 
+        catalog_paths = self._catalog.get("sensitive_paths", {}) if self._catalog else {}
+
         for dir_entry in directories:
             dir_lower = dir_entry.lower()
-            for sensitive_path, severity in self.SENSITIVE_PATHS.items():
+            for sensitive_path, severity in self._sensitive_paths.items():
                 if sensitive_path.lower() in dir_lower:
                     self.risk_score += score_map.get(severity, 2)
 
@@ -607,6 +665,12 @@ class VulnerabilityAnalyzer:
                         "INFO": f"Se encontró el endpoint '{sensitive_path}'. Documentar y verificar su protección."
                     }
 
+                    catalog_recs = catalog_paths.get(sensitive_path, {}).get("recommendations")
+                    recommendations = catalog_recs or [
+                        f"Bloquear el acceso público a '{sensitive_path}' mediante reglas del servidor o WAF.",
+                        "Verificar que no exista información sensible en este recurso y eliminarlo si no es necesario."
+                    ]
+
                     self.findings.append({
                         "severity": severity,
                         "title": f"Recurso sensible expuesto: {sensitive_path}",
@@ -615,10 +679,7 @@ class VulnerabilityAnalyzer:
                         "service": "http",
                         "version": "",
                         "category": "web-directories",
-                        "recommendations": [
-                            f"Bloquear el acceso público a '{sensitive_path}' mediante reglas del servidor o WAF.",
-                            "Verificar que no exista información sensible en este recurso y eliminarlo si no es necesario."
-                        ],
+                        "recommendations": recommendations,
                         "cves": []
                     })
                     break
@@ -790,12 +851,20 @@ class VulnerabilityAnalyzer:
         """Genera recomendaciones según el perfil de escaneo"""
         recommendations = []
         port_numbers = {p["port"] for p in self.results.get("ports", [])}
-        high_risk_open = [p for p in self.results.get("ports", []) if p["port"] in self.HIGH_RISK_PORTS]
+        high_risk_open = [p for p in self.results.get("ports", []) if p["port"] in self._high_risk_ports]
         has_critical = any(f["severity"] == "CRITICAL" for f in self.findings)
         has_high = any(f["severity"] == "HIGH" for f in self.findings)
         has_nikto = bool(self.results.get("nikto_findings"))
         headers = self.results.get("headers", {})
         headers_lower = {k.lower() for k in headers}
+
+        catalog_globals = (
+            self._catalog.get("global_recommendations", []) if self._catalog else []
+        )
+        catalog_profile_recs = (
+            self._catalog.get("profile_recommendations", {}).get(self.profile, [])
+            if self._catalog else []
+        )
 
         if self.risk_score >= 100:
             recommendations.append(
@@ -815,7 +884,7 @@ class VulnerabilityAnalyzer:
                 "Planificar la remediación de vulnerabilidades de severidad alta en un plazo máximo de 30 días."
             )
 
-        # Recomendaciones por perfil
+        # Recomendaciones condicionales por perfil (lógica de detección se mantiene)
         if self.profile in ("web", "api-owasp", "compliance"):
             if "content-security-policy" not in headers_lower:
                 recommendations.append(
@@ -833,23 +902,6 @@ class VulnerabilityAnalyzer:
                 recommendations.append(
                     "Revisar y bloquear el acceso a recursos sensibles encontrados durante el escaneo de directorios."
                 )
-            recommendations.append(
-                "Implementar un Web Application Firewall (WAF) para filtrar tráfico malicioso y proteger la aplicación."
-            )
-
-        if self.profile == "api-owasp":
-            recommendations.append(
-                "Implementar autenticación OAuth 2.0 o JWT con validación estricta en todos los endpoints de la API."
-            )
-            recommendations.append(
-                "Aplicar rate limiting y throttling para prevenir abuso de la API y ataques de fuerza bruta."
-            )
-            recommendations.append(
-                "Realizar una revisión de código orientada a las vulnerabilidades del OWASP API Security Top 10 2023."
-            )
-            recommendations.append(
-                "Implementar logging y monitoreo de todas las solicitudes a la API para detectar patrones de ataque."
-            )
 
         if self.profile == "network":
             if high_risk_open:
@@ -857,9 +909,6 @@ class VulnerabilityAnalyzer:
                 recommendations.append(
                     f"Cerrar o proteger mediante firewall los puertos de alto riesgo expuestos: {port_list}."
                 )
-            recommendations.append(
-                "Usar VPN o túnel cifrado para el acceso a servicios administrativos en lugar de exponerlos directamente."
-            )
             if 22 in port_numbers:
                 recommendations.append(
                     "Configurar SSH para autenticación exclusivamente por clave pública y deshabilitar el acceso mediante contraseña (PasswordAuthentication no)."
@@ -868,36 +917,29 @@ class VulnerabilityAnalyzer:
                 recommendations.append(
                     "Migrar servicios HTTP (puerto 80) a HTTPS e implementar redirección automática."
                 )
-            recommendations.append(
-                "Implementar un sistema de detección de intrusiones (IDS/IPS) para monitorear el tráfico de red."
-            )
-            recommendations.append(
-                "Segmentar la red mediante VLANs para aislar servicios críticos de la infraestructura general."
-            )
 
-        if self.profile == "compliance":
-            recommendations.append(
-                "Deshabilitar cifrados SSL/TLS débiles (SSLv3, TLSv1.0, TLSv1.1, RC4, DES, 3DES) y permitir solo TLS 1.2 y TLS 1.3."
-            )
-            recommendations.append(
-                "Verificar la validez y configuración del certificado SSL/TLS (cadena de confianza, nombre de host, fecha de expiración)."
-            )
-            recommendations.append(
-                "Implementar Perfect Forward Secrecy (PFS) usando suites de cifrado ECDHE."
-            )
-            recommendations.append(
-                "Generar un informe de cumplimiento basado en PCI-DSS, NIST o ISO 27001 según los requerimientos de la organización."
-            )
+        # Recomendaciones del catálogo por perfil (estáticas, actualizables via update_catalog.py)
+        added = set(recommendations)
+        for rec in catalog_profile_recs:
+            if rec not in added:
+                recommendations.append(rec)
+                added.add(rec)
 
-        recommendations.append(
-            "Establecer un proceso regular de actualizaciones y parcheo de seguridad para todos los servicios expuestos."
-        )
-        recommendations.append(
-            "Realizar escaneos de vulnerabilidades periódicos (mínimo mensual) y pruebas de penetración anuales."
-        )
-        recommendations.append(
-            "Implementar monitoreo continuo y alertas tempranas para detectar actividad anómala en los sistemas."
-        )
+        # Recomendaciones globales siempre presentes (del catálogo si está disponible)
+        if catalog_globals:
+            for rec in catalog_globals:
+                if rec not in added:
+                    recommendations.append(rec)
+        else:
+            recommendations.append(
+                "Establecer un proceso regular de actualizaciones y parcheo de seguridad para todos los servicios expuestos."
+            )
+            recommendations.append(
+                "Realizar escaneos de vulnerabilidades periódicos (mínimo mensual) y pruebas de penetración anuales."
+            )
+            recommendations.append(
+                "Implementar monitoreo continuo y alertas tempranas para detectar actividad anómala en los sistemas."
+            )
 
         return recommendations
 

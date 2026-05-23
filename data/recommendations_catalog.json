@@ -1,0 +1,529 @@
+{
+  "version": "1.0",
+  "last_updated": "2026-05-23",
+  "ports": {
+    "21": {
+      "risk_level": "HIGH",
+      "description": "FTP - Protocolo inseguro",
+      "recommendations": [
+        "Deshabilitar FTP y migrar a SFTP (puerto 22) o FTPS (FTP sobre TLS).",
+        "Si FTP es estrictamente necesario, restringir acceso por IP con reglas de firewall.",
+        "Usar VPN o túnel cifrado para transferencias de archivos administrativas.",
+        "Habilitar logging de sesiones FTP para auditoría."
+      ],
+      "cves": []
+    },
+    "22": {
+      "risk_level": "MEDIUM",
+      "description": "SSH - Puerto de administración remota",
+      "recommendations": [
+        "Configurar autenticación exclusivamente por clave pública (deshabilitar PasswordAuthentication).",
+        "Cambiar el puerto SSH por defecto (22) a un puerto no estándar para reducir escaneos automatizados.",
+        "Implementar fail2ban o similar para bloquear ataques de fuerza bruta.",
+        "Restringir acceso SSH solo a IPs administrativas mediante firewall."
+      ],
+      "cves": []
+    },
+    "23": {
+      "risk_level": "HIGH",
+      "description": "Telnet - Sin cifrado",
+      "recommendations": [
+        "Deshabilitar Telnet inmediatamente y migrar a SSH para administración remota.",
+        "Telnet transmite credenciales y datos en texto plano — cualquier interceptor puede capturarlos.",
+        "Implementar reglas de firewall para bloquear el puerto 23 en el perímetro de red."
+      ],
+      "cves": []
+    },
+    "25": {
+      "risk_level": "HIGH",
+      "description": "SMTP - Potencial relay abierto",
+      "recommendations": [
+        "Verificar que el servidor SMTP no sea un relay abierto (open relay test).",
+        "Configurar SPF, DKIM y DMARC para autenticar el correo saliente.",
+        "Restringir SMTP al mínimo de IPs necesarias con reglas de firewall.",
+        "Usar SMTPS (puerto 465) o STARTTLS para cifrar las comunicaciones."
+      ],
+      "cves": []
+    },
+    "80": {
+      "risk_level": "MEDIUM",
+      "description": "HTTP - Comunicación sin cifrado",
+      "recommendations": [
+        "Migrar a HTTPS (puerto 443) y configurar redirección automática de HTTP a HTTPS.",
+        "Implementar HSTS para forzar conexiones cifradas en futuros accesos.",
+        "Deshabilitar el puerto 80 o usarlo únicamente para redirigir a HTTPS."
+      ],
+      "cves": []
+    },
+    "110": {
+      "risk_level": "HIGH",
+      "description": "POP3 - Sin cifrado",
+      "recommendations": [
+        "Deshabilitar POP3 y migrar a POP3S (puerto 995) con cifrado TLS.",
+        "Preferir IMAP sobre TLS (IMAPS, puerto 993) para mayor funcionalidad y seguridad.",
+        "Bloquear el acceso externo al puerto 110 con reglas de firewall."
+      ],
+      "cves": []
+    },
+    "143": {
+      "risk_level": "HIGH",
+      "description": "IMAP - Sin cifrado",
+      "recommendations": [
+        "Migrar a IMAPS (puerto 993) con cifrado TLS.",
+        "Deshabilitar el puerto 143 sin cifrado o forzar STARTTLS obligatorio.",
+        "Restringir el acceso solo a clientes de correo autorizados."
+      ],
+      "cves": []
+    },
+    "161": {
+      "risk_level": "HIGH",
+      "description": "SNMP - Posible información del sistema",
+      "recommendations": [
+        "Actualizar a SNMPv3 con autenticación y cifrado (SNMPv1/v2c no tienen seguridad real).",
+        "Cambiar las community strings por defecto ('public', 'private') por valores únicos y complejos.",
+        "Restringir el acceso SNMP solo a IPs de sistemas de monitorización autorizados.",
+        "Deshabilitar SNMP si no se usa activamente para monitorización."
+      ],
+      "cves": []
+    },
+    "445": {
+      "risk_level": "HIGH",
+      "description": "SMB - Vulnerable a ataques de red",
+      "recommendations": [
+        "Bloquear el puerto 445 en el perímetro de red — nunca exponer SMB directamente a Internet.",
+        "Deshabilitar SMBv1 (vulnerable a EternalBlue/WannaCry, MS17-010).",
+        "Aplicar parches de seguridad de Microsoft para SMB de forma inmediata.",
+        "Usar VPN para acceso compartido a recursos internos en lugar de exponer SMB."
+      ],
+      "cves": ["CVE-2017-0144", "CVE-2020-0796"]
+    },
+    "2049": {
+      "risk_level": "HIGH",
+      "description": "NFS - Compartición de archivos insegura",
+      "recommendations": [
+        "Restringir las exportaciones NFS solo a hosts específicos en /etc/exports.",
+        "Usar NFSv4 con autenticación Kerberos para mayor seguridad.",
+        "Bloquear el puerto 2049 en el perímetro de red — no exponer NFS a Internet.",
+        "Auditar regularmente los archivos compartidos por NFS para detectar exposiciones no deseadas."
+      ],
+      "cves": []
+    },
+    "3306": {
+      "risk_level": "HIGH",
+      "description": "MySQL - Base de datos expuesta",
+      "recommendations": [
+        "No exponer MySQL directamente a Internet — usar solo en red interna o localhost.",
+        "Cambiar el puerto MySQL por defecto (3306) si se requiere acceso externo.",
+        "Usar SSL/TLS para conexiones remotas a MySQL.",
+        "Crear usuarios con privilegios mínimos necesarios (principio de menor privilegio).",
+        "Auditar y eliminar usuarios con contraseñas vacías o débiles (mysql_secure_installation)."
+      ],
+      "cves": []
+    },
+    "3389": {
+      "risk_level": "HIGH",
+      "description": "RDP - Expuesto a ataques de fuerza bruta",
+      "recommendations": [
+        "No exponer RDP directamente a Internet — usar VPN para acceso remoto.",
+        "Habilitar Autenticación a Nivel de Red (NLA) en RDP.",
+        "Implementar bloqueo de cuentas después de intentos fallidos consecutivos.",
+        "Aplicar parches de seguridad — RDP tiene múltiples CVEs críticos históricos.",
+        "Cambiar el puerto RDP por defecto (3389) si el acceso es estrictamente necesario."
+      ],
+      "cves": ["CVE-2019-0708", "CVE-2020-0609"]
+    },
+    "5432": {
+      "risk_level": "HIGH",
+      "description": "PostgreSQL - Base de datos expuesta",
+      "recommendations": [
+        "Restringir conexiones a PostgreSQL a localhost o red interna en pg_hba.conf.",
+        "Usar SSL para todas las conexiones remotas a la base de datos.",
+        "Aplicar el principio de menor privilegio en los roles de base de datos.",
+        "Habilitar logging de auditoría (pgaudit) para detectar accesos no autorizados."
+      ],
+      "cves": []
+    },
+    "6379": {
+      "risk_level": "HIGH",
+      "description": "Redis - Sin autenticación por defecto",
+      "recommendations": [
+        "Configurar autenticación en Redis (requirepass en redis.conf).",
+        "Vincular Redis solo a interfaces locales (bind 127.0.0.1) — no exponer a Internet.",
+        "Usar Redis 6+ con ACL para control de acceso granular.",
+        "Cifrar el tráfico Redis usando TLS si se requiere acceso remoto."
+      ],
+      "cves": []
+    },
+    "8000": {
+      "risk_level": "MEDIUM",
+      "description": "HTTP-DEV - Posible servidor de desarrollo",
+      "recommendations": [
+        "Verificar si este servidor de desarrollo debe estar expuesto en producción.",
+        "Implementar autenticación si el servicio es accesible externamente.",
+        "Migrar a HTTPS si el servicio se usa en producción."
+      ],
+      "cves": []
+    },
+    "8080": {
+      "risk_level": "MEDIUM",
+      "description": "HTTP-ALT - Sin cifrado",
+      "recommendations": [
+        "Configurar HTTPS en el servidor que escucha en este puerto.",
+        "Implementar redirección automática de HTTP a HTTPS.",
+        "Considerar mover el servicio al puerto estándar 443."
+      ],
+      "cves": []
+    },
+    "8443": {
+      "risk_level": "MEDIUM",
+      "description": "HTTPS-ALT - Puerto alternativo HTTPS",
+      "recommendations": [
+        "Verificar la configuración TLS — asegurar TLS 1.2+ y deshabilitar versiones débiles.",
+        "Verificar la cadena de certificados y su fecha de expiración.",
+        "Considerar consolidar en el puerto estándar 443 para simplificar la gestión."
+      ],
+      "cves": []
+    },
+    "27017": {
+      "risk_level": "HIGH",
+      "description": "MongoDB - Base de datos expuesta",
+      "recommendations": [
+        "Habilitar autenticación en MongoDB (no está activada por defecto en versiones antiguas).",
+        "Vincular MongoDB solo a interfaces locales — no exponer a Internet.",
+        "Usar control de acceso basado en roles (RBAC) para restringir permisos por usuario.",
+        "Habilitar cifrado TLS para conexiones remotas y cifrado en reposo.",
+        "Actualizar a la versión más reciente de MongoDB y aplicar parches de seguridad."
+      ],
+      "cves": []
+    }
+  },
+  "security_headers": {
+    "Strict-Transport-Security": {
+      "severity": "HIGH",
+      "title": "Cabecera HSTS ausente (Strict-Transport-Security)",
+      "description": "La cabecera HTTP Strict-Transport-Security no está configurada. Esto permite ataques de degradación de protocolo (SSL stripping) y robo de cookies en tránsito.",
+      "recommendation": "Configurar: Strict-Transport-Security: max-age=31536000; includeSubDomains; preload",
+      "notes": ""
+    },
+    "Content-Security-Policy": {
+      "severity": "HIGH",
+      "title": "Política de Seguridad de Contenido ausente (CSP)",
+      "description": "La cabecera Content-Security-Policy no está definida. Sin CSP, la aplicación es vulnerable a ataques de Cross-Site Scripting (XSS) e inyección de contenido malicioso.",
+      "recommendation": "Definir una política CSP estricta que restrinja fuentes de scripts, estilos, imágenes e iframes. Ejemplo: Content-Security-Policy: default-src 'self'; script-src 'self'",
+      "notes": ""
+    },
+    "X-Frame-Options": {
+      "severity": "MEDIUM",
+      "title": "Protección contra Clickjacking ausente (X-Frame-Options)",
+      "description": "Sin la cabecera X-Frame-Options, la aplicación puede ser embebida en iframes de sitios maliciosos, habilitando ataques de clickjacking y robo de credenciales.",
+      "recommendation": "Configurar: X-Frame-Options: DENY (recomendado) o SAMEORIGIN",
+      "notes": ""
+    },
+    "X-Content-Type-Options": {
+      "severity": "MEDIUM",
+      "title": "Protección contra MIME-Sniffing ausente (X-Content-Type-Options)",
+      "description": "Sin esta cabecera, los navegadores pueden interpretar archivos con un tipo MIME diferente al declarado, lo que puede permitir ataques de ejecución de contenido.",
+      "recommendation": "Configurar: X-Content-Type-Options: nosniff",
+      "notes": ""
+    },
+    "X-XSS-Protection": {
+      "severity": "LOW",
+      "title": "Filtro XSS del navegador no configurado (X-XSS-Protection)",
+      "description": "Esta cabecera activa el filtro XSS integrado en navegadores legacy. Su ausencia puede facilitar ataques XSS reflejados en clientes con navegadores antiguos.",
+      "recommendation": "Configurar: X-XSS-Protection: 1; mode=block",
+      "notes": ""
+    },
+    "Referrer-Policy": {
+      "severity": "LOW",
+      "title": "Política de Referrer no configurada (Referrer-Policy)",
+      "description": "Sin esta cabecera, el navegador puede enviar la URL completa como referrer a sitios externos, filtrando parámetros sensibles de la URL como tokens o IDs de sesión.",
+      "recommendation": "Configurar: Referrer-Policy: strict-origin-when-cross-origin",
+      "notes": ""
+    },
+    "Permissions-Policy": {
+      "severity": "LOW",
+      "title": "Política de Permisos del navegador ausente (Permissions-Policy)",
+      "description": "Sin esta cabecera, no se controla el acceso de la página a APIs sensibles del navegador como cámara, micrófono o geolocalización.",
+      "recommendation": "Configurar: Permissions-Policy: geolocation=(), microphone=(), camera=()",
+      "notes": ""
+    }
+  },
+  "sensitive_paths": {
+    "/.git": {
+      "severity": "CRITICAL",
+      "recommendations": [
+        "Bloquear el acceso público a /.git mediante reglas del servidor web de forma inmediata.",
+        "Verificar si se ha expuesto código fuente, credenciales o configuración sensible.",
+        "Rotar inmediatamente cualquier secreto (tokens, contraseñas, claves API) que pueda haber en el historial git."
+      ]
+    },
+    "/.env": {
+      "severity": "CRITICAL",
+      "recommendations": [
+        "Bloquear el acceso inmediatamente — este archivo puede contener credenciales de producción.",
+        "Rotar todas las credenciales que puedan haber estado expuestas.",
+        "Añadir .env a .gitignore y nunca incluirlo en el directorio web público."
+      ]
+    },
+    "/.env.local": {
+      "severity": "CRITICAL",
+      "recommendations": [
+        "Bloquear acceso y rotar todas las credenciales potencialmente expuestas.",
+        "Nunca almacenar archivos .env en directorios web accesibles públicamente."
+      ]
+    },
+    "/.env.production": {
+      "severity": "CRITICAL",
+      "recommendations": [
+        "Bloquear acceso y rotar todas las credenciales potencialmente expuestas.",
+        "Usar variables de entorno del sistema operativo en lugar de archivos .env en producción."
+      ]
+    },
+    "/backup": {
+      "severity": "HIGH",
+      "recommendations": [
+        "Bloquear o eliminar el directorio de backups del acceso público.",
+        "Mover backups fuera del directorio web raíz a una ubicación segura.",
+        "Cifrar los backups si contienen datos sensibles."
+      ]
+    },
+    "/backups": {
+      "severity": "HIGH",
+      "recommendations": [
+        "Bloquear o eliminar el directorio de backups del acceso público.",
+        "Mover backups fuera del directorio web raíz a una ubicación segura."
+      ]
+    },
+    "/dump": {
+      "severity": "HIGH",
+      "recommendations": [
+        "Bloquear el acceso al dump de base de datos.",
+        "Eliminar dumps del servidor de producción una vez procesados.",
+        "Cifrar los dumps de base de datos si contienen datos sensibles."
+      ]
+    },
+    "/db": {
+      "severity": "HIGH",
+      "recommendations": [
+        "Bloquear el acceso al directorio de base de datos.",
+        "Verificar qué información está expuesta y su nivel de sensibilidad."
+      ]
+    },
+    "/admin": {
+      "severity": "HIGH",
+      "recommendations": [
+        "Proteger el panel de administración con autenticación multifactor (MFA).",
+        "Restringir el acceso solo a IPs administrativas mediante firewall o WAF."
+      ]
+    },
+    "/administrator": {
+      "severity": "HIGH",
+      "recommendations": [
+        "Proteger el panel de administración con autenticación robusta y MFA.",
+        "Considerar mover a una URL no predecible para dificultar el descubrimiento."
+      ]
+    },
+    "/wp-admin": {
+      "severity": "HIGH",
+      "recommendations": [
+        "Proteger WordPress admin con autenticación de dos factores (2FA) y restricción por IP.",
+        "Limitar intentos de login con un plugin de seguridad (Wordfence, iThemes Security).",
+        "Mantener WordPress, plugins y temas actualizados."
+      ]
+    },
+    "/wp-login.php": {
+      "severity": "HIGH",
+      "recommendations": [
+        "Proteger la página de login de WordPress con 2FA.",
+        "Cambiar la URL de login de WordPress a una menos predecible con plugins de seguridad.",
+        "Implementar CAPTCHA en el formulario de login."
+      ]
+    },
+    "/phpmyadmin": {
+      "severity": "HIGH",
+      "recommendations": [
+        "Restringir phpMyAdmin a IPs de administración únicamente.",
+        "Considerar eliminar phpMyAdmin de producción y usar acceso SSH + CLI para gestión de DB.",
+        "Si se mantiene, configurar autenticación adicional a nivel de servidor web."
+      ]
+    },
+    "/console": {
+      "severity": "HIGH",
+      "recommendations": [
+        "Deshabilitar la consola de administración en producción.",
+        "Si es necesaria, protegerla con autenticación fuerte y restricción por IP."
+      ]
+    },
+    "/manager": {
+      "severity": "HIGH",
+      "recommendations": [
+        "Proteger el panel de gestión (posiblemente Tomcat Manager) con autenticación fuerte.",
+        "Restringir acceso por IP y considerar deshabilitarlo en producción."
+      ]
+    },
+    "/server-status": {
+      "severity": "HIGH",
+      "recommendations": [
+        "Deshabilitar /server-status en producción o restringir a IPs internas.",
+        "En Apache: <Location /server-status> Require ip 127.0.0.1 </Location>"
+      ]
+    },
+    "/server-info": {
+      "severity": "HIGH",
+      "recommendations": [
+        "Deshabilitar /server-info en producción — expone configuración detallada del servidor Apache.",
+        "En Apache: <Location /server-info> Require all denied </Location>"
+      ]
+    },
+    "/config": {
+      "severity": "MEDIUM",
+      "recommendations": [
+        "Bloquear el acceso a directorios de configuración.",
+        "Verificar que no haya archivos de configuración con credenciales accesibles públicamente."
+      ]
+    },
+    "/configuration": {
+      "severity": "MEDIUM",
+      "recommendations": [
+        "Bloquear el acceso a directorios de configuración.",
+        "Mover archivos de configuración fuera del directorio web o añadir restricciones de acceso."
+      ]
+    },
+    "/swagger": {
+      "severity": "MEDIUM",
+      "recommendations": [
+        "Restringir el acceso a Swagger UI en producción a usuarios autenticados.",
+        "Deshabilitar Swagger en producción o protegerlo con autenticación básica o token."
+      ]
+    },
+    "/swagger-ui": {
+      "severity": "MEDIUM",
+      "recommendations": [
+        "Restringir el acceso a Swagger UI en producción.",
+        "Implementar autenticación antes de acceder a la documentación de la API."
+      ]
+    },
+    "/api-docs": {
+      "severity": "MEDIUM",
+      "recommendations": [
+        "Proteger la documentación de la API con autenticación.",
+        "Revisar qué información sensible expone la documentación (endpoints, modelos, ejemplos)."
+      ]
+    },
+    "/openapi": {
+      "severity": "MEDIUM",
+      "recommendations": [
+        "Proteger la especificación OpenAPI con autenticación.",
+        "Evitar exponer públicamente los endpoints y modelos de datos de la API en producción."
+      ]
+    },
+    "/.htaccess": {
+      "severity": "MEDIUM",
+      "recommendations": [
+        "Configurar el servidor web para bloquear el acceso a archivos .ht*.",
+        "En Apache: <FilesMatch \"^\\.ht\"> Require all denied </FilesMatch>"
+      ]
+    },
+    "/.htpasswd": {
+      "severity": "HIGH",
+      "recommendations": [
+        "Bloquear inmediatamente el acceso a .htpasswd — contiene hashes de contraseñas.",
+        "Rotar todas las contraseñas de los usuarios afectados.",
+        "Mover el archivo .htpasswd fuera del directorio web."
+      ]
+    },
+    "/logs": {
+      "severity": "MEDIUM",
+      "recommendations": [
+        "Bloquear el acceso público a logs — pueden contener información sensible (tokens, errores, IPs).",
+        "Mover los logs fuera del directorio web o configurar restricciones de acceso."
+      ]
+    },
+    "/log": {
+      "severity": "MEDIUM",
+      "recommendations": [
+        "Bloquear el acceso público a archivos de log.",
+        "Revisar qué información sensible se está registrando y es visible externamente."
+      ]
+    },
+    "/debug": {
+      "severity": "MEDIUM",
+      "recommendations": [
+        "Deshabilitar el modo debug en producción.",
+        "Las páginas de debug pueden exponer stack traces, variables de entorno y configuración interna."
+      ]
+    },
+    "/test": {
+      "severity": "LOW",
+      "recommendations": [
+        "Verificar si el directorio de pruebas debe estar accesible en producción.",
+        "Eliminar código y recursos de prueba del entorno de producción."
+      ]
+    },
+    "/api/v1": {
+      "severity": "INFO",
+      "recommendations": [
+        "Documentar y verificar que los endpoints de la API v1 estén correctamente protegidos.",
+        "Implementar autenticación y autorización en todos los endpoints."
+      ]
+    },
+    "/api/v2": {
+      "severity": "INFO",
+      "recommendations": [
+        "Documentar y verificar que los endpoints de la API v2 estén correctamente protegidos.",
+        "Deprecar versiones antiguas de la API y comunicar el timeline de fin de soporte."
+      ]
+    }
+  },
+  "nikto_severity_keywords": {
+    "CRITICAL": ["sql injection", "remote code execution", "rce", "arbitrary file"],
+    "HIGH": ["vulnerable", "exploit", "xss", "cross-site scripting", "directory traversal", "lfi", "rfi"],
+    "MEDIUM": ["security", "warning", "disclosure", "exposed", "insecure cookie", "missing"],
+    "LOW": []
+  },
+  "profile_recommendations": {
+    "web": [
+      "Implementar una política Content-Security-Policy (CSP) estricta para prevenir ataques XSS e inyección de contenido.",
+      "Habilitar HTTPS y configurar la cabecera HSTS (Strict-Transport-Security) para forzar conexiones cifradas.",
+      "Aplicar el conjunto completo de cabeceras de seguridad HTTP recomendadas por OWASP Secure Headers Project.",
+      "Revisar y bloquear el acceso a recursos sensibles encontrados durante el escaneo de directorios.",
+      "Implementar un Web Application Firewall (WAF) para filtrar tráfico malicioso y proteger la aplicación."
+    ],
+    "api-owasp": [
+      "Implementar autenticación OAuth 2.0 o JWT con validación estricta en todos los endpoints de la API.",
+      "Aplicar rate limiting y throttling para prevenir abuso de la API y ataques de fuerza bruta.",
+      "Realizar una revisión de código orientada a las vulnerabilidades del OWASP API Security Top 10 2023.",
+      "Implementar logging y monitoreo de todas las solicitudes a la API para detectar patrones de ataque.",
+      "Implementar un Web Application Firewall (WAF) para filtrar tráfico malicioso y proteger la aplicación."
+    ],
+    "network": [
+      "Cerrar o proteger mediante firewall los puertos de alto riesgo expuestos en la red.",
+      "Usar VPN o túnel cifrado para el acceso a servicios administrativos en lugar de exponerlos directamente.",
+      "Configurar SSH para autenticación exclusivamente por clave pública y deshabilitar el acceso mediante contraseña.",
+      "Migrar servicios HTTP (puerto 80) a HTTPS e implementar redirección automática.",
+      "Implementar un sistema de detección de intrusiones (IDS/IPS) para monitorear el tráfico de red.",
+      "Segmentar la red mediante VLANs para aislar servicios críticos de la infraestructura general."
+    ],
+    "compliance": [
+      "Deshabilitar cifrados SSL/TLS débiles (SSLv3, TLSv1.0, TLSv1.1, RC4, DES, 3DES) y permitir solo TLS 1.2 y TLS 1.3.",
+      "Verificar la validez y configuración del certificado SSL/TLS (cadena de confianza, nombre de host, fecha de expiración).",
+      "Implementar Perfect Forward Secrecy (PFS) usando suites de cifrado ECDHE.",
+      "Generar un informe de cumplimiento basado en PCI-DSS, NIST o ISO 27001 según los requerimientos de la organización."
+    ],
+    "stealth": [],
+    "lab": [],
+    "quick": [],
+    "standard": [],
+    "full": [],
+    "zap-passive": [],
+    "zap-active": []
+  },
+  "global_recommendations": [
+    "Parchear o mitigar de inmediato todas las vulnerabilidades críticas identificadas en este reporte.",
+    "Revisar los registros (logs) del sistema para detectar posibles compromisos o accesos no autorizados previos.",
+    "Planificar la remediación de vulnerabilidades de severidad alta en un plazo máximo de 30 días.",
+    "Establecer un proceso regular de actualizaciones y parcheo de seguridad para todos los servicios expuestos.",
+    "Realizar escaneos de vulnerabilidades periódicos (mínimo mensual) y pruebas de penetración anuales.",
+    "Implementar monitoreo continuo y alertas tempranas para detectar actividad anómala en los sistemas."
+  ]
+}
