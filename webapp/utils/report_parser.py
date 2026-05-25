@@ -302,43 +302,65 @@ class VulnerabilityAnalyzer:
             "severity": "HIGH",
             "title": "Cabecera HSTS ausente (Strict-Transport-Security)",
             "description": "La cabecera HTTP Strict-Transport-Security no está configurada. Esto permite ataques de degradación de protocolo (SSL stripping) y robo de cookies en tránsito.",
-            "recommendation": "Configurar: Strict-Transport-Security: max-age=31536000; includeSubDomains; preload"
+            "recommendations": [
+                "Configurar: Strict-Transport-Security: max-age=31536000; includeSubDomains; preload",
+                "Verificar que el sitio funcione correctamente en HTTPS antes de activar HSTS para evitar bloqueos."
+            ]
         },
         "Content-Security-Policy": {
             "severity": "HIGH",
             "title": "Política de Seguridad de Contenido ausente (CSP)",
             "description": "La cabecera Content-Security-Policy no está definida. Sin CSP, la aplicación es vulnerable a ataques de Cross-Site Scripting (XSS) e inyección de contenido malicioso.",
-            "recommendation": "Definir una política CSP estricta que restrinja fuentes de scripts, estilos, imágenes e iframes. Ejemplo: Content-Security-Policy: default-src 'self'; script-src 'self'"
+            "recommendations": [
+                "Definir una política CSP estricta: Content-Security-Policy: default-src 'self'; script-src 'self'",
+                "Usar 'report-uri' o 'report-to' para monitorear violaciones de CSP antes de aplicar la política en modo enforce.",
+                "Evitar 'unsafe-inline' y 'unsafe-eval' en la directiva script-src."
+            ]
         },
         "X-Frame-Options": {
             "severity": "MEDIUM",
             "title": "Protección contra Clickjacking ausente (X-Frame-Options)",
             "description": "Sin la cabecera X-Frame-Options, la aplicación puede ser embebida en iframes de sitios maliciosos, habilitando ataques de clickjacking y robo de credenciales.",
-            "recommendation": "Configurar: X-Frame-Options: DENY (recomendado) o SAMEORIGIN"
+            "recommendations": [
+                "Configurar: X-Frame-Options: DENY (recomendado) o SAMEORIGIN",
+                "Alternativamente, usar la directiva CSP frame-ancestors para mayor control granular."
+            ]
         },
         "X-Content-Type-Options": {
             "severity": "MEDIUM",
             "title": "Protección contra MIME-Sniffing ausente (X-Content-Type-Options)",
             "description": "Sin esta cabecera, los navegadores pueden interpretar archivos con un tipo MIME diferente al declarado, lo que puede permitir ataques de ejecución de contenido.",
-            "recommendation": "Configurar: X-Content-Type-Options: nosniff"
+            "recommendations": [
+                "Configurar: X-Content-Type-Options: nosniff",
+                "Asegurarse de que todos los recursos se sirvan con el Content-Type correcto."
+            ]
         },
         "X-XSS-Protection": {
             "severity": "LOW",
             "title": "Filtro XSS del navegador no configurado (X-XSS-Protection)",
             "description": "Esta cabecera activa el filtro XSS integrado en navegadores legacy. Su ausencia puede facilitar ataques XSS reflejados en clientes con navegadores antiguos.",
-            "recommendation": "Configurar: X-XSS-Protection: 1; mode=block"
+            "recommendations": [
+                "Configurar: X-XSS-Protection: 1; mode=block",
+                "Implementar una política CSP robusta como protección principal contra XSS."
+            ]
         },
         "Referrer-Policy": {
             "severity": "LOW",
             "title": "Política de Referrer no configurada (Referrer-Policy)",
             "description": "Sin esta cabecera, el navegador puede enviar la URL completa como referrer a sitios externos, filtrando parámetros sensibles de la URL como tokens o IDs de sesión.",
-            "recommendation": "Configurar: Referrer-Policy: strict-origin-when-cross-origin"
+            "recommendations": [
+                "Configurar: Referrer-Policy: strict-origin-when-cross-origin",
+                "Para mayor privacidad, usar 'no-referrer' si no se necesita información de referrer en solicitudes cross-origin."
+            ]
         },
         "Permissions-Policy": {
             "severity": "LOW",
             "title": "Política de Permisos del navegador ausente (Permissions-Policy)",
             "description": "Sin esta cabecera, no se controla el acceso de la página a APIs sensibles del navegador como cámara, micrófono o geolocalización.",
-            "recommendation": "Configurar: Permissions-Policy: geolocation=(), microphone=(), camera=()"
+            "recommendations": [
+                "Configurar: Permissions-Policy: geolocation=(), microphone=(), camera=()",
+                "Revisar qué APIs del navegador utiliza la aplicación y denegar explícitamente las que no se necesiten."
+            ]
         }
     }
 
@@ -422,10 +444,16 @@ class VulnerabilityAnalyzer:
                 pass
 
         for header, header_data in catalog.get("security_headers", {}).items():
+            entry = dict(header_data)
+            # Normalizar: si el catálogo usa "recommendation" (singular), convertir a lista
+            if "recommendation" in entry and "recommendations" not in entry:
+                entry["recommendations"] = [entry.pop("recommendation")]
+            elif "recommendation" in entry:
+                entry.pop("recommendation")
             if header in self._security_headers:
-                self._security_headers[header].update(header_data)
+                self._security_headers[header].update(entry)
             else:
-                self._security_headers[header] = dict(header_data)
+                self._security_headers[header] = entry
 
         for path, path_data in catalog.get("sensitive_paths", {}).items():
             severity = path_data.get("severity")
@@ -512,6 +540,7 @@ class VulnerabilityAnalyzer:
                 self.risk_score += 5
 
             self.findings.append({
+                "vuln_id": f"port_{port_num}",
                 "severity": severity,
                 "title": title,
                 "description": description,
@@ -531,6 +560,7 @@ class VulnerabilityAnalyzer:
                     for version, cves in vuln_versions.items():
                         if version in version_info:
                             self.findings.append({
+                                "vuln_id": f"version_{product.lower()}_{version.replace('.', '_')}",
                                 "severity": "CRITICAL",
                                 "title": f"Versión vulnerable detectada: {product} {version}",
                                 "description": f"Se detectó {product} versión {version} con vulnerabilidades conocidas y explotables.",
@@ -560,7 +590,10 @@ class VulnerabilityAnalyzer:
                 severity = info["severity"]
                 score_map = {"HIGH": 15, "MEDIUM": 8, "LOW": 3}
                 self.risk_score += score_map.get(severity, 2)
+                # Soportar tanto "recommendations" (lista) como "recommendation" (singular legacy)
+                recs = info.get("recommendations") or [info.get("recommendation", "")]
                 self.findings.append({
+                    "vuln_id": f"header_{header.lower().replace('-', '_')}",
                     "severity": severity,
                     "title": info["title"],
                     "description": info["description"],
@@ -568,7 +601,7 @@ class VulnerabilityAnalyzer:
                     "service": "https" if "strict-transport-security" in headers_lower else "http",
                     "version": "",
                     "category": "web-headers",
-                    "recommendations": [info["recommendation"]],
+                    "recommendations": recs,
                     "cves": []
                 })
 
@@ -829,7 +862,10 @@ class VulnerabilityAnalyzer:
 
             description, recommendations = self._enrich_nikto_finding(finding)
             self.risk_score += score_add
+            # ID basado en severidad y primeras palabras del hallazgo para identificación única
+            nikto_slug = re.sub(r'[^a-z0-9]+', '_', finding[:40].lower()).strip('_')
             self.findings.append({
+                "vuln_id": f"nikto_{severity.lower()}_{nikto_slug}",
                 "severity": severity,
                 "title": f"Hallazgo Nikto: {finding[:80]}",
                 "description": description,
@@ -871,7 +907,9 @@ class VulnerabilityAnalyzer:
                         "Verificar que no exista información sensible en este recurso y eliminarlo si no es necesario."
                     ]
 
+                    path_slug = sensitive_path.replace('/', '_').replace('.', '').strip('_')
                     self.findings.append({
+                        "vuln_id": f"path_{path_slug}",
                         "severity": severity,
                         "title": f"Recurso sensible expuesto: {sensitive_path}",
                         "description": descriptions.get(severity, f"Recurso encontrado: {sensitive_path}. Detalle: {dir_entry}"),
@@ -911,7 +949,9 @@ class VulnerabilityAnalyzer:
                 if indicator.lower() in output:
                     reported_scripts.add(script)
                     self.risk_score += score
+                    script_slug = re.sub(r'[^a-z0-9]+', '_', script.lower()).strip('_')
                     self.findings.append({
+                        "vuln_id": f"nse_{script_slug}",
                         "severity": severity,
                         "title": f"Script NSE '{script}': {label}",
                         "description": f"El script NSE de nmap '{script}' reportó: {label}. Salida (extracto): {nse.get('output', '')[:300]}",
@@ -938,6 +978,7 @@ class VulnerabilityAnalyzer:
         cors = headers_lower.get("access-control-allow-origin", "")
         if cors == "*":
             self.findings.append({
+                "vuln_id": "owasp_api7_cors_wildcard",
                 "severity": "HIGH",
                 "title": "OWASP API7 - CORS Wildcard: Access-Control-Allow-Origin: *",
                 "description": "La API permite solicitudes de cualquier origen (CORS wildcard '*'). Esto puede permitir que scripts maliciosos de cualquier dominio accedan a datos de la API en nombre de usuarios autenticados.",
@@ -960,6 +1001,7 @@ class VulnerabilityAnalyzer:
         has_auth_scheme = "authorization" in headers_lower
         if not has_auth_header and not has_auth_scheme:
             self.findings.append({
+                "vuln_id": "owasp_api2_broken_auth",
                 "severity": "MEDIUM",
                 "title": "OWASP API2 - Sin indicadores de autenticación en respuestas",
                 "description": "No se detectaron cabeceras de autenticación (WWW-Authenticate, X-Api-Key) en las respuestas del servidor. Esto puede indicar endpoints sin protección de autenticación.",
@@ -984,6 +1026,7 @@ class VulnerabilityAnalyzer:
         ])
         if not has_rate_limit:
             self.findings.append({
+                "vuln_id": "owasp_api4_rate_limiting",
                 "severity": "MEDIUM",
                 "title": "OWASP API4 - Sin Rate Limiting detectado",
                 "description": "No se detectaron cabeceras de limitación de solicitudes (X-RateLimit-Limit, Retry-After). Sin rate limiting, la API es vulnerable a ataques de fuerza bruta, enumeración de recursos y denegación de servicio.",
@@ -1005,7 +1048,9 @@ class VulnerabilityAnalyzer:
         doc_paths = ["/swagger", "/swagger-ui", "/api-docs", "/openapi", "/redoc"]
         for doc_path in doc_paths:
             if doc_path in dirs_text:
+                doc_slug = doc_path.strip('/').replace('-', '_')
                 self.findings.append({
+                    "vuln_id": f"owasp_api9_docs_{doc_slug}",
                     "severity": "MEDIUM",
                     "title": f"OWASP API9 - Documentación API expuesta: {doc_path}",
                     "description": f"Se encontró documentación de la API accesible públicamente en '{doc_path}'. La exposición pública de Swagger/OpenAPI revela todos los endpoints, parámetros y modelos de datos de la API a potenciales atacantes.",
@@ -1031,6 +1076,7 @@ class VulnerabilityAnalyzer:
         ]
         if missing_security_headers:
             self.findings.append({
+                "vuln_id": "owasp_api8_security_config",
                 "severity": "MEDIUM",
                 "title": "OWASP API8 - Configuración de seguridad HTTP incompleta",
                 "description": f"Faltan cabeceras de seguridad críticas: {', '.join(missing_security_headers)}. Las APIs mal configuradas son vulnerables a ataques de inyección de contenido y robo de sesión.",

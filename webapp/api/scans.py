@@ -539,7 +539,9 @@ def _generate_headers_table_html(headers: dict) -> str:
             row_style = 'background:#f0fff4;'
         else:
             status = '❌ Ausente'
-            display = f'<em style="color:#777;">{info["recommendation"]}</em>'
+            # Soportar tanto "recommendations" (lista) como "recommendation" (singular legacy)
+            recs = info.get("recommendations") or [info.get("recommendation", "")]
+            display = f'<em style="color:#777;">{recs[0]}</em>'
             row_style = 'background:#fff5f5;'
         html += f"""
                         <tr style="{row_style}">
@@ -1131,26 +1133,44 @@ def generate_professional_html_report(scan_data: dict) -> str:
             }
             severity_color = severity_colors_inline.get(severity, "#757575")
             
+            vuln_id = vuln.get('vuln_id', '')
+            vuln_id_attr = f' data-vuln-id="{vuln_id}"' if vuln_id else ''
+            port_info = f"Puerto {vuln.get('port', '')} ({vuln.get('service', '')})" if vuln.get('port') else ""
+            cves = vuln.get('cves', [])
+            cves_html = ""
+            if cves:
+                cves_links = " ".join(
+                    f'<a href="https://nvd.nist.gov/vuln/detail/{c}" target="_blank" '
+                    f'style="color:#c62828;font-size:0.8em;margin-right:6px;">{c}</a>'
+                    for c in cves
+                )
+                cves_html = f'<div style="margin-top:6px;">{cves_links}</div>'
+
+            recs = vuln.get('recommendations', [])
+            recs_html = ""
+            if recs:
+                items = "".join(
+                    f'<li style="margin:4px 0;">{r}</li>' for r in recs
+                )
+                recs_html = f"""
+                    <div class="recommendation">
+                        <div class="recommendation-title">💡 Recomendaciones</div>
+                        <ul style="margin:8px 0 0 16px;padding:0;">{items}</ul>
+                    </div>
+"""
+
             html += f"""
-                <div class="finding-card finding-{severity_class}">
+                <div class="finding-card finding-{severity_class}"{vuln_id_attr}>
                     <div class="finding-header">
                         <div class="finding-title">{vuln.get('title', 'Hallazgo sin título')}</div>
                         <div class="finding-severity" style="background: {severity_color};">{severity}</div>
                     </div>
+                    {'<div style="font-size:0.82em;color:#888;margin-bottom:6px;">'+port_info+'</div>' if port_info else ''}
                     <div style="color: #555; margin: 10px 0;">
                         {vuln.get('description', 'Sin descripción disponible')}
                     </div>
-"""
-            
-            if vuln.get('recommendation'):
-                html += f"""
-                    <div class="recommendation">
-                        <div class="recommendation-title">💡 Recomendación</div>
-                        <div>{vuln.get('recommendation')}</div>
-                    </div>
-"""
-            
-            html += """
+                    {cves_html}
+                    {recs_html}
                 </div>
 """
         html += """
@@ -1353,14 +1373,20 @@ DIRECTORIOS Y RECURSOS ENCONTRADOS
 {'-'*80}
 """
             for i, vuln in enumerate(cat_vulns, 1):
+                vuln_id = vuln.get('vuln_id', '')
+                id_line = f"    ID:          {vuln_id}\n" if vuln_id else ""
+                cves = vuln.get('cves', [])
+                cves_line = f"    CVEs:        {', '.join(cves)}\n" if cves else ""
                 txt += f"""
 [{i}] {vuln.get('title', 'Hallazgo sin título')}
     Severidad:   {vuln.get('severity', 'INFO')}
-    Descripción: {vuln.get('description', 'Sin descripción')[:200]}
+{id_line}{cves_line}    Descripción: {vuln.get('description', 'Sin descripción')[:200]}
 """
                 recs = vuln.get('recommendations', [])
                 if recs:
-                    txt += f"    Remediación: {recs[0][:160]}\n"
+                    txt += "    Remediación:\n"
+                    for j, r in enumerate(recs, 1):
+                        txt += f"      {j}. {r[:160]}\n"
                 txt += "\n"
 
     # Recomendaciones

@@ -336,7 +336,7 @@
             <div class="pd-header">
                 <div>
                     <div class="pd-title" id="pd-name"></div>
-                    <div id="pd-badge-row" style="margin-top:6px;display:flex;align-items:center;gap:8px;">
+                    <div id="pd-badge-row" style="margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
                         <code id="pd-id" style="font-size:0.78rem;color:#94a3b8;"></code>
                         <span id="pd-time" style="font-size:0.78rem;color:#64748b;"></span>
                         <span id="pd-sudo" style="font-size:0.75rem;color:#fbbf24;"></span>
@@ -345,8 +345,31 @@
                 <button class="pd-close-btn" onclick="closeProfileModal()">✕</button>
             </div>
             <div class="pd-body">
+                <!-- Descripción -->
                 <p id="pd-description" class="pd-desc"></p>
-                <h4 class="pd-section-title">Herramientas y Comandos</h4>
+
+                <!-- Bloque educativo del perfil -->
+                <div id="pd-edu-block" style="display:none;">
+                    <!-- Objetivos de aprendizaje -->
+                    <div class="pd-edu-card pd-edu-objectives">
+                        <div class="pd-edu-card-title">🎯 ¿Qué aprenderás con este perfil?</div>
+                        <ul id="pd-objectives-list" class="pd-edu-list"></ul>
+                    </div>
+                    <!-- Cuándo usarlo + limitaciones -->
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+                        <div class="pd-edu-card pd-edu-when">
+                            <div class="pd-edu-card-title">✅ Cuándo usarlo</div>
+                            <p id="pd-when-to-use" class="pd-edu-text"></p>
+                        </div>
+                        <div class="pd-edu-card pd-edu-limits">
+                            <div class="pd-edu-card-title">⚠️ Limitaciones</div>
+                            <p id="pd-limitations" class="pd-edu-text"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Herramientas y comandos -->
+                <h4 class="pd-section-title">🛠 Herramientas y Comandos</h4>
                 <div id="pd-commands-list"></div>
             </div>
         </div>
@@ -356,7 +379,7 @@
     /* ── Modal Detalle de Perfil ─────────────────────────── */
     .pd-overlay {
         position: fixed; inset: 0;
-        background: rgba(0,0,0,0.65);
+        background: rgba(0,0,0,0.70);
         z-index: 1000;
         display: flex;
         align-items: center;
@@ -368,8 +391,8 @@
         border: 1px solid #2d3748;
         border-radius: 12px;
         width: 100%;
-        max-width: 680px;
-        max-height: 85vh;
+        max-width: 920px;
+        max-height: 92vh;
         display: flex;
         flex-direction: column;
         overflow: hidden;
@@ -409,80 +432,186 @@
     .pd-desc {
         font-size: 0.88rem;
         color: #94a3b8;
-        margin-bottom: 18px;
-        line-height: 1.55;
+        margin-bottom: 16px;
+        line-height: 1.6;
     }
+
+    /* ── Tarjetas educativas del perfil ── */
+    .pd-edu-card {
+        border-radius: 8px;
+        padding: 12px 14px;
+        margin-bottom: 10px;
+    }
+    .pd-edu-objectives { background: #0e2233; border: 1px solid #1d4f6a; }
+    .pd-edu-when       { background: #0d2218; border: 1px solid #1a4a30; }
+    .pd-edu-limits     { background: #241a00; border: 1px solid #4a3800; }
+    .pd-edu-card-title {
+        font-size: 0.78rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 8px;
+        color: #cbd5e0;
+    }
+    .pd-edu-list {
+        margin: 0; padding-left: 18px;
+        color: #94a3b8;
+        font-size: 0.83rem;
+        line-height: 1.7;
+    }
+    .pd-edu-text {
+        margin: 0;
+        color: #94a3b8;
+        font-size: 0.83rem;
+        line-height: 1.6;
+    }
+
+    /* ── Sección title ── */
     .pd-section-title {
-        font-size: 0.8rem;
+        font-size: 0.78rem;
         text-transform: uppercase;
         letter-spacing: 0.7px;
         color: #64748b;
-        margin-bottom: 10px;
-        font-weight: 600;
+        margin: 16px 0 10px;
+        font-weight: 700;
     }
+
+    /* ── Tarjeta de comando ── */
     .pd-command-row {
         background: #0f1923;
         border: 1px solid #2d3748;
-        border-radius: 8px;
-        padding: 12px 14px;
-        margin-bottom: 8px;
+        border-radius: 10px;
+        margin-bottom: 10px;
+        overflow: hidden;
     }
-    .pd-cmd-header {
+    .pd-cmd-summary {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        margin-bottom: 7px;
+        padding: 11px 14px;
+        cursor: pointer;
+        user-select: none;
+        gap: 10px;
+        transition: background 0.15s;
+    }
+    .pd-cmd-summary:hover { background: #16202e; }
+    .pd-cmd-left {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        min-width: 0;
+    }
+    .pd-cmd-tool-row {
+        display: flex;
+        align-items: center;
         gap: 8px;
     }
     .pd-cmd-tool {
         font-weight: 700;
-        font-size: 0.85rem;
+        font-size: 0.9rem;
         color: #7eb8e8;
     }
-    .pd-cmd-badges {
+    .pd-cmd-purpose {
+        font-size: 0.8rem;
+        color: #94a3b8;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 520px;
+    }
+    .pd-cmd-right {
         display: flex;
-        gap: 5px;
+        align-items: center;
+        gap: 6px;
         flex-shrink: 0;
     }
     .pd-badge {
-        font-size: 0.63rem;
-        padding: 1px 7px;
+        font-size: 0.62rem;
+        padding: 2px 8px;
         border-radius: 10px;
-        font-weight: 600;
+        font-weight: 700;
         text-transform: uppercase;
+        white-space: nowrap;
     }
     .pd-badge-req    { background: #14361f; color: #5bc98a; }
     .pd-badge-opt    { background: #2d3748; color: #94a3b8; }
     .pd-badge-sudo   { background: #3d2d00; color: #ffc107; }
     .pd-badge-time   { background: #1a2332; color: #64748b; border: 1px solid #2d3748; }
+    .pd-badge-diff-basico      { background: #0d2218; color: #5bc98a; }
+    .pd-badge-diff-intermedio  { background: #1c2a00; color: #a3e635; }
+    .pd-badge-diff-avanzado    { background: #2d0a00; color: #f87171; }
+    .pd-cmd-chevron {
+        color: #475569;
+        font-size: 0.75rem;
+        transition: transform 0.2s;
+    }
+    .pd-cmd-chevron.open { transform: rotate(180deg); }
+
+    /* ── Cuerpo expandible del comando ── */
+    .pd-cmd-body {
+        display: none;
+        padding: 0 14px 14px;
+        border-top: 1px solid #1e2c3d;
+    }
+    .pd-cmd-body.open { display: block; }
+
+    .pd-cmd-explanation {
+        font-size: 0.83rem;
+        color: #94a3b8;
+        line-height: 1.65;
+        margin: 10px 0 12px;
+    }
+    .pd-cmd-finds-title {
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        color: #64748b;
+        margin-bottom: 6px;
+    }
+    .pd-cmd-finds {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+        margin-bottom: 12px;
+    }
+    .pd-find-tag {
+        background: #162130;
+        border: 1px solid #2d3748;
+        color: #7eb8e8;
+        font-size: 0.72rem;
+        padding: 2px 9px;
+        border-radius: 20px;
+    }
+    .pd-owasp-ref {
+        font-size: 0.73rem;
+        color: #f59e0b;
+        background: #1c1400;
+        border: 1px solid #3d2e00;
+        border-radius: 6px;
+        padding: 5px 10px;
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
     .pd-cmd-full {
         font-family: 'Consolas', 'Courier New', monospace;
-        font-size: 0.78rem;
+        font-size: 0.77rem;
         color: #c0e4ff;
-        background: #162130;
-        padding: 7px 10px;
-        border-radius: 5px;
+        background: #0a1520;
+        border: 1px solid #1e3248;
+        padding: 8px 11px;
+        border-radius: 6px;
         word-break: break-all;
         white-space: pre-wrap;
-        margin-bottom: 5px;
+        margin-top: 10px;
     }
     .pd-cmd-output {
-        font-size: 0.72rem;
+        font-size: 0.71rem;
         color: #475569;
-        margin-top: 4px;
+        margin-top: 5px;
     }
-    .pd-info-btn {
-        background: transparent;
-        border: 1px solid #3498db44;
-        color: #7eb8e8;
-        border-radius: 6px;
-        padding: 2px 8px;
-        font-size: 0.72rem;
-        cursor: pointer;
-        transition: background 0.15s;
-        line-height: 1.5;
-    }
-    .pd-info-btn:hover { background: #243447; }
     </style>
 
     <!-- Scripts -->

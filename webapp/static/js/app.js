@@ -571,6 +571,61 @@ async function viewScanReport(scanId) {
 // Modal Detalle de Perfil
 // ============================================
 
+function _diffBadgeClass(difficulty) {
+    const map = { 'básico': 'pd-badge-diff-basico', 'intermedio': 'pd-badge-diff-intermedio', 'avanzado': 'pd-badge-diff-avanzado' };
+    return map[difficulty] || 'pd-badge-opt';
+}
+
+function _toggleCmdBody(idx) {
+    const body = document.getElementById(`pd-cmd-body-${idx}`);
+    const chev = document.getElementById(`pd-cmd-chev-${idx}`);
+    if (!body) return;
+    const isOpen = body.classList.toggle('open');
+    if (chev) chev.classList.toggle('open', isOpen);
+}
+
+function _renderCommandCard(cmd, idx) {
+    const reqBadge = `<span class="pd-badge ${cmd.required ? 'pd-badge-req' : 'pd-badge-opt'}">${cmd.required ? 'Requerido' : 'Opcional'}</span>`;
+    const sudoBadge = cmd.sudo ? `<span class="pd-badge pd-badge-sudo">sudo</span>` : '';
+    const timeBadge = `<span class="pd-badge pd-badge-time">${cmd.timeout_seconds}s</span>`;
+    const diffBadge = cmd.difficulty && cmd.difficulty !== '—'
+        ? `<span class="pd-badge ${_diffBadgeClass(cmd.difficulty)}">${cmd.difficulty}</span>` : '';
+
+    const findsHtml = (cmd.what_it_finds || []).map(f =>
+        `<span class="pd-find-tag">${f}</span>`
+    ).join('');
+
+    const owaspHtml = cmd.owasp_ref && cmd.owasp_ref !== '—'
+        ? `<div class="pd-owasp-ref">🔗 <strong>OWASP:</strong> ${cmd.owasp_ref}</div>` : '';
+
+    const outputHtml = cmd.output_file
+        ? `<div class="pd-cmd-output">📄 Salida: ${cmd.output_file}</div>` : '';
+
+    return `
+    <div class="pd-command-row">
+        <div class="pd-cmd-summary" onclick="_toggleCmdBody(${idx})">
+            <div class="pd-cmd-left">
+                <div class="pd-cmd-tool-row">
+                    <span class="pd-cmd-tool">${cmd.icon} ${cmd.tool.toUpperCase()}</span>
+                    ${reqBadge} ${sudoBadge} ${timeBadge} ${diffBadge}
+                </div>
+                ${cmd.purpose ? `<div class="pd-cmd-purpose">${cmd.purpose}</div>` : ''}
+            </div>
+            <span class="pd-cmd-chevron" id="pd-cmd-chev-${idx}">▼</span>
+        </div>
+        <div class="pd-cmd-body" id="pd-cmd-body-${idx}">
+            ${cmd.explanation ? `<p class="pd-cmd-explanation">${cmd.explanation}</p>` : ''}
+            ${findsHtml ? `
+                <div class="pd-cmd-finds-title">Detecta / Identifica:</div>
+                <div class="pd-cmd-finds">${findsHtml}</div>` : ''}
+            ${owaspHtml}
+            <div class="pd-cmd-finds-title">Comando ejecutado:</div>
+            <div class="pd-cmd-full">$ ${cmd.tool} ${cmd.args}</div>
+            ${outputHtml}
+        </div>
+    </div>`;
+}
+
 async function showProfileDetail(profileId) {
     const modal = document.getElementById('profile-detail-modal');
     if (!modal) return;
@@ -581,7 +636,10 @@ async function showProfileDetail(profileId) {
     document.getElementById('pd-id').textContent = '';
     document.getElementById('pd-time').textContent = '';
     document.getElementById('pd-sudo').textContent = '';
-    document.getElementById('pd-commands-list').innerHTML = '<div style="color:#64748b;font-size:0.85rem;padding:8px 0;">Cargando comandos...</div>';
+    document.getElementById('pd-commands-list').innerHTML =
+        '<div style="color:#64748b;font-size:0.85rem;padding:8px 0;">Cargando...</div>';
+    const eduBlock = document.getElementById('pd-edu-block');
+    if (eduBlock) eduBlock.style.display = 'none';
     modal.style.display = 'flex';
 
     try {
@@ -595,29 +653,35 @@ async function showProfileDetail(profileId) {
         document.getElementById('pd-time').textContent = '⏱️ ' + p.estimated_time;
         document.getElementById('pd-sudo').textContent = p.requires_sudo ? '🔐 Requiere sudo' : '';
 
+        // Bloque educativo del perfil
+        const hasEdu = (p.learning_objectives && p.learning_objectives.length) || p.when_to_use || p.limitations;
+        if (eduBlock && hasEdu) {
+            const objList = document.getElementById('pd-objectives-list');
+            if (objList && p.learning_objectives) {
+                objList.innerHTML = p.learning_objectives.map(o => `<li>${o}</li>`).join('');
+            }
+            const whenEl = document.getElementById('pd-when-to-use');
+            if (whenEl) whenEl.textContent = p.when_to_use || '';
+            const limEl = document.getElementById('pd-limitations');
+            if (limEl) limEl.textContent = p.limitations || '';
+            eduBlock.style.display = 'block';
+        }
+
+        // Comandos
         const list = document.getElementById('pd-commands-list');
         if (!p.commands || !p.commands.length) {
             list.innerHTML = '<div style="color:#64748b;font-size:0.85rem;">Sin comandos definidos</div>';
             return;
         }
+        list.innerHTML = p.commands.map((cmd, i) => _renderCommandCard(cmd, i)).join('');
 
-        list.innerHTML = p.commands.map((cmd, i) => `
-            <div class="pd-command-row">
-                <div class="pd-cmd-header">
-                    <span class="pd-cmd-tool">${cmd.icon} ${cmd.tool}</span>
-                    <span class="pd-cmd-badges">
-                        <span class="pd-badge ${cmd.required ? 'pd-badge-req' : 'pd-badge-opt'}">${cmd.required ? 'Requerido' : 'Opcional'}</span>
-                        ${cmd.sudo ? '<span class="pd-badge pd-badge-sudo">sudo</span>' : ''}
-                        <span class="pd-badge pd-badge-time">${cmd.timeout_seconds}s</span>
-                    </span>
-                </div>
-                <div class="pd-cmd-full">${cmd.tool} ${cmd.args}</div>
-                ${cmd.output_file ? `<div class="pd-cmd-output">📄 ${cmd.output_file}</div>` : ''}
-            </div>`).join('');
+        // Abrir el primer comando por defecto
+        if (p.commands.length) _toggleCmdBody(0);
 
     } catch (e) {
         document.getElementById('pd-name').textContent = 'Error';
-        document.getElementById('pd-commands-list').innerHTML = `<div style="color:#f87171;font-size:0.85rem;">Error cargando detalle: ${e.message}</div>`;
+        document.getElementById('pd-commands-list').innerHTML =
+            `<div style="color:#f87171;font-size:0.85rem;">Error cargando detalle: ${e.message}</div>`;
     }
 }
 
