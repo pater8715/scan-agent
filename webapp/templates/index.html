@@ -141,6 +141,36 @@
                             <small class="help-text">Permite acceder al historial de escaneos</small>
                         </div>
 
+                        <!-- Panel de Configuración de Fases (Fase 10) -->
+                        <div id="phases-toggle-container" style="display:none; margin-bottom:16px;">
+                            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                                <button type="button" id="phases-toggle-btn"
+                                    onclick="togglePhasesPanel()"
+                                    style="background:#1a2332; border:1px solid #2d4a6e; color:#93c5fd; padding:7px 14px; border-radius:6px; cursor:pointer; font-size:0.85rem; display:flex; align-items:center; gap:6px;">
+                                    <span id="phases-toggle-icon">▶</span> ⚙️ Configurar fases manualmente (opcional)
+                                </button>
+                                <span id="phases-summary-inline" style="font-size:0.82rem; color:#64748b;"></span>
+                            </div>
+                            <div id="phases-panel" style="display:none; margin-top:12px;">
+                                <div id="phases-list" style="display:flex; flex-direction:column; gap:8px;">
+                                    <div style="color:#64748b; font-size:0.82rem;">Cargando fases...</div>
+                                </div>
+                                <div id="phases-footer" style="margin-top:12px; padding:10px 14px; background:#0d1824; border-radius:6px; border:1px solid #1e3a5f; display:flex; align-items:center; gap:16px; flex-wrap:wrap; font-size:0.83rem;">
+                                    <span id="phases-count-label" style="color:#e2e8f0; font-weight:600;"></span>
+                                    <span id="phases-time-label" style="color:#64748b;"></span>
+                                    <span style="margin-left:auto; display:flex; gap:8px;">
+                                        <button type="button" onclick="selectAllPhases(true)"
+                                            style="background:none; border:1px solid #2d4a6e; color:#93c5fd; padding:3px 10px; border-radius:4px; cursor:pointer; font-size:0.78rem;">Todas</button>
+                                        <button type="button" onclick="selectAllPhases(false)"
+                                            style="background:none; border:1px solid #2d4a6e; color:#64748b; padding:3px 10px; border-radius:4px; cursor:pointer; font-size:0.78rem;">Ninguna</button>
+                                        <button type="button" onclick="savePhasePreset()"
+                                            style="background:none; border:1px solid #2d4a6e; color:#94a3b8; padding:3px 10px; border-radius:4px; cursor:pointer; font-size:0.78rem;">💾 Guardar preset</button>
+                                    </span>
+                                </div>
+                                <div id="phases-presets-bar" style="margin-top:8px; display:none;"></div>
+                            </div>
+                        </div>
+
                         <div class="form-actions">
                             <button type="submit" class="btn btn-primary" id="start-scan-btn">
                                 <span class="icon">▶️</span> Iniciar Escaneo

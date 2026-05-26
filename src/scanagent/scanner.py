@@ -889,7 +889,7 @@ class VulnerabilityScanner:
             return False
     
     def run_scan(self, target: str, profile_name: str, output_dir: str = "./outputs",
-                 step_callback=None) -> tuple:
+                 step_callback=None, steps_filter=None) -> tuple:
         """Ejecuta un perfil de escaneo completo
 
         Args:
@@ -932,6 +932,21 @@ class VulnerabilityScanner:
             ]
         else:
             commands_to_run = profile.commands
+            # Aplicar filtro de pasos cuando el usuario eligió una selección parcial
+            if steps_filter is not None:
+                valid_indices = set(steps_filter)
+                skipped = [
+                    {"index": i, "tool": c["tool"], "args": c.get("args", "")}
+                    for i, c in enumerate(commands_to_run)
+                    if i not in valid_indices
+                ]
+                commands_to_run = [
+                    c for i, c in enumerate(commands_to_run)
+                    if i in valid_indices
+                ]
+                self.results["skipped_steps"] = skipped
+            else:
+                self.results["skipped_steps"] = []
 
         # Inicializar resultados
         self.results['started_at'] = datetime.now()

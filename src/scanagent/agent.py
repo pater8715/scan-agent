@@ -144,27 +144,29 @@ class ScanAgent:
     
     
     def execute_scan(self, target: str, profile: str, outputs_dir: str = "./outputs",
-                     step_callback=None) -> bool:
+                     step_callback=None, steps_filter=None) -> bool:
         """
         NUEVA FUNCIONALIDAD v2.0: Ejecuta un escaneo de vulnerabilidades.
-        
+
         Args:
             target: IP o dominio del objetivo
             profile: Perfil de escaneo a utilizar
             outputs_dir: Directorio donde guardar resultados
-        
+            steps_filter: Lista de índices (0-based) de pasos a ejecutar. None = todos.
+
         Returns:
             True si el escaneo fue exitoso, False en caso contrario
         """
         self._print_phase("FASE 0: EJECUCIÓN DE ESCANEO")
-        
+
         print(f"[*] Objetivo: {target}")
         print(f"[*] Perfil: {profile}")
         print(f"[*] Directorio de salida: {outputs_dir}\n")
-        
+
         # Ejecutar escaneo con herramientas base (nmap, nikto, gobuster, curl)
         success, scan_files = self.scanner.run_scan(target, profile, outputs_dir,
-                                                     step_callback=step_callback)
+                                                     step_callback=step_callback,
+                                                     steps_filter=steps_filter)
 
         if not success:
             print(f"\n[✗] El escaneo falló o fue interrumpido")

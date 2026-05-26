@@ -164,16 +164,25 @@ function selectProfile(profileId, cardElement) {
     document.querySelectorAll('.profile-card').forEach(card => {
         card.classList.remove('selected');
     });
-    
+
     // Seleccionar nuevo perfil
     cardElement.classList.add('selected');
     selectedProfile = profileId;
-    
+
+    // Mostrar toggle de fases y resetear panel si el perfil cambió
+    const toggleContainer = document.getElementById('phases-toggle-container');
+    if (toggleContainer) {
+        toggleContainer.style.display = 'block';
+        if (_phasesLoadedFor !== profileId) {
+            _resetPhasesPanel();
+        }
+    }
+
     // Mostrar formulario de configuración
     document.getElementById('scan-config-section').style.display = 'block';
-    
+
     // Scroll suave al formulario
-    document.getElementById('scan-config-section').scrollIntoView({ 
+    document.getElementById('scan-config-section').scrollIntoView({
         behavior: 'smooth',
         block: 'start'
     });
@@ -272,11 +281,13 @@ async function handleScanSubmit(e) {
     
     const saveToDb = document.getElementById('save-to-db').checked;
     
+    const selectedSteps = _getSelectedStepsPayload();
     const scanRequest = {
         target: target,
         profile: selectedProfile,
         output_formats: formats,
-        save_to_db: saveToDb
+        save_to_db: saveToDb,
+        selected_steps: selectedSteps,
     };
     
     try {
@@ -329,11 +340,16 @@ function resetAll() {
     resetForm();
     selectedProfile = null;
     currentScanId = null;
-    
+
     // Remover selección de perfiles
     document.querySelectorAll('.profile-card').forEach(card => {
         card.classList.remove('selected');
     });
+
+    // Resetear panel de fases
+    _resetPhasesPanel();
+    const toggleContainer = document.getElementById('phases-toggle-container');
+    if (toggleContainer) toggleContainer.style.display = 'none';
     
     // Ocultar secciones
     document.getElementById('scan-config-section').style.display = 'none';
@@ -529,7 +545,13 @@ async function loadScansHistory() {
             <tr>
                 <td><code>${scan.scan_id}</code></td>
                 <td>${scan.target}</td>
-                <td><span class="profile-badge ${scan.profile}">${scan.profile}</span></td>
+                <td>
+                    <span class="profile-badge ${scan.profile}">${scan.profile}</span>
+                    ${scan.selected_steps != null
+                        ? `<span title="Perfil personalizado — solo ${(scan.selected_steps || []).length} fase(s) ejecutadas"
+                            style="margin-left:5px; background:#1e3a5f; color:#93c5fd; border-radius:4px; padding:1px 7px; font-size:0.72rem; cursor:help;">⚙ personalizado</span>`
+                        : ''}
+                </td>
                 <td><span class="status-badge ${scan.status}">${getStatusLabel(scan.status)}</span></td>
                 <td>${formatDate(scan.started_at)}</td>
                 <td style="display:flex;gap:6px;flex-wrap:wrap;">
@@ -775,3 +797,238 @@ const additionalStyles = `
 `;
 
 document.head.insertAdjacentHTML('beforeend', additionalStyles);
+
+// ============================================================
+// Fase 10 — Selección manual de fases por escaneo
+// ============================================================
+
+let _phasesLoadedFor = null;      // profileId del que se cargaron las fases
+let _phasesData = [];             // array de commands del perfil
+let _phasesPanelOpen = false;     // estado del panel
+
+function _resetPhasesPanel() {
+    _phasesLoadedFor = null;
+    _phasesData = [];
+    _phasesPanelOpen = false;
+    const panel = document.getElementById('phases-panel');
+    const icon  = document.getElementById('phases-toggle-icon');
+    const list  = document.getElementById('phases-list');
+    const summary = document.getElementById('phases-summary-inline');
+    if (panel)   panel.style.display = 'none';
+    if (icon)    icon.textContent = '▶';
+    if (list)    list.innerHTML = '<div style="color:#64748b; font-size:0.82rem;">Cargando fases...</div>';
+    if (summary) summary.textContent = '';
+    // Restaurar botón de inicio
+    _updateStartBtnForPhases(true);
+}
+
+async function togglePhasesPanel() {
+    const panel = document.getElementById('phases-panel');
+    const icon  = document.getElementById('phases-toggle-icon');
+    if (!panel) return;
+
+    if (_phasesPanelOpen) {
+        panel.style.display = 'none';
+        icon.textContent = '▶';
+        _phasesPanelOpen = false;
+        // Al cerrar sin cambios, restablecer selección total
+        _resetPhasesPanel();
+        _updateStartBtnForPhases(true);
+        return;
+    }
+
+    panel.style.display = 'block';
+    icon.textContent = '▼';
+    _phasesPanelOpen = true;
+
+    if (_phasesLoadedFor !== selectedProfile) {
+        await _loadPhasesForProfile(selectedProfile);
+    }
+    _renderPresets(selectedProfile);
+}
+
+async function _loadPhasesForProfile(profileId) {
+    const list = document.getElementById('phases-list');
+    if (!list || !profileId) return;
+    list.innerHTML = '<div style="color:#64748b; font-size:0.82rem;">Cargando fases...</div>';
+
+    try {
+        const r = await fetch(`/api/profiles/${profileId}/detail`);
+        if (!r.ok) throw new Error('Error ' + r.status);
+        const data = await r.json();
+        _phasesData = data.commands || [];
+        _phasesLoadedFor = profileId;
+        _renderPhaseCards(_phasesData);
+    } catch (e) {
+        list.innerHTML = `<p style="color:#ef4444;font-size:0.82rem;">Error cargando fases: ${e.message}</p>`;
+    }
+}
+
+const _DIFF_COLORS = { básico: '#22c55e', intermedio: '#eab308', avanzado: '#f97316' };
+
+function _renderPhaseCards(commands) {
+    const list = document.getElementById('phases-list');
+    if (!list) return;
+
+    list.innerHTML = commands.map((cmd, i) => {
+        const estMin = Math.ceil((cmd.timeout_seconds || 120) / 60);
+        const isReq  = cmd.required !== false;
+        const diffColor = _DIFF_COLORS[cmd.difficulty] || '#94a3b8';
+        return `
+        <div class="phase-card" id="phase-card-${i}"
+            style="background:#0d1824; border:1px solid #1e3a5f; border-radius:8px; padding:10px 14px; display:flex; align-items:flex-start; gap:12px;">
+            <input type="checkbox" id="phase-cb-${i}" data-index="${i}" checked
+                onchange="_onPhaseToggle(${i})"
+                style="width:16px; height:16px; margin-top:3px; accent-color:#3b82f6; cursor:pointer; flex-shrink:0;">
+            <div style="flex:1; min-width:0;">
+                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:4px;">
+                    <span style="font-size:1rem;">${cmd.icon || '⚙️'}</span>
+                    <span style="font-weight:700; color:#e2e8f0; font-size:0.9rem;">${cmd.tool}</span>
+                    ${isReq
+                        ? `<span style="background:#1e3a5f; color:#93c5fd; border-radius:4px; padding:1px 8px; font-size:0.72rem;">Requerida</span>`
+                        : `<span style="background:#1a2332; color:#64748b; border-radius:4px; padding:1px 8px; font-size:0.72rem;">Opcional</span>`}
+                    ${cmd.difficulty ? `<span style="color:${diffColor}; font-size:0.72rem;">${cmd.difficulty}</span>` : ''}
+                    <span style="color:#475569; font-size:0.72rem; margin-left:auto;">⏱ ~${estMin} min</span>
+                </div>
+                <p style="color:#94a3b8; font-size:0.8rem; margin:0 0 2px;">${cmd.purpose || ''}</p>
+                ${cmd.owasp_ref ? `<span style="color:#475569; font-size:0.72rem;">${cmd.owasp_ref}</span>` : ''}
+                <div id="phase-warn-${i}" style="display:none; margin-top:5px; padding:4px 8px; background:#2d1a00; border:1px solid #78350f; border-radius:4px; font-size:0.78rem; color:#fbbf24;">
+                    ⚠️ Esta fase es requerida por el perfil — omitirla puede generar un reporte incompleto.
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+
+    _updatePhasesFooter();
+}
+
+function _onPhaseToggle(index) {
+    const cmd  = _phasesData[index];
+    const warn = document.getElementById(`phase-warn-${index}`);
+    const cb   = document.getElementById(`phase-cb-${index}`);
+    if (warn && cmd && cmd.required !== false) {
+        warn.style.display = cb && !cb.checked ? 'block' : 'none';
+    }
+    _updatePhasesFooter();
+}
+
+function _getSelectedIndices() {
+    return _phasesData
+        .map((_, i) => ({ i, cb: document.getElementById(`phase-cb-${i}`) }))
+        .filter(({ cb }) => cb && cb.checked)
+        .map(({ i }) => i);
+}
+
+function _updatePhasesFooter() {
+    const selected = _getSelectedIndices();
+    const total    = _phasesData.length;
+    const totalSec = selected.reduce((s, i) => s + (_phasesData[i]?.timeout_seconds || 120), 0);
+    const totalMin = Math.ceil(totalSec / 60);
+
+    const countEl = document.getElementById('phases-count-label');
+    const timeEl  = document.getElementById('phases-time-label');
+    const inlineEl = document.getElementById('phases-summary-inline');
+
+    if (countEl) countEl.textContent = `${selected.length} de ${total} fases seleccionadas`;
+    if (timeEl)  timeEl.textContent  = `~${totalMin} min estimados`;
+    if (inlineEl && _phasesPanelOpen)
+        inlineEl.textContent = `${selected.length}/${total} fases · ~${totalMin} min`;
+
+    // Deshabilitar "Iniciar" si 0 seleccionadas
+    _updateStartBtnForPhases(selected.length > 0);
+}
+
+function _updateStartBtnForPhases(enabled) {
+    const btn = document.getElementById('start-scan-btn');
+    if (!btn) return;
+    if (_phasesPanelOpen && !enabled) {
+        btn.disabled = true;
+        btn.title = 'Debes seleccionar al menos una fase';
+    } else {
+        btn.disabled = false;
+        btn.title = '';
+    }
+}
+
+function selectAllPhases(checked) {
+    _phasesData.forEach((_, i) => {
+        const cb = document.getElementById(`phase-cb-${i}`);
+        if (cb) cb.checked = checked;
+        const warn = document.getElementById(`phase-warn-${i}`);
+        if (warn) warn.style.display = 'none';
+    });
+    _updatePhasesFooter();
+}
+
+// ── Presets en localStorage ───────────────────────────────────────────────
+
+function _presetsKey(profileId) { return `scan_phase_presets_${profileId}`; }
+
+function _getPresets(profileId) {
+    try { return JSON.parse(localStorage.getItem(_presetsKey(profileId)) || '[]'); }
+    catch (_) { return []; }
+}
+
+function _savePresets(profileId, presets) {
+    localStorage.setItem(_presetsKey(profileId), JSON.stringify(presets));
+}
+
+function savePhasePreset() {
+    if (!selectedProfile || !_phasesData.length) return;
+    const selected = _getSelectedIndices();
+    if (!selected.length) { showToast('Selecciona al menos una fase para guardar el preset', 'warning'); return; }
+    const name = window.prompt('Nombre del preset:');
+    if (!name || !name.trim()) return;
+    const presets = _getPresets(selectedProfile);
+    presets.push({ name: name.trim(), steps: selected, created: Date.now() });
+    _savePresets(selectedProfile, presets);
+    _renderPresets(selectedProfile);
+    showToast(`Preset "${name.trim()}" guardado`, 'success');
+}
+
+function _applyPreset(steps) {
+    _phasesData.forEach((_, i) => {
+        const cb = document.getElementById(`phase-cb-${i}`);
+        if (cb) cb.checked = steps.includes(i);
+        const warn = document.getElementById(`phase-warn-${i}`);
+        if (warn) warn.style.display = 'none';
+    });
+    _updatePhasesFooter();
+}
+
+function _deletePreset(profileId, idx) {
+    const presets = _getPresets(profileId);
+    presets.splice(idx, 1);
+    _savePresets(profileId, presets);
+    _renderPresets(profileId);
+}
+
+function _renderPresets(profileId) {
+    const bar = document.getElementById('phases-presets-bar');
+    if (!bar) return;
+    const presets = _getPresets(profileId);
+    if (!presets.length) { bar.style.display = 'none'; return; }
+    bar.style.display = 'flex';
+    bar.style.cssText += 'gap:8px; flex-wrap:wrap; align-items:center;';
+    bar.innerHTML = '<span style="color:#64748b; font-size:0.78rem; white-space:nowrap;">💾 Presets:</span>' +
+        presets.map((p, i) => `
+            <span style="display:inline-flex; align-items:center; gap:4px; background:#0d1824; border:1px solid #2d4a6e; border-radius:5px; padding:2px 8px 2px 10px; font-size:0.78rem;">
+                <button type="button" onclick="_applyPreset([${p.steps.join(',')}])"
+                    style="background:none; border:none; color:#93c5fd; cursor:pointer; font-size:0.78rem; padding:0;">
+                    ${p.name}
+                </button>
+                <button type="button" onclick="_deletePreset('${profileId}', ${i})"
+                    title="Eliminar preset"
+                    style="background:none; border:none; color:#64748b; cursor:pointer; font-size:0.75rem; padding:0 2px;">✕</button>
+            </span>`).join('');
+}
+
+// ── Integración con el envío del formulario ───────────────────────────────
+
+function _getSelectedStepsPayload() {
+    if (!_phasesPanelOpen || !_phasesData.length) return null;
+    const selected = _getSelectedIndices();
+    // Si todos están seleccionados, enviar null (equivale a perfil completo)
+    if (selected.length === _phasesData.length) return null;
+    return selected;
+}

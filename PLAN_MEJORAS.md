@@ -332,7 +332,7 @@ Actualmente los reportes embeben las recomendaciones en el momento del escaneo. 
 ---
 
 ### FASE 10 — Selección Manual de Fases por Escaneo
-**Prioridad:** MEDIA | **Estimado:** ~20h | **Estado:** ⬜ Pendiente
+**Prioridad:** MEDIA | **Estimado:** ~20h | **Estado:** ✅ Completada
 
 **Descripción de la mejora:**  
 Al iniciar un escaneo, después de elegir el perfil, el usuario puede activar opcionalmente un panel "Configurar fases" que muestra cada herramienta/comando del perfil como una tarjeta con checkbox. Puede desmarcar las que no quiere ejecutar, ajustando el escaneo a su necesidad sin tener que crear un perfil nuevo. Si el panel no se activa, el comportamiento es idéntico al actual: se ejecutan todas las fases del perfil seleccionado.
@@ -354,65 +354,65 @@ Al iniciar un escaneo, después de elegir el perfil, el usuario puede activar op
 #### 10.1 — Capa Backend: `scanner.py` — filtrado de comandos
 | # | Tarea | Archivo | Estado |
 |---|-------|---------|--------|
-| 10.1.1 | Añadir parámetro `steps_filter: Optional[List[int]] = None` a `run_scan()`. Cuando no es `None`, filtrar `commands_to_run` a los índices indicados antes de ejecutar. Los índices corresponden a la posición del comando en `profile.commands` (0-based). | `src/scanagent/scanner.py` | ⬜ |
-| 10.1.2 | Añadir lista `skipped_steps` al dict de resultados: registrar los comandos que se omitieron (índice, herramienta, args) para trazabilidad. | `src/scanagent/scanner.py` | ⬜ |
-| 10.1.3 | Ajustar el cálculo de progreso: el total de pasos para el porcentaje debe ser `len(filtered_commands)`, no `len(profile.commands)`, para que la barra refleje correctamente el progreso real. | `src/scanagent/scanner.py` | ⬜ |
+| 10.1.1 | Añadir parámetro `steps_filter: Optional[List[int]] = None` a `run_scan()`. Cuando no es `None`, filtrar `commands_to_run` a los índices indicados antes de ejecutar. Los índices corresponden a la posición del comando en `profile.commands` (0-based). | `src/scanagent/scanner.py` | ✅ |
+| 10.1.2 | Añadir lista `skipped_steps` al dict de resultados: registrar los comandos que se omitieron (índice, herramienta, args) para trazabilidad. | `src/scanagent/scanner.py` | ✅ |
+| 10.1.3 | Ajustar el cálculo de progreso: el total de pasos para el porcentaje debe ser `len(filtered_commands)`, no `len(profile.commands)`, para que la barra refleje correctamente el progreso real. | `src/scanagent/scanner.py` | ✅ |
 
 #### 10.2 — Capa Backend: `agent.py` — propagación del parámetro
 | # | Tarea | Archivo | Estado |
 |---|-------|---------|--------|
-| 10.2.1 | Añadir `steps_filter: Optional[List[int]] = None` a la firma de `execute_scan()` y pasarlo a la llamada de `scanner.run_scan()`. | `src/scanagent/agent.py` | ⬜ |
+| 10.2.1 | Añadir `steps_filter: Optional[List[int]] = None` a la firma de `execute_scan()` y pasarlo a la llamada de `scanner.run_scan()`. | `src/scanagent/agent.py` | ✅ |
 
 #### 10.3 — Capa Backend: `scans.py` — modelo de petición y endpoint
 | # | Tarea | Archivo | Estado |
 |---|-------|---------|--------|
-| 10.3.1 | Añadir campo `selected_steps: Optional[List[int]] = Field(default=None, description="Índices de fases a ejecutar. None = todas.")` al modelo `ScanRequest`. | `webapp/api/scans.py` | ⬜ |
-| 10.3.2 | Validar en `start_scan()`: si `selected_steps` no es `None`, verificar que todos los índices estén en rango `[0, len(profile.commands) - 1]` y que la lista no esté vacía. Retornar HTTP 400 con mensaje claro si falla. | `webapp/api/scans.py` | ⬜ |
-| 10.3.3 | Propagar `selected_steps` a `execute_scan()` → `agent.execute_scan()`. Almacenar en `scan_status` para que el WebSocket pueda indicar qué fases se están ejecutando. | `webapp/api/scans.py` | ⬜ |
+| 10.3.1 | Añadir campo `selected_steps: Optional[List[int]] = Field(default=None, description="Índices de fases a ejecutar. None = todas.")` al modelo `ScanRequest`. | `webapp/api/scans.py` | ✅ |
+| 10.3.2 | Validar en `start_scan()`: si `selected_steps` no es `None`, verificar que todos los índices estén en rango `[0, len(profile.commands) - 1]` y que la lista no esté vacía. Retornar HTTP 400 con mensaje claro si falla. | `webapp/api/scans.py` | ✅ |
+| 10.3.3 | Propagar `selected_steps` a `execute_scan()` → `agent.execute_scan()`. Almacenar en `scan_status` para que el WebSocket pueda indicar qué fases se están ejecutando. | `webapp/api/scans.py` | ✅ |
 
 #### 10.4 — Capa Backend: base de datos y metadatos
 | # | Tarea | Archivo | Estado |
 |---|-------|---------|--------|
-| 10.4.1 | Añadir columna `custom_steps TEXT` (JSON) al schema de la tabla `scans`: almacena el array de índices seleccionados, o `NULL` si se usó el perfil completo. | `config/schema.sql` | ⬜ |
-| 10.4.2 | Al guardar el escaneo en DB, persistir `selected_steps` en `custom_steps` y también `skipped_steps` (lista de herramientas omitidas) como JSON en una columna `skipped_steps TEXT`. | `webapp/api/scans.py` | ⬜ |
-| 10.4.3 | Al guardar los metadatos en disco (`file_manager.save_scan_metadata()`), incluir `custom_steps`, `skipped_steps` y `is_custom_profile: bool` en el JSON de metadata. | `webapp/api/scans.py` | ⬜ |
+| 10.4.1 | Añadir columna `custom_steps TEXT` (JSON) al schema de la tabla `scans`: almacena el array de índices seleccionados, o `NULL` si se usó el perfil completo. | `config/schema.sql` | ✅ |
+| 10.4.2 | Al guardar el escaneo en DB, persistir `selected_steps` en `custom_steps` y también `skipped_steps` (lista de herramientas omitidas) como JSON en una columna `skipped_steps TEXT`. | `webapp/api/scans.py` | ✅ |
+| 10.4.3 | Al guardar los metadatos en disco (`file_manager.save_scan_metadata()`), incluir `custom_steps`, `skipped_steps` y `is_custom_profile: bool` en el JSON de metadata. | `webapp/api/scans.py` | ✅ |
 
 #### 10.5 — Capa Backend: reportes — reflejar fases ejecutadas
 | # | Tarea | Archivo | Estado |
 |---|-------|---------|--------|
-| 10.5.1 | En `generate_professional_html_report()`, añadir una sección "Configuración del Escaneo" que muestre: perfil base usado, fases ejecutadas (lista verde con ✅) y fases omitidas (lista gris con ⊘). Solo visible si `is_custom_profile = True`. | `webapp/api/scans.py` | ⬜ |
-| 10.5.2 | En `generate_txt_report()` y `generate_markdown_report()`, añadir al encabezado del reporte la sección "Fases omitidas:" cuando aplique. | `webapp/api/scans.py` | ⬜ |
-| 10.5.3 | En el JSON report, añadir al objeto raíz `"scan_config": {"profile": "lab", "custom_steps": [0,1,3], "skipped": ["nikto"]}` para que consumidores externos tengan trazabilidad completa. | `webapp/api/scans.py` | ⬜ |
+| 10.5.1 | En `generate_professional_html_report()`, añadir una sección "Configuración del Escaneo" que muestre: perfil base usado, fases ejecutadas (lista verde con ✅) y fases omitidas (lista gris con ⊘). Solo visible si `is_custom_profile = True`. | `webapp/api/scans.py` | ✅ |
+| 10.5.2 | En `generate_txt_report()` y `generate_markdown_report()`, añadir al encabezado del reporte la sección "Fases omitidas:" cuando aplique. | `webapp/api/scans.py` | ✅ |
+| 10.5.3 | En el JSON report, añadir al objeto raíz `"scan_config": {"profile": "lab", "custom_steps": [0,1,3], "skipped": ["nikto"]}` para que consumidores externos tengan trazabilidad completa. | `webapp/api/scans.py` | ✅ |
 
 #### 10.6 — Capa Frontend: panel "Configurar fases"
 | # | Tarea | Archivo | Estado |
 |---|-------|---------|--------|
-| 10.6.1 | Después del selector de perfil y antes del formulario de objetivo, añadir un toggle `<button>⚙️ Configurar fases manualmente (opcional)</button>` que expande/colapsa el panel de selección. El toggle solo se muestra cuando hay un perfil seleccionado. | `webapp/templates/index.html` | ⬜ |
-| 10.6.2 | Al activar el toggle, llamar a `GET /api/profiles/{id}/detail` (endpoint ya existente con datos educativos) y renderizar la lista de fases. Mientras carga, mostrar skeleton. | `webapp/static/js/app.js` | ⬜ |
-| 10.6.3 | Cada fase se renderiza como una tarjeta con: checkbox (checked por defecto), icono + nombre de herramienta, propósito en una línea (`purpose`), badge Requerido/Opcional y badge de tiempo estimado derivado de `timeout_seconds`. | `webapp/static/js/app.js` | ⬜ |
-| 10.6.4 | Si se desmarca una fase con `required: true`, mostrar un aviso naranja debajo de la tarjeta: "⚠️ Esta fase es requerida por el perfil — omitirla puede generar un reporte incompleto". El checkbox sigue siendo interactivo (no se bloquea). | `webapp/static/js/app.js` | ⬜ |
-| 10.6.5 | En el pie del panel, mostrar dinámicamente: `N de M fases seleccionadas · ~X min estimados`. El tiempo total se recalcula cada vez que el usuario marca/desmarca un checkbox sumando los `timeout_seconds` de los seleccionados y convirtiéndolos a minutos. | `webapp/static/js/app.js` | ⬜ |
-| 10.6.6 | Deshabilitar el botón "Iniciar Escaneo" y mostrar tooltip "Debes seleccionar al menos una fase" cuando 0 checkboxes estén marcados. Volver a habilitar al marcar alguno. | `webapp/static/js/app.js` | ⬜ |
-| 10.6.7 | Al cerrar/colapsar el panel sin cambios (o al cambiar de perfil), restablecer la selección a "todas las fases" para no acumular configuraciones previas accidentalmente. | `webapp/static/js/app.js` | ⬜ |
+| 10.6.1 | Después del selector de perfil y antes del formulario de objetivo, añadir un toggle `<button>⚙️ Configurar fases manualmente (opcional)</button>` que expande/colapsa el panel de selección. El toggle solo se muestra cuando hay un perfil seleccionado. | `webapp/templates/index.html` | ✅ |
+| 10.6.2 | Al activar el toggle, llamar a `GET /api/profiles/{id}/detail` (endpoint ya existente con datos educativos) y renderizar la lista de fases. Mientras carga, mostrar skeleton. | `webapp/static/js/app.js` | ✅ |
+| 10.6.3 | Cada fase se renderiza como una tarjeta con: checkbox (checked por defecto), icono + nombre de herramienta, propósito en una línea (`purpose`), badge Requerido/Opcional y badge de tiempo estimado derivado de `timeout_seconds`. | `webapp/static/js/app.js` | ✅ |
+| 10.6.4 | Si se desmarca una fase con `required: true`, mostrar un aviso naranja debajo de la tarjeta: "⚠️ Esta fase es requerida por el perfil — omitirla puede generar un reporte incompleto". El checkbox sigue siendo interactivo (no se bloquea). | `webapp/static/js/app.js` | ✅ |
+| 10.6.5 | En el pie del panel, mostrar dinámicamente: `N de M fases seleccionadas · ~X min estimados`. El tiempo total se recalcula cada vez que el usuario marca/desmarca un checkbox sumando los `timeout_seconds` de los seleccionados y convirtiéndolos a minutos. | `webapp/static/js/app.js` | ✅ |
+| 10.6.6 | Deshabilitar el botón "Iniciar Escaneo" y mostrar tooltip "Debes seleccionar al menos una fase" cuando 0 checkboxes estén marcados. Volver a habilitar al marcar alguno. | `webapp/static/js/app.js` | ✅ |
+| 10.6.7 | Al cerrar/colapsar el panel sin cambios (o al cambiar de perfil), restablecer la selección a "todas las fases" para no acumular configuraciones previas accidentalmente. | `webapp/static/js/app.js` | ✅ |
 
 #### 10.7 — Capa Frontend: integración con el envío del formulario
 | # | Tarea | Archivo | Estado |
 |---|-------|---------|--------|
-| 10.7.1 | Al construir el `ScanRequest` en el submit del formulario, leer los checkboxes del panel. Si el panel no fue activado o todos están marcados, enviar `selected_steps: null`. Si hay una selección parcial, enviar el array de índices (0-based) de los checkboxes marcados. | `webapp/static/js/app.js` | ⬜ |
-| 10.7.2 | Incluir en el mensaje de progreso WebSocket la fase que se está ejecutando: "Ejecutando fase 2/3: nikto" en lugar del genérico "Ejecutando nikto". | `webapp/static/js/app.js` | ⬜ |
+| 10.7.1 | Al construir el `ScanRequest` en el submit del formulario, leer los checkboxes del panel. Si el panel no fue activado o todos están marcados, enviar `selected_steps: null`. Si hay una selección parcial, enviar el array de índices (0-based) de los checkboxes marcados. | `webapp/static/js/app.js` | ✅ |
+| 10.7.2 | Incluir en el mensaje de progreso WebSocket la fase que se está ejecutando: "Ejecutando fase 2/3: nikto" en lugar del genérico "Ejecutando nikto". | `webapp/static/js/app.js` | ✅ (via step_callback) |
 
 #### 10.8 — Capa Frontend: historial y lista de escaneos
 | # | Tarea | Archivo | Estado |
 |---|-------|---------|--------|
-| 10.8.1 | En la tabla de historial de escaneos, añadir un badge "⚙ personalizado" junto al nombre del perfil cuando el escaneo tiene `custom_steps` no nulo. Al pasar el cursor sobre el badge, mostrar tooltip con la lista de herramientas omitidas. | `webapp/templates/index.html` | ⬜ |
-| 10.8.2 | En la vista de detalle del reporte (panel de reportes), mostrar en el subtítulo del escaneo: "Perfil: lab · 3 de 5 fases ejecutadas" cuando aplique. | `webapp/templates/index.html` | ⬜ |
+| 10.8.1 | En la tabla de historial de escaneos, añadir un badge "⚙ personalizado" junto al nombre del perfil cuando el escaneo tiene `custom_steps` no nulo. Al pasar el cursor sobre el badge, mostrar tooltip con la lista de herramientas omitidas. | `webapp/templates/index.html` | ✅ |
+| 10.8.2 | En la vista de detalle del reporte (panel de reportes), mostrar en el subtítulo del escaneo: "Perfil: lab · 3 de 5 fases ejecutadas" cuando aplique. | `webapp/templates/index.html` | ✅ |
 
 #### 10.9 — Función avanzada: guardar configuraciones como presets (opcional)
 | # | Tarea | Archivo | Estado |
 |---|-------|---------|--------|
-| 10.9.1 | Añadir botón "Guardar como preset..." en el pie del panel de selección. Al hacer clic, pedir un nombre (input inline) y guardar `{nombre, profile_id, selected_steps}` en `localStorage` del navegador. | `webapp/static/js/app.js` | ⬜ |
-| 10.9.2 | Al seleccionar un perfil, mostrar debajo del toggle "Configurar fases" los presets guardados para ese perfil como botones: "Aplicar preset: Solo nmap + curl". Al hacer clic, marcar automáticamente los checkboxes correspondientes. | `webapp/static/js/app.js` | ⬜ |
-| 10.9.3 | Añadir opción "Eliminar preset" con confirmación inline para cada preset guardado. | `webapp/static/js/app.js` | ⬜ |
+| 10.9.1 | Añadir botón "Guardar como preset..." en el pie del panel de selección. Al hacer clic, pedir un nombre (input inline) y guardar `{nombre, profile_id, selected_steps}` en `localStorage` del navegador. | `webapp/static/js/app.js` | ✅ |
+| 10.9.2 | Al seleccionar un perfil, mostrar debajo del toggle "Configurar fases" los presets guardados para ese perfil como botones: "Aplicar preset: Solo nmap + curl". Al hacer clic, marcar automáticamente los checkboxes correspondientes. | `webapp/static/js/app.js` | ✅ |
+| 10.9.3 | Añadir opción "Eliminar preset" con confirmación inline para cada preset guardado. | `webapp/static/js/app.js` | ✅ |
 
 ---
 
@@ -428,8 +428,8 @@ Al iniciar un escaneo, después de elegir el perfil, el usuario puede activar op
 | 6 | Seguridad y arquitectura | MEDIA | ~15h | ✅ |
 | 7 | Funcionalidades avanzadas | BAJA | ~30h | ✅ |
 | 8 | Correcciones de perfiles de escaneo | ALTA | ~18h | ✅ |
-| 9 | Reportes dinámicos con actualización automática | ALTA | ~22h | ⬜ |
-| 10 | Selección manual de fases por escaneo | MEDIA | ~20h | ⬜ |
+| 9 | Reportes dinámicos con actualización automática | ALTA | ~22h | ✅ |
+| 10 | Selección manual de fases por escaneo | MEDIA | ~20h | ✅ |
 | | **TOTAL** | | **~237h** | |
 
 ---
@@ -446,7 +446,7 @@ SEMANA 14:   Fase 6 — Seguridad y arquitectura                                
 SEMANA 15:   Fase 7 — Funcionalidades avanzadas                                          ✅
 SEMANA 16:   Fase 8 — Correcciones de perfiles (calidad de datos del escaneo)            ✅
 SEMANA 17-18: Fase 9 — Reportes dinámicos (actualización automática de catálogo)         ✅
-SEMANA 19-20: Fase 10 — Selección manual de fases (configuración personalizada por sesión) ⬜  ← ACTUAL
+SEMANA 19-20: Fase 10 — Selección manual de fases (configuración personalizada por sesión) ✅
 ```
 
 **Justificación del orden Fase 8 → 9 → 10:**
@@ -475,6 +475,7 @@ SEMANA 19-20: Fase 10 — Selección manual de fases (configuración personaliza
 | 2026-05-25 | Adición de tarea 8.6.5: escaneo de red genera listado de IPs disponibles visible en sección "Objetivos de Laboratorio" de la UI | 8 |
 | 2026-05-26 | Implementación completa Fase 8 — correcciones de 10 perfiles (8.1–8.10), 3 nuevas herramientas Docker (wafw00f, sslscan, enum4linux+snmp-check), 3 parsers nuevos (whatweb, wafw00f, sslscan), endpoint discovered-hosts, UI hosts activos con vendor MAC | 8 |
 | 2026-05-26 | Implementación completa Fase 9 — CatalogLoader (SHA-256 cache), CatalogWatcher (polling 60s), CatalogSyncWorker (CISA KEV cada 24h), API catalog completa (version/reload/entries/sync-log/sync/refresh), tablas SQLite catalog_versions+catalog_sync_log, UI página Catálogo con filtros/edición modal, banner WS catalog_updated, WebSocket listener global | 9 |
+| 2026-05-26 | Implementación completa Fase 10 — steps_filter en scanner.run_scan/agent.execute_scan, selected_steps en ScanRequest con validación de rango, skipped_steps en metadatos y JSON report, scan_config en reporte, panel UI "Configurar fases" con checkboxes/advertencias/footer dinámico, presets localStorage, badge historial, reseteo por cambio de perfil | 10 |
 | 2026-05-25 | Modal de perfil enriquecido con contenido educativo: objetivos de aprendizaje, propósito por herramienta, qué detecta y referencia OWASP por cada comando | — |
 | 2026-05-25 | Adición de Fase 10: selección manual de fases por escaneo — 9 subsecciones, 3 capas (backend scanner+agent+API, frontend panel+historial, presets opcionales) | 10 |
 

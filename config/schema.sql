@@ -411,6 +411,16 @@ GROUP BY student_id
 ORDER BY last_scan DESC;
 
 -- ========================================
+-- Fase 10: columnas de selección de fases en la tabla scans
+-- ========================================
+-- Estos ALTER TABLE son ignorados silenciosamente si la columna ya existe
+-- (SQLite no soporta IF NOT EXISTS en ALTER TABLE, se maneja en el código de app)
+
+-- ALTER TABLE scans ADD COLUMN custom_steps TEXT;      -- JSON array de índices seleccionados o NULL
+-- ALTER TABLE scans ADD COLUMN skipped_steps TEXT;     -- JSON array de pasos omitidos o NULL
+-- ALTER TABLE scans ADD COLUMN is_custom_profile INTEGER DEFAULT 0;
+
+-- ========================================
 -- Table: catalog_versions  (Fase 9)
 -- ========================================
 -- Registra el hash y fecha de cada versión detectada del catálogo

@@ -52,6 +52,10 @@ class ScanRequest(BaseModel):
         description="Formatos de reporte: json, html, txt, md"
     )
     save_to_db: bool = Field(default=True, description="Guardar en base de datos")
+    selected_steps: Optional[List[int]] = Field(
+        default=None,
+        description="Índices (0-based) de las fases a ejecutar. None = todas las del perfil."
+    )
 
 
 class ScanStatus(BaseModel):
@@ -106,6 +110,19 @@ async def start_scan(request: ScanRequest, background_tasks: BackgroundTasks):
             status_code=400,
             detail=f"Perfil inválido. Opciones: {', '.join(valid_profiles)}"
         )
+
+    # Validar selected_steps si se especificaron
+    if request.selected_steps is not None:
+        profile_obj = VulnerabilityScanner.PROFILES.get(request.profile)
+        max_idx = len(profile_obj.commands) - 1 if profile_obj else 0
+        if len(request.selected_steps) == 0:
+            raise HTTPException(status_code=400, detail="selected_steps no puede estar vacío. Selecciona al menos una fase.")
+        invalid = [i for i in request.selected_steps if i < 0 or i > max_idx]
+        if invalid:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Índices de fase fuera de rango [0-{max_idx}]: {invalid}"
+            )
     
     # Generar ID único para el escaneo
     scan_id = str(uuid.uuid4())[:8]
@@ -122,7 +139,8 @@ async def start_scan(request: ScanRequest, background_tasks: BackgroundTasks):
         "started_at": datetime.now(),
         "completed_at": None,
         "output_formats": request.output_formats,
-        "save_to_db": request.save_to_db
+        "save_to_db": request.save_to_db,
+        "selected_steps": request.selected_steps,
     }
     
     active_scans[scan_id] = scan_status
@@ -292,6 +310,7 @@ async def execute_scan(scan_id: str, request: ScanRequest):
         active_scans[scan_id]["message"] = f"Escaneando {request.target}..."
 
         # Ejecutar herramientas de red en hilo separado (no bloquea el event loop)
+        _steps = request.selected_steps  # capturar en variable local para la lambda
         success = await loop.run_in_executor(
             _scan_executor,
             lambda: agent.execute_scan(
@@ -299,6 +318,7 @@ async def execute_scan(scan_id: str, request: ScanRequest):
                 profile=request.profile,
                 outputs_dir=output_dir,
                 step_callback=step_callback,
+                steps_filter=_steps,
             ),
         )
 
@@ -406,6 +426,10 @@ async def execute_scan(scan_id: str, request: ScanRequest):
             except Exception as _e:
                 print(f"⚠️  No se pudo guardar discovered hosts: {_e}")
 
+        # Recopilar pasos omitidos del scanner (si hubo selección parcial)
+        skipped_steps = agent.scanner.results.get("skipped_steps", [])
+        is_custom = request.selected_steps is not None
+
         scan_metadata = {
             "scan_id": scan_id,
             "target": request.target,
@@ -418,8 +442,27 @@ async def execute_scan(scan_id: str, request: ScanRequest):
             "reports": reports,
             "size_bytes": sum(Path(r).stat().st_size for r in reports if Path(r).exists()),
             "retention_priority": "high" if vuln_count > 10 else "normal",
+            "custom_steps": request.selected_steps,
+            "skipped_steps": skipped_steps,
+            "is_custom_profile": is_custom,
         }
         file_manager.save_scan_metadata(scan_id, scan_metadata)
+
+        # Añadir scan_config al JSON de reporte si existe
+        if json_report.exists() and is_custom:
+            try:
+                with open(json_report, "r", encoding="utf-8") as _jf:
+                    _jdata = json.load(_jf)
+                _jdata["scan_config"] = {
+                    "profile": request.profile,
+                    "custom_steps": request.selected_steps,
+                    "skipped": [s["tool"] for s in skipped_steps],
+                    "is_custom_profile": True,
+                }
+                with open(json_report, "w", encoding="utf-8") as _jf:
+                    json.dump(_jdata, _jf, ensure_ascii=False, indent=2)
+            except Exception:
+                pass
 
     except Exception as e:
         import traceback
