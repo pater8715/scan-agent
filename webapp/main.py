@@ -14,6 +14,7 @@ Autor: Scan Agent Team
 Versión: 1.0.0
 """
 
+import asyncio
 import sys
 import os
 import logging
@@ -38,6 +39,15 @@ from webapp.api.scans import router as scans_router
 from webapp.api.reports import router as reports_router
 from webapp.api.profiles import router as profiles_router
 from webapp.api.lab import router as lab_router
+from webapp.api.catalog import router as catalog_router
+
+# Importar utilidades de catálogo (Fase 9)
+from webapp.utils.catalog_loader import catalog_loader
+from webapp.utils.catalog_watcher import CatalogWatcher
+from webapp.utils.catalog_sync import CatalogSyncWorker
+
+# Cola asyncio para eventos de cambio de catálogo → WebSocket broadcast
+_catalog_event_queue: asyncio.Queue = asyncio.Queue()
 
 # Inicializar logging estructurado
 try:
@@ -130,32 +140,93 @@ app.include_router(scans_router, prefix="/api/scans", tags=["Scans"], dependenci
 app.include_router(reports_router, prefix="/api/reports", tags=["Reports"], dependencies=_auth_deps)
 app.include_router(profiles_router, prefix="/api/profiles", tags=["Profiles"])
 app.include_router(lab_router, prefix="/api/lab", tags=["Lab"])
+app.include_router(catalog_router, prefix="/api/catalog", tags=["Catalog"], dependencies=_auth_deps)
+
+
+# ---------------------------------------------------------------------------
+# Eventos de ciclo de vida: arrancar/parar watcher y sync worker
+# ---------------------------------------------------------------------------
+
+_catalog_watcher: CatalogWatcher = None
+_catalog_sync_worker: CatalogSyncWorker = None
+
+
+@app.on_event("startup")
+async def _startup():
+    global _catalog_watcher, _catalog_sync_worker
+
+    # Warm-up del CatalogLoader
+    catalog_loader.get()
+    logger.info("CatalogLoader inicializado — SHA-256: %s", catalog_loader.sha256())
+
+    # Loop de broadcast de eventos de catálogo
+    asyncio.create_task(_catalog_broadcast_loop())
+
+    # CatalogWatcher — detecta cambios en el JSON y los emite al WS
+    loop = asyncio.get_event_loop()
+    _catalog_watcher = CatalogWatcher(event_queue=_catalog_event_queue, loop=loop, interval=60)
+    _catalog_watcher.start()
+    logger.info("CatalogWatcher iniciado (polling cada 60 s)")
+
+    # CatalogSyncWorker — sincroniza NVD/CISA KEV cada 24h
+    _catalog_sync_worker = CatalogSyncWorker()
+    _catalog_sync_worker.start()
+    logger.info("CatalogSyncWorker iniciado (ciclo cada 24h)")
+
+
+@app.on_event("shutdown")
+async def _shutdown():
+    if _catalog_watcher:
+        _catalog_watcher.stop()
+    if _catalog_sync_worker:
+        _catalog_sync_worker.stop()
 
 
 # WebSocket Manager para progreso en tiempo real
 class ConnectionManager:
     """Gestiona conexiones WebSocket para actualizar progreso en tiempo real"""
-    
+
     def __init__(self):
         self.active_connections: dict[str, WebSocket] = {}
-    
+
     async def connect(self, scan_id: str, websocket: WebSocket):
         await websocket.accept()
         self.active_connections[scan_id] = websocket
-    
+
     def disconnect(self, scan_id: str):
         if scan_id in self.active_connections:
             del self.active_connections[scan_id]
-    
+
     async def send_progress(self, scan_id: str, message: dict):
         if scan_id in self.active_connections:
             try:
                 await self.active_connections[scan_id].send_json(message)
-            except:
+            except Exception:
                 self.disconnect(scan_id)
+
+    async def broadcast(self, message: dict):
+        """Envía un mensaje a TODOS los clientes WebSocket conectados."""
+        dead = []
+        for sid, ws in list(self.active_connections.items()):
+            try:
+                await ws.send_json(message)
+            except Exception:
+                dead.append(sid)
+        for sid in dead:
+            self.disconnect(sid)
 
 
 manager = ConnectionManager()
+
+
+async def _catalog_broadcast_loop():
+    """Consume eventos de la cola de catálogo y los difunde por WebSocket."""
+    while True:
+        try:
+            event = await _catalog_event_queue.get()
+            await manager.broadcast(event)
+        except Exception as exc:
+            logger.warning("Error en catalog broadcast loop: %s", exc)
 
 
 @app.get("/", response_class=HTMLResponse)

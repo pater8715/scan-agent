@@ -26,6 +26,7 @@ from scanagent.scanner import VulnerabilityScanner
 # Importar gestor de archivos
 from webapp.utils.file_manager import FileRetentionManager
 from webapp.utils.report_parser import ScanResultParser, VulnerabilityAnalyzer
+from webapp.utils.catalog_loader import catalog_loader
 
 router = APIRouter()
 db = DatabaseManager()
@@ -449,8 +450,9 @@ def generate_basic_reports(scan_id: str, target: str, profile: str,
     parser = ScanResultParser()
     parsed_data = parser.parse_all_files(output_path, target)
 
-    # Analizar vulnerabilidades con perfil específico
-    analyzer = VulnerabilityAnalyzer(parsed_data, profile=profile)
+    # Analizar vulnerabilidades con catálogo actual (resolución dinámica en tiempo de render)
+    current_catalog = catalog_loader.get()
+    analyzer = VulnerabilityAnalyzer(parsed_data, profile=profile, catalog=current_catalog)
     analysis = analyzer.analyze()
 
     # Construir host_info desde campos planos del parser
@@ -467,6 +469,7 @@ def generate_basic_reports(scan_id: str, target: str, profile: str,
         "target": target,
         "profile": profile,
         "timestamp": datetime.now().isoformat(),
+        "catalog_sha256": catalog_loader.sha256(),
         "host_info": host_info,
         "ports": parsed_data.get("ports", []),
         "active_hosts": parsed_data.get("active_hosts", []),
@@ -474,6 +477,9 @@ def generate_basic_reports(scan_id: str, target: str, profile: str,
         "nikto_findings": parsed_data.get("nikto_findings", []),
         "directories": parsed_data.get("directories", []),
         "nse_findings": parsed_data.get("nse_findings", []),
+        "whatweb_findings": parsed_data.get("whatweb_findings", []),
+        "waf_info": parsed_data.get("waf_info", {}),
+        "ssl_info": parsed_data.get("ssl_info", {}),
         "vulnerabilities": analysis.get("findings", []),
         "risk_score": analysis.get("risk_score", 0),
         "risk_level": analysis.get("risk_level", "Unknown"),

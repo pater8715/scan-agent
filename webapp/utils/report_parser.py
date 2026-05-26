@@ -538,12 +538,15 @@ class VulnerabilityAnalyzer:
         "/api/v2": "INFO",
     }
 
-    def __init__(self, scan_results: Dict, profile: str = "web"):
+    def __init__(self, scan_results: Dict, profile: str = "web",
+                 catalog: Optional[Dict] = None):
         self.results = scan_results
         self.profile = profile.lower() if profile else "web"
         self.findings = []
         self.risk_score = 0
-        self._catalog = self._load_catalog()
+        # Si se pasa catálogo externo (ej: desde CatalogLoader), úsarlo directamente.
+        # Si no, cargar desde disco como siempre (comportamiento legacy).
+        self._catalog = catalog if catalog is not None else self._load_catalog()
         # Instance-level copies; catalog overrides on top of class defaults
         self._high_risk_ports = dict(self.HIGH_RISK_PORTS)
         self._medium_risk_ports = dict(self.MEDIUM_RISK_PORTS)

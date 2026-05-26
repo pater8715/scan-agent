@@ -411,6 +411,39 @@ GROUP BY student_id
 ORDER BY last_scan DESC;
 
 -- ========================================
+-- Table: catalog_versions  (Fase 9)
+-- ========================================
+-- Registra el hash y fecha de cada versión detectada del catálogo
+CREATE TABLE IF NOT EXISTS catalog_versions (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    catalog_file    TEXT NOT NULL,
+    sha256_hash     TEXT NOT NULL,
+    entry_count     INTEGER DEFAULT 0,
+    detected_at     TEXT NOT NULL DEFAULT (datetime('now')),
+    notes           TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_catalog_versions_file ON catalog_versions(catalog_file);
+CREATE INDEX IF NOT EXISTS idx_catalog_versions_hash ON catalog_versions(sha256_hash);
+
+-- ========================================
+-- Table: catalog_sync_log  (Fase 9)
+-- ========================================
+-- Historial de sincronizaciones del catálogo con NVD/CISA KEV
+CREATE TABLE IF NOT EXISTS catalog_sync_log (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp       TEXT NOT NULL DEFAULT (datetime('now')),
+    source          TEXT NOT NULL,
+    entries_added   INTEGER DEFAULT 0,
+    entries_updated INTEGER DEFAULT 0,
+    entries_unchanged INTEGER DEFAULT 0,
+    error           TEXT,
+    duration_ms     INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_sync_log_ts ON catalog_sync_log(timestamp DESC);
+
+-- ========================================
 -- MAINTENANCE
 -- ========================================
 

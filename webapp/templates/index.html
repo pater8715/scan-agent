@@ -29,10 +29,27 @@
                     <button class="nav-btn" data-page="manual">
                         <span class="icon">📖</span> Manual
                     </button>
+                    <button class="nav-btn" data-page="catalog">
+                        <span class="icon">📚</span> Catálogo
+                    </button>
                 </nav>
             </div>
         </div>
     </header>
+
+    <!-- Banner de actualización del catálogo (Fase 9) -->
+    <div id="catalog-update-banner" style="display:none; background:#1e3a2f; border-bottom:2px solid #22c55e; padding:8px 0;">
+        <div class="container" style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+            <span style="color:#22c55e; font-weight:bold;">📚 Catálogo actualizado</span>
+            <span id="catalog-banner-msg" style="color:#94a3b8; font-size:0.88rem;"></span>
+            <button id="catalog-banner-refresh-btn" onclick="refreshCurrentReport()"
+                style="padding:4px 14px; background:#22c55e; color:#0a0f18; border:none; border-radius:6px; cursor:pointer; font-weight:600; font-size:0.82rem;">
+                Actualizar reporte
+            </button>
+            <button onclick="document.getElementById('catalog-update-banner').style.display='none'"
+                style="margin-left:auto; background:none; border:none; color:#64748b; cursor:pointer; font-size:1.1rem;">✕</button>
+        </div>
+    </div>
 
     <!-- Panel de Escaneos Activos (visible en todas las páginas) -->
     <div id="active-scans-bar" style="display:none; background:#1a2332; border-bottom:2px solid #3498db; padding:10px 0;">
@@ -313,6 +330,78 @@
                         <div id="manual-content">
                             <div class="loading">Cargando manual...</div>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Catalog Page (Fase 9) -->
+            <div id="catalog-page" class="page">
+                <div class="page-header">
+                    <h2>📚 Catálogo de Recomendaciones</h2>
+                    <p class="subtitle">Gestiona las recomendaciones de seguridad que se aplican dinámicamente a cada reporte</p>
+                </div>
+
+                <!-- Info bar del catálogo -->
+                <div class="card" style="margin-bottom:16px;">
+                    <div style="display:flex; align-items:center; gap:24px; flex-wrap:wrap;">
+                        <div>
+                            <div style="font-size:0.78rem; color:#64748b; margin-bottom:2px;">VERSIÓN</div>
+                            <div id="cat-version" style="font-weight:600; color:#e2e8f0;">—</div>
+                        </div>
+                        <div>
+                            <div style="font-size:0.78rem; color:#64748b; margin-bottom:2px;">ÚLTIMA ACTUALIZACIÓN</div>
+                            <div id="cat-updated" style="font-weight:600; color:#e2e8f0;">—</div>
+                        </div>
+                        <div>
+                            <div style="font-size:0.78rem; color:#64748b; margin-bottom:2px;">ENTRADAS</div>
+                            <div id="cat-count" style="font-weight:600; color:#22c55e;">—</div>
+                        </div>
+                        <div>
+                            <div style="font-size:0.78rem; color:#64748b; margin-bottom:2px;">SHA-256</div>
+                            <div id="cat-sha256" style="font-family:monospace; font-size:0.78rem; color:#94a3b8;">—</div>
+                        </div>
+                        <div style="margin-left:auto; display:flex; gap:8px;">
+                            <button class="btn btn-secondary" onclick="loadCatalogVersion()">🔄 Refrescar</button>
+                            <button class="btn btn-primary" onclick="triggerCatalogSync()" id="sync-btn">⚡ Sincronizar NVD/CISA</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filtro -->
+                <div class="card" style="margin-bottom:16px;">
+                    <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+                        <input type="text" id="cat-search" placeholder="🔍 Filtrar entradas..."
+                            style="flex:1; min-width:180px; padding:8px 12px; background:#0d1824; border:1px solid #1e3a5f; border-radius:6px; color:#e2e8f0; font-size:0.88rem;">
+                        <select id="cat-section-filter" onchange="filterCatalogEntries()"
+                            style="padding:8px 12px; background:#0d1824; border:1px solid #1e3a5f; border-radius:6px; color:#e2e8f0;">
+                            <option value="">Todas las secciones</option>
+                            <option value="ports">Puertos</option>
+                            <option value="security_headers">Cabeceras HTTP</option>
+                            <option value="sensitive_paths">Rutas sensibles</option>
+                        </select>
+                        <select id="cat-risk-filter" onchange="filterCatalogEntries()"
+                            style="padding:8px 12px; background:#0d1824; border:1px solid #1e3a5f; border-radius:6px; color:#e2e8f0;">
+                            <option value="">Todo nivel de riesgo</option>
+                            <option value="CRITICAL">Crítico</option>
+                            <option value="HIGH">Alto</option>
+                            <option value="MEDIUM">Medio</option>
+                            <option value="LOW">Bajo</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Lista de entradas -->
+                <div class="card">
+                    <div id="catalog-entries-list" style="display:flex; flex-direction:column; gap:12px;">
+                        <div class="loading">Cargando catálogo...</div>
+                    </div>
+                </div>
+
+                <!-- Historial de sincronizaciones -->
+                <div class="card" style="margin-top:16px;">
+                    <h3 style="margin:0 0 12px; font-size:1rem; color:#94a3b8;">🕐 Historial de Sincronizaciones</h3>
+                    <div id="sync-log-list" style="font-size:0.85rem;">
+                        <div class="loading">Cargando historial...</div>
                     </div>
                 </div>
             </div>
@@ -732,12 +821,287 @@
             });
         });
 
-        // Cargar reportes al entrar en la pestaña
+        // Cargar reportes/catálogo al entrar en la pestaña
         document.querySelectorAll('.nav-btn').forEach(btn => {
             btn.addEventListener('click', () => {
-                if (btn.dataset.page === 'reports') loadReportsList();
+                const page = btn.dataset.page;
+                if (page === 'reports') loadReportsList();
+                if (page === 'catalog') { loadCatalogVersion(); loadCatalogEntries(); loadSyncLog(); }
             });
         });
+
+        // ── Catálogo de Recomendaciones (Fase 9) ──────────────────────────────
+
+        let allCatalogEntries = [];
+
+        async function loadCatalogVersion() {
+            try {
+                const r = await fetch('/api/catalog/version');
+                if (!r.ok) return;
+                const d = await r.json();
+                document.getElementById('cat-version').textContent = d.version || '—';
+                document.getElementById('cat-updated').textContent = d.last_updated
+                    ? new Date(d.last_updated).toLocaleDateString('es-CO') : '—';
+                document.getElementById('cat-count').textContent = d.entry_count ?? '—';
+                document.getElementById('cat-sha256').textContent = (d.sha256 || '').slice(0, 16) + '…';
+            } catch (_) {}
+        }
+
+        const RISK_COLORS = { CRITICAL: '#ef4444', HIGH: '#f97316', MEDIUM: '#eab308', LOW: '#22c55e', INFO: '#3b82f6' };
+        const SECTION_LABELS = { ports: 'Puerto', security_headers: 'Cabecera HTTP', sensitive_paths: 'Ruta sensible' };
+
+        async function loadCatalogEntries() {
+            const list = document.getElementById('catalog-entries-list');
+            list.innerHTML = '<div class="loading">Cargando catálogo…</div>';
+            try {
+                const r = await fetch('/api/catalog/entries');
+                if (!r.ok) throw new Error('Error ' + r.status);
+                const data = await r.json();
+                allCatalogEntries = data.entries || [];
+                renderCatalogEntries(allCatalogEntries);
+            } catch (e) {
+                list.innerHTML = `<p style="color:#ef4444;font-size:0.85rem;">Error cargando catálogo: ${e.message}</p>`;
+            }
+        }
+
+        function renderCatalogEntries(entries) {
+            const list = document.getElementById('catalog-entries-list');
+            if (!entries.length) {
+                list.innerHTML = '<p style="color:#64748b;font-size:0.85rem;">No hay entradas que coincidan con el filtro.</p>';
+                return;
+            }
+            list.innerHTML = entries.map(e => {
+                const riskColor = RISK_COLORS[e.risk_level] || '#94a3b8';
+                const sectionLabel = SECTION_LABELS[e.section] || e.section;
+                const recs = (e.recommendations || []).map(r => `<li>${r}</li>`).join('');
+                const cves = (e.cves || []).slice(0, 4).map(c =>
+                    `<span style="background:#1a2332;border:1px solid #2d3748;border-radius:4px;padding:1px 7px;font-size:0.73rem;font-family:monospace;">${c}</span>`
+                ).join(' ');
+                const srcBadge = e.source === 'cisa_kev'
+                    ? `<span style="background:#7f1d1d;color:#fca5a5;border-radius:4px;padding:1px 8px;font-size:0.72rem;">CISA KEV</span>`
+                    : e.source === 'nvd'
+                        ? `<span style="background:#1e3a5f;color:#93c5fd;border-radius:4px;padding:1px 8px;font-size:0.72rem;">NVD</span>`
+                        : '';
+                return `
+                <div style="background:#0d1824;border:1px solid #1e3a5f;border-radius:8px;padding:14px 16px;">
+                    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;">
+                        <span style="font-weight:700;color:#e2e8f0;font-size:0.95rem;">${e.key}</span>
+                        <span style="background:${riskColor}22;color:${riskColor};border:1px solid ${riskColor}55;border-radius:4px;padding:1px 9px;font-size:0.73rem;font-weight:600;">${e.risk_level || 'N/A'}</span>
+                        <span style="background:#1a2332;border:1px solid #2d3748;border-radius:4px;padding:1px 9px;font-size:0.72rem;color:#94a3b8;">${sectionLabel}</span>
+                        ${srcBadge}
+                        <button onclick="openEditEntry('${e.id}')"
+                            style="margin-left:auto;background:#1e3a5f;border:none;color:#93c5fd;padding:3px 12px;border-radius:5px;cursor:pointer;font-size:0.78rem;">
+                            ✏️ Editar
+                        </button>
+                    </div>
+                    ${e.description ? `<p style="color:#94a3b8;font-size:0.82rem;margin:0 0 8px;">${e.description}</p>` : ''}
+                    ${recs ? `<ul style="margin:0 0 8px;padding-left:20px;color:#cbd5e1;font-size:0.82rem;line-height:1.7;">${recs}</ul>` : ''}
+                    ${cves ? `<div style="display:flex;gap:6px;flex-wrap:wrap;">${cves}</div>` : ''}
+                </div>`;
+            }).join('');
+        }
+
+        function filterCatalogEntries() {
+            const search = document.getElementById('cat-search').value.toLowerCase();
+            const section = document.getElementById('cat-section-filter').value;
+            const risk = document.getElementById('cat-risk-filter').value;
+            const filtered = allCatalogEntries.filter(e => {
+                const matchSearch = !search ||
+                    e.key.toLowerCase().includes(search) ||
+                    (e.description || '').toLowerCase().includes(search) ||
+                    (e.recommendations || []).some(r => r.toLowerCase().includes(search));
+                const matchSection = !section || e.section === section;
+                const matchRisk = !risk || e.risk_level === risk;
+                return matchSearch && matchSection && matchRisk;
+            });
+            renderCatalogEntries(filtered);
+        }
+
+        document.getElementById('cat-search')?.addEventListener('input', filterCatalogEntries);
+
+        async function triggerCatalogSync() {
+            const btn = document.getElementById('sync-btn');
+            if (btn) { btn.disabled = true; btn.textContent = '⏳ Sincronizando…'; }
+            try {
+                const r = await fetch('/api/catalog/sync', { method: 'POST' });
+                if (r.ok) {
+                    showToast('Sincronización iniciada en background. Puede tardar unos minutos.', 'info');
+                } else {
+                    showToast('Error al iniciar sincronización', 'error');
+                }
+            } catch (_) {
+                showToast('Error de conexión', 'error');
+            } finally {
+                if (btn) { btn.disabled = false; btn.textContent = '⚡ Sincronizar NVD/CISA'; }
+            }
+        }
+
+        async function refreshCurrentReport() {
+            const banner = document.getElementById('catalog-update-banner');
+            const scanId = _currentReportId;
+            if (!scanId) {
+                showToast('Abre un reporte primero para actualizarlo', 'warning');
+                banner && (banner.style.display = 'none');
+                return;
+            }
+            try {
+                const r = await fetch(`/api/catalog/reports/${scanId}/refresh`, { method: 'POST' });
+                if (r.ok) {
+                    showToast(`Reporte ${scanId} regenerándose en background…`, 'info');
+                    banner && (banner.style.display = 'none');
+                } else {
+                    showToast('No se pudo regenerar el reporte', 'error');
+                }
+            } catch (_) { showToast('Error de conexión', 'error'); }
+        }
+
+        async function loadSyncLog() {
+            const el = document.getElementById('sync-log-list');
+            if (!el) return;
+            try {
+                const r = await fetch('/api/catalog/sync-log?limit=10');
+                if (!r.ok) throw new Error('Error ' + r.status);
+                const data = await r.json();
+                const log = data.log || [];
+                if (!log.length) {
+                    el.innerHTML = '<p style="color:#64748b;font-size:0.82rem;">Sin sincronizaciones registradas.</p>';
+                    return;
+                }
+                el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:0.82rem;">
+                    <thead><tr style="color:#64748b;">
+                        <th style="text-align:left;padding:4px 8px;">Fecha</th>
+                        <th style="text-align:left;padding:4px 8px;">Fuente</th>
+                        <th style="text-align:center;padding:4px 8px;">Añadidas</th>
+                        <th style="text-align:center;padding:4px 8px;">Actualizadas</th>
+                        <th style="text-align:left;padding:4px 8px;">Estado</th>
+                    </tr></thead>
+                    <tbody>${log.map(row => `
+                        <tr style="border-top:1px solid #1e3a5f;">
+                            <td style="padding:5px 8px;color:#94a3b8;">${new Date(row.timestamp).toLocaleString('es-CO')}</td>
+                            <td style="padding:5px 8px;color:#e2e8f0;">${row.source || '—'}</td>
+                            <td style="padding:5px 8px;text-align:center;color:#22c55e;">${row.entries_added ?? 0}</td>
+                            <td style="padding:5px 8px;text-align:center;color:#3b82f6;">${row.entries_updated ?? 0}</td>
+                            <td style="padding:5px 8px;">${row.error
+                                ? `<span style="color:#ef4444;">❌ ${row.error.slice(0, 60)}</span>`
+                                : `<span style="color:#22c55e;">✅ OK ${row.duration_ms != null ? '(' + row.duration_ms + ' ms)' : ''}</span>`
+                            }</td>
+                        </tr>`).join('')}
+                    </tbody></table>`;
+            } catch (e) {
+                el.innerHTML = `<p style="color:#ef4444;font-size:0.82rem;">Error cargando historial: ${e.message}</p>`;
+            }
+        }
+
+        // ── Modal edición de entrada del catálogo ───────────────────────────────
+        (function buildCatalogEditModal() {
+            const overlay = document.createElement('div');
+            overlay.id = 'catalog-edit-modal';
+            overlay.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1100;display:none;align-items:center;justify-content:center;padding:20px;';
+            overlay.innerHTML = `
+                <div style="background:#1a2332;border:1px solid #2d3748;border-radius:12px;width:100%;max-width:600px;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid #2d3748;">
+                        <span style="font-weight:700;color:#e2e8f0;">✏️ Editar entrada: <span id="cedit-key" style="color:#93c5fd;"></span></span>
+                        <button onclick="closeCatalogEdit()" style="background:#2d3748;border:none;color:#94a3b8;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:0.9rem;">✕</button>
+                    </div>
+                    <div style="padding:18px 20px;overflow-y:auto;flex:1;">
+                        <label style="font-size:0.82rem;color:#94a3b8;">Descripción</label>
+                        <input id="cedit-desc" type="text" style="width:100%;margin:6px 0 14px;padding:8px 10px;background:#0d1824;border:1px solid #1e3a5f;border-radius:6px;color:#e2e8f0;font-size:0.88rem;box-sizing:border-box;">
+                        <label style="font-size:0.82rem;color:#94a3b8;">Recomendaciones (una por línea)</label>
+                        <textarea id="cedit-recs" rows="8" style="width:100%;margin:6px 0 14px;padding:8px 10px;background:#0d1824;border:1px solid #1e3a5f;border-radius:6px;color:#e2e8f0;font-size:0.85rem;font-family:monospace;resize:vertical;box-sizing:border-box;"></textarea>
+                        <div style="display:flex;gap:10px;justify-content:flex-end;">
+                            <button onclick="closeCatalogEdit()" class="btn btn-secondary">Cancelar</button>
+                            <button id="cedit-save-btn" onclick="saveCatalogEntry()" class="btn btn-primary">💾 Guardar</button>
+                        </div>
+                    </div>
+                </div>`;
+            overlay.addEventListener('click', e => { if (e.target === overlay) closeCatalogEdit(); });
+            document.body.appendChild(overlay);
+        })();
+
+        let _editingEntryId = null;
+
+        function openEditEntry(entryId) {
+            const entry = allCatalogEntries.find(e => e.id === entryId);
+            if (!entry) return;
+            _editingEntryId = entryId;
+            document.getElementById('cedit-key').textContent = entry.key;
+            document.getElementById('cedit-desc').value = entry.description || '';
+            document.getElementById('cedit-recs').value = (entry.recommendations || []).join('\n');
+            const modal = document.getElementById('catalog-edit-modal');
+            modal.style.display = 'flex';
+        }
+
+        function closeCatalogEdit() {
+            document.getElementById('catalog-edit-modal').style.display = 'none';
+            _editingEntryId = null;
+        }
+
+        async function saveCatalogEntry() {
+            if (!_editingEntryId) return;
+            const desc = document.getElementById('cedit-desc').value.trim();
+            const recs = document.getElementById('cedit-recs').value
+                .split('\n').map(l => l.trim()).filter(Boolean);
+            const btn = document.getElementById('cedit-save-btn');
+            btn.disabled = true; btn.textContent = 'Guardando…';
+            try {
+                const r = await fetch(`/api/catalog/entries/${_editingEntryId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ recommendations: recs, description: desc }),
+                });
+                if (r.ok) {
+                    showToast('Entrada actualizada correctamente', 'success');
+                    closeCatalogEdit();
+                    loadCatalogEntries();
+                    loadCatalogVersion();
+                } else {
+                    const d = await r.json();
+                    showToast(d.detail || 'Error al guardar', 'error');
+                }
+            } catch (_) { showToast('Error de conexión', 'error'); }
+            finally { btn.disabled = false; btn.textContent = '💾 Guardar'; }
+        }
+
+        // ── WebSocket global para eventos del catálogo ────────────────────────
+        (function initCatalogWebSocket() {
+            const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${wsProto}//${location.host}/ws/_catalog_listener`;
+            let catalogWs = null;
+            let reconnectTimer = null;
+
+            function connect() {
+                try {
+                    catalogWs = new WebSocket(wsUrl);
+                    catalogWs.onopen = () => {
+                        if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+                    };
+                    catalogWs.onmessage = (evt) => {
+                        let msg;
+                        try { msg = JSON.parse(evt.data); } catch (_) { return; }
+                        if (msg.event === 'catalog_updated') {
+                            const banner = document.getElementById('catalog-update-banner');
+                            const bannerMsg = document.getElementById('catalog-banner-msg');
+                            if (banner) {
+                                bannerMsg.textContent = `SHA-256: ${(msg.sha256 || '').slice(0,12)}… · ${msg.entry_count ?? ''} entradas · ${new Date().toLocaleTimeString('es-CO')}`;
+                                banner.style.display = 'block';
+                            }
+                            // Si el usuario está en la página del catálogo, recargar
+                            const catPage = document.getElementById('catalog-page');
+                            if (catPage && catPage.classList.contains('active')) {
+                                loadCatalogVersion();
+                                loadCatalogEntries();
+                                loadSyncLog();
+                            }
+                        }
+                    };
+                    catalogWs.onclose = () => {
+                        reconnectTimer = setTimeout(connect, 15000);
+                    };
+                    catalogWs.onerror = () => { catalogWs.close(); };
+                } catch (_) {}
+            }
+            connect();
+        })();
 
         // ── Panel de Escaneos Activos ──────────────────────────────────────
         (function () {

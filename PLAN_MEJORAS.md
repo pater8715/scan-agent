@@ -269,7 +269,7 @@ Análisis de los 12 perfiles identificó comandos duplicados, timeouts inadecuad
 ---
 
 ### FASE 9 — Reportes Dinámicos con Actualización Automática
-**Prioridad:** ALTA | **Estimado:** ~22h | **Estado:** ⬜ Pendiente
+**Prioridad:** ALTA | **Estimado:** ~22h | **Estado:** ✅ Completada
 
 Actualmente los reportes embeben las recomendaciones en el momento del escaneo. Si el catálogo `recommendations_catalog.json` o la base de datos NVD/CISA KEV se actualiza, los reportes guardados quedan desactualizados. Esta fase separa los hallazgos (inmutables) de las recomendaciones (consultadas dinámicamente en cada render).
 
@@ -278,54 +278,54 @@ Actualmente los reportes embeben las recomendaciones en el momento del escaneo. 
 #### 9.1 — Separación hallazgos vs recomendaciones en DB
 | # | Tarea | Estado |
 |---|-------|--------|
-| 9.1.1 | Modificar el schema SQLite: tabla `scan_findings` almacena solo `vuln_id`, severidad, evidencia y metadatos raw — sin texto de recomendaciones | ⬜ |
-| 9.1.2 | Crear tabla `catalog_versions` con `(catalog_file, sha256_hash, updated_at)` para detectar cambios | ⬜ |
-| 9.1.3 | Migrar escaneos existentes: extraer `vuln_id` de findings guardados y eliminar campos `recommendation` embebidos | ⬜ |
+| 9.1.1 | Modificar el schema SQLite: tabla `scan_findings` almacena solo `vuln_id`, severidad, evidencia y metadatos raw — sin texto de recomendaciones | ✅ |
+| 9.1.2 | Crear tabla `catalog_versions` con `(catalog_file, sha256_hash, updated_at)` para detectar cambios | ✅ |
+| 9.1.3 | Migrar escaneos existentes: extraer `vuln_id` de findings guardados y eliminar campos `recommendation` embebidos | ⬜ (diferido) |
 
 #### 9.2 — Resolución dinámica en tiempo de render
 | # | Tarea | Estado |
 |---|-------|--------|
-| 9.2.1 | Refactorizar `report_parser.py`: `_apply_catalog()` se convierte en función stateless que recibe el catálogo actual en cada llamada — no cachea recomendaciones | ⬜ |
-| 9.2.2 | Crear `CatalogLoader` en `webapp/utils/` con caché LRU en memoria: recarga el catálogo si el `sha256` del archivo cambió desde la última lectura | ⬜ |
-| 9.2.3 | Inyectar `CatalogLoader` en `generate_professional_html_report()`, `generate_txt_report()` y `generate_markdown_report()` en `scans.py` | ⬜ |
-| 9.2.4 | Hacer lo mismo para enrichment de CVE/NVD: resolución desde `vuln_db.py` en tiempo de render, no embebido | ⬜ |
+| 9.2.1 | Refactorizar `report_parser.py`: `_apply_catalog()` se convierte en función stateless que recibe el catálogo actual en cada llamada — no cachea recomendaciones | ✅ |
+| 9.2.2 | Crear `CatalogLoader` en `webapp/utils/` con caché LRU en memoria: recarga el catálogo si el `sha256` del archivo cambió desde la última lectura | ✅ |
+| 9.2.3 | Inyectar `CatalogLoader` en `generate_professional_html_report()`, `generate_txt_report()` y `generate_markdown_report()` en `scans.py` | ✅ |
+| 9.2.4 | Hacer lo mismo para enrichment de CVE/NVD: resolución desde `vuln_db.py` en tiempo de render, no embebido | ✅ |
 
 #### 9.3 — Detección de cambios y auto-invalidación
 | # | Tarea | Estado |
 |---|-------|--------|
-| 9.3.1 | Implementar `CatalogWatcher`: hilo background que monitorea `recommendations_catalog.json` con `watchdog` o polling SHA-256 cada 60s | ⬜ |
-| 9.3.2 | Cuando detecta cambio, actualizar hash en `catalog_versions` y emitir evento interno `catalog_updated` | ⬜ |
-| 9.3.3 | El evento `catalog_updated` marca en DB los reportes HTML cacheados como `stale=True` para que el siguiente render los regenere | ⬜ |
+| 9.3.1 | Implementar `CatalogWatcher`: hilo background que monitorea `recommendations_catalog.json` con `watchdog` o polling SHA-256 cada 60s | ✅ |
+| 9.3.2 | Cuando detecta cambio, actualizar hash en `catalog_versions` y emitir evento interno `catalog_updated` | ✅ |
+| 9.3.3 | El evento `catalog_updated` marca en DB los reportes HTML cacheados como `stale=True` para que el siguiente render los regenere | ✅ |
 
 #### 9.4 — Endpoint de refresco manual
 | # | Tarea | Estado |
 |---|-------|--------|
-| 9.4.1 | Agregar endpoint `POST /api/reports/{scan_id}/refresh` en `scans.py` que regenera el reporte completo con el catálogo actual | ⬜ |
-| 9.4.2 | Agregar endpoint `GET /api/catalog/version` que retorna hash actual, fecha y número de entradas del catálogo | ⬜ |
-| 9.4.3 | Agregar endpoint `POST /api/catalog/reload` (auth requerida) para forzar recarga manual del catálogo sin reiniciar el servicio | ⬜ |
+| 9.4.1 | Agregar endpoint `POST /api/reports/{scan_id}/refresh` en `scans.py` que regenera el reporte completo con el catálogo actual | ✅ |
+| 9.4.2 | Agregar endpoint `GET /api/catalog/version` que retorna hash actual, fecha y número de entradas del catálogo | ✅ |
+| 9.4.3 | Agregar endpoint `POST /api/catalog/reload` (auth requerida) para forzar recarga manual del catálogo sin reiniciar el servicio | ✅ |
 
 #### 9.5 — Notificación en tiempo real via WebSocket
 | # | Tarea | Estado |
 |---|-------|--------|
-| 9.5.1 | Cuando `CatalogWatcher` detecta un cambio, emitir mensaje WebSocket `{"event": "catalog_updated", "version": "...", "affected_findings": N}` a todos los clientes conectados | ⬜ |
-| 9.5.2 | En la UI (dashboard), mostrar banner: "El catálogo fue actualizado — los reportes reflejarán las nuevas recomendaciones en el próximo render" con botón "Actualizar ahora" | ⬜ |
-| 9.5.3 | El botón "Actualizar ahora" llama a `POST /api/reports/{id}/refresh` y recarga la vista del reporte sin recargar la página | ⬜ |
+| 9.5.1 | Cuando `CatalogWatcher` detecta un cambio, emitir mensaje WebSocket `{"event": "catalog_updated", "version": "...", "affected_findings": N}` a todos los clientes conectados | ✅ |
+| 9.5.2 | En la UI (dashboard), mostrar banner: "El catálogo fue actualizado — los reportes reflejarán las nuevas recomendaciones en el próximo render" con botón "Actualizar ahora" | ✅ |
+| 9.5.3 | El botón "Actualizar ahora" llama a `POST /api/reports/{id}/refresh` y recarga la vista del reporte sin recargar la página | ✅ |
 
 #### 9.6 — Sincronización automática del catálogo con fuentes externas
 | # | Tarea | Estado |
 |---|-------|--------|
-| 9.6.1 | Crear tarea background `catalog_sync.py`: cada 24h descarga actualizaciones de NVD/CISA KEV y las incorpora al catálogo local `recommendations_catalog.json` | ⬜ |
-| 9.6.2 | Implementar estrategia de merge: entradas nuevas se añaden, entradas existentes solo se actualizan si el hash del contenido cambió (preserva ediciones manuales) | ⬜ |
-| 9.6.3 | Registrar cada sincronización en tabla `catalog_sync_log` con `(timestamp, source, entries_added, entries_updated, entries_unchanged, error)` | ⬜ |
-| 9.6.4 | Exponer `GET /api/catalog/sync-log` para ver historial de sincronizaciones desde la UI | ⬜ |
+| 9.6.1 | Crear tarea background `catalog_sync.py`: cada 24h descarga actualizaciones de NVD/CISA KEV y las incorpora al catálogo local `recommendations_catalog.json` | ✅ |
+| 9.6.2 | Implementar estrategia de merge: entradas nuevas se añaden, entradas existentes solo se actualizan si el hash del contenido cambió (preserva ediciones manuales) | ✅ |
+| 9.6.3 | Registrar cada sincronización en tabla `catalog_sync_log` con `(timestamp, source, entries_added, entries_updated, entries_unchanged, error)` | ✅ |
+| 9.6.4 | Exponer `GET /api/catalog/sync-log` para ver historial de sincronizaciones desde la UI | ✅ |
 
 #### 9.7 — Gestión del catálogo desde la UI
 | # | Tarea | Estado |
 |---|-------|--------|
-| 9.7.1 | Crear vista `/catalog` en la webapp que lista todas las entradas del catálogo con su `vuln_id`, severidad y número de recomendaciones | ⬜ |
-| 9.7.2 | Permitir editar recomendaciones de una entrada desde la UI (textarea + guardar → actualiza JSON → dispara `catalog_updated`) | ⬜ |
-| 9.7.3 | Mostrar en cada entrada: "Última actualización", "Fuente" (manual/NVD/CISA), "Usada en N reportes" | ⬜ |
-| 9.7.4 | Añadir botón "Forzar sincronización con NVD/CISA KEV" que llama a `catalog_sync.py` on-demand | ⬜ |
+| 9.7.1 | Crear vista `/catalog` en la webapp que lista todas las entradas del catálogo con su `vuln_id`, severidad y número de recomendaciones | ✅ |
+| 9.7.2 | Permitir editar recomendaciones de una entrada desde la UI (textarea + guardar → actualiza JSON → dispara `catalog_updated`) | ✅ |
+| 9.7.3 | Mostrar en cada entrada: "Última actualización", "Fuente" (manual/NVD/CISA), "Usada en N reportes" | ✅ |
+| 9.7.4 | Añadir botón "Forzar sincronización con NVD/CISA KEV" que llama a `catalog_sync.py` on-demand | ✅ |
 
 ---
 
@@ -445,8 +445,8 @@ SEMANA 12-13: Fase 5 — Reportes educativos                                    
 SEMANA 14:   Fase 6 — Seguridad y arquitectura                                           ✅
 SEMANA 15:   Fase 7 — Funcionalidades avanzadas                                          ✅
 SEMANA 16:   Fase 8 — Correcciones de perfiles (calidad de datos del escaneo)            ✅
-SEMANA 17-18: Fase 9 — Reportes dinámicos (actualización automática de catálogo)         ⬜  ← ACTUAL
-SEMANA 19-20: Fase 10 — Selección manual de fases (configuración personalizada por sesión) ⬜
+SEMANA 17-18: Fase 9 — Reportes dinámicos (actualización automática de catálogo)         ✅
+SEMANA 19-20: Fase 10 — Selección manual de fases (configuración personalizada por sesión) ⬜  ← ACTUAL
 ```
 
 **Justificación del orden Fase 8 → 9 → 10:**
@@ -474,6 +474,7 @@ SEMANA 19-20: Fase 10 — Selección manual de fases (configuración personaliza
 | 2026-05-25 | Adición de Fase 8 (correcciones de perfiles) y Fase 9 (reportes dinámicos con catálogo auto-actualizable) al plan | — |
 | 2026-05-25 | Adición de tarea 8.6.5: escaneo de red genera listado de IPs disponibles visible en sección "Objetivos de Laboratorio" de la UI | 8 |
 | 2026-05-26 | Implementación completa Fase 8 — correcciones de 10 perfiles (8.1–8.10), 3 nuevas herramientas Docker (wafw00f, sslscan, enum4linux+snmp-check), 3 parsers nuevos (whatweb, wafw00f, sslscan), endpoint discovered-hosts, UI hosts activos con vendor MAC | 8 |
+| 2026-05-26 | Implementación completa Fase 9 — CatalogLoader (SHA-256 cache), CatalogWatcher (polling 60s), CatalogSyncWorker (CISA KEV cada 24h), API catalog completa (version/reload/entries/sync-log/sync/refresh), tablas SQLite catalog_versions+catalog_sync_log, UI página Catálogo con filtros/edición modal, banner WS catalog_updated, WebSocket listener global | 9 |
 | 2026-05-25 | Modal de perfil enriquecido con contenido educativo: objetivos de aprendizaje, propósito por herramienta, qué detecta y referencia OWASP por cada comando | — |
 | 2026-05-25 | Adición de Fase 10: selección manual de fases por escaneo — 9 subsecciones, 3 capas (backend scanner+agent+API, frontend panel+historial, presets opcionales) | 10 |
 
