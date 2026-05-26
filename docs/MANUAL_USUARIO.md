@@ -1,6 +1,6 @@
 # Manual de Usuario — Scan Agent Lab
 
-**Versión:** 3.1  
+**Versión:** 3.2  
 **Audiencia:** Estudiantes de desarrollo de aplicaciones web y APIs REST  
 **Requisito previo:** Docker Desktop instalado y funcionando
 
@@ -22,6 +22,8 @@
 12. [Ejercicios prácticos guiados](#12-ejercicios-prácticos-guiados)
 13. [Seguridad de la herramienta](#13-seguridad-de-la-herramienta)
 14. [Funcionalidades avanzadas](#14-funcionalidades-avanzadas)
+15. [Catálogo de recomendaciones](#15-catálogo-de-recomendaciones)
+16. [Selección manual de fases](#16-selección-manual-de-fases)
 
 ---
 
@@ -132,10 +134,17 @@ Todos los contenedores deben mostrar `Up`. Si alguno aparece como `Restarting`, 
 
 Herramienta de análisis que orquesta múltiples escáneres:
 
-- **nmap** — descubrimiento de puertos y versiones de servicios
-- **nikto** — detección de vulnerabilidades web conocidas
-- **gobuster** — enumeración de rutas y directorios
-- **módulo propio** — pruebas OWASP API Security Top 10 2023
+| Herramienta | Propósito |
+|-------------|-----------|
+| **nmap** | Descubrimiento de puertos, versiones de servicios y scripts NSE |
+| **nikto** | Detección de vulnerabilidades web conocidas (6,700+ pruebas) |
+| **gobuster** | Enumeración de rutas, directorios y endpoints de API |
+| **wafw00f** | Detección de Web Application Firewalls |
+| **sslscan** | Auditoría de configuración TLS/SSL (protocolos, ciphers, certificado) |
+| **whatweb** | Identificación de tecnologías web (CMS, frameworks, versiones) |
+| **enum4linux** | Enumeración de recursos SMB/Samba en redes internas |
+| **snmp-check** | Auditoría de servicios SNMP (cadenas de comunidad por defecto) |
+| **módulo propio** | Pruebas OWASP API Security Top 10 2023 |
 
 ### OWASP Juice Shop
 
@@ -225,6 +234,57 @@ Una vez terminado el escaneo:
 - Haz clic en **📄 Ver Reporte** para ver el resultado de un escaneo completado
 - Los escaneos en curso muestran el botón **⛔ Cancelar**
 - Puedes filtrar por target, fecha o perfil
+- Los escaneos ejecutados con fases personalizadas muestran el badge **⚙ personalizado** junto al perfil
+
+### Catálogo de recomendaciones
+
+La pestaña **Catálogo** (menú de navegación superior) muestra el catálogo de recomendaciones de seguridad que usa Scan Agent para enriquecer sus hallazgos.
+
+**Barra de versión:**
+
+En la parte superior aparece la versión actual del catálogo con su hash SHA-256 y el número de entradas. Si el catálogo se actualiza mientras la página está abierta, aparece un banner amarillo de notificación en tiempo real.
+
+**Buscar y filtrar:**
+
+| Control | Función |
+|---------|---------|
+| Campo de búsqueda | Filtrar por título, descripción o categoría OWASP |
+| Selector OWASP | Mostrar solo entradas de una categoría específica |
+| Selector severidad | Filtrar por nivel CRITICAL / HIGH / MEDIUM / LOW |
+
+**Editar una entrada:**
+
+Haz clic en **✏️ Editar** en cualquier tarjeta para abrir el modal de edición. Puedes modificar el título, descripción, nivel de riesgo y recomendación. Los cambios se aplican al catálogo inmediatamente.
+
+> Los cambios en el catálogo afectan a los escaneos futuros. Los reportes ya generados no se modifican.
+
+**Registro de sincronizaciones (Sync Log):**
+
+Al final de la página aparece el historial de sincronizaciones con CISA KEV. Cada fila muestra: fecha, entradas añadidas, entradas actualizadas y si hubo errores.
+
+### Configurar fases manualmente
+
+Al seleccionar un perfil, aparece debajo del formulario un botón plegable **⚙️ Configurar fases manualmente (opcional)**. Esto permite ejecutar solo un subconjunto de las herramientas del perfil.
+
+**Cuándo usarlo:**
+
+- Para acelerar un escaneo omitiendo fases lentas (ej.: gobuster en un objetivo sin servidor web)
+- Para enfocar el análisis en una herramienta específica (ej.: solo nmap + nikto)
+- Para ejercicios donde el profesor pide ejecutar solo ciertas fases
+
+**Cómo usarlo:**
+
+1. Selecciona un perfil en el formulario
+2. Haz clic en **⚙️ Configurar fases manualmente**
+3. Aparecen tarjetas para cada fase — marca/desmarca las que deseas incluir
+4. El pie del panel muestra cuántas fases están seleccionadas y el tiempo estimado
+5. Lanza el escaneo normalmente con **▶ Start Scan**
+
+**Presets:**
+
+Puedes guardar una selección como preset con el botón **💾 Guardar preset**. Los presets se almacenan localmente en el navegador (por perfil) y aparecen como botones de acceso rápido.
+
+> Las fases marcadas como **[Requerida]** pueden desmarcarse, pero el sistema mostrará una advertencia porque son necesarias para el funcionamiento correcto del perfil.
 
 ### API Docs (Swagger)
 
@@ -299,20 +359,25 @@ make lab-scan-dvwa     # Escanea DVWA con perfil lab
 
 ## 6. Perfiles de escaneo
 
-| Perfil | Descripción | Tiempo estimado | Uso recomendado |
-|--------|-------------|-----------------|-----------------|
-| `quick` | Puertos más comunes + versiones | 2-5 min | Primera exploración |
-| `standard` | Escaneo completo de puertos y servicios | 10-15 min | Escaneo de referencia |
-| `full` | Todo: puertos, versiones, scripts NSE, directorios | 30-60 min | Análisis exhaustivo |
-| `web` | Foco en HTTP/HTTPS + nikto + gobuster | 10-20 min | Aplicaciones web |
-| `api` | Endpoints REST + headers de seguridad API | 5-10 min | APIs REST generales |
-| `api-owasp` | OWASP API Security Top 10 2023 completo | 10-20 min | Auditoría de APIs |
-| `lab` | Optimizado para Juice Shop y DVWA | 10-15 min | **Uso en el lab** |
-| `stealth` | Escaneo lento para evitar detección | 20-40 min | Entornos con IDS |
-| `network` | Descubrimiento de hosts y topología de red | 5-10 min | Redes locales |
-| `compliance` | Verifica controles de seguridad específicos | 15-25 min | Auditorías formales |
+| Perfil | Descripción | Herramientas incluidas | Tiempo estimado | Uso recomendado |
+|--------|-------------|----------------------|-----------------|-----------------|
+| `quick` | Puertos más comunes + versiones | nmap, curl | 2-5 min | Primera exploración |
+| `standard` | Escaneo completo de puertos y servicios | nmap (todos los puertos), curl | 10-15 min | Escaneo de referencia |
+| `full` | Todo: puertos, versiones, scripts NSE, directorios | nmap, nikto, gobuster, whatweb | 30-60 min | Análisis exhaustivo |
+| `web` | Foco en HTTP/HTTPS con análisis TLS y tecnologías | nmap, nikto, gobuster, wafw00f, sslscan, whatweb | 15-25 min | Aplicaciones web |
+| `api` | Endpoints REST + headers de seguridad API | nmap, curl (headers y CORS) | 5-10 min | APIs REST generales |
+| `api-owasp` | OWASP API Security Top 10 2023 completo | nmap, curl, módulo OWASP propio | 10-20 min | Auditoría de APIs |
+| `lab` | Optimizado para Juice Shop y DVWA | nmap, nikto, gobuster, curl | 10-15 min | **Uso en el lab** |
+| `stealth` | Escaneo lento para evitar detección | nmap (timing T1), curl | 20-40 min | Entornos con IDS |
+| `network` | Descubrimiento de hosts y topología de red | nmap (ping sweep + puertos comunes) | 5-10 min | Redes locales |
+| `compliance` | Verifica controles de seguridad específicos | nmap, nikto, sslscan, curl (headers) | 15-25 min | Auditorías formales |
+| `internal` | Servicios de red interna (SMB, SNMP) | nmap, enum4linux, snmp-check | 10-20 min | Redes corporativas |
 
 > Para el laboratorio, el perfil **`lab`** es el punto de partida ideal. Cubre web y API con una intensidad balanceada.
+
+### Selección parcial de fases
+
+Cualquier perfil admite una **selección manual de fases** desde la interfaz web — puedes elegir qué herramientas ejecutar sin cambiar de perfil (ver [sección 16](#16-selección-manual-de-fases)).
 
 ---
 
@@ -1706,6 +1771,198 @@ Si tienes VS Code con la extensión [SARIF Viewer](https://marketplace.visualstu
 | 11 | Análisis de dependencias | A06 | 20 min | ⬤⬤○ Intermedio |
 | 12 | Modo CTF completo | múltiple | 40 min | ⬤⬤⬤ Avanzado |
 | 13 | Exportar SARIF a GitHub | — | 15 min | ⬤⬤○ Intermedio |
+
+---
+
+---
+
+## 15. Catálogo de recomendaciones
+
+El catálogo de recomendaciones es la base de conocimiento interna que Scan Agent usa para enriquecer los hallazgos de cada escaneo con descripciones detalladas, referencias OWASP y recomendaciones de remediación específicas.
+
+### 15.1 Acceder al catálogo
+
+Haz clic en **Catálogo** en el menú de navegación superior de la interfaz web. La página carga automáticamente:
+
+1. La barra de versión (hash SHA-256, número de entradas, fecha de última modificación)
+2. La lista de entradas con sus filtros
+3. El registro de sincronizaciones con CISA KEV
+
+### 15.2 Barra de versión
+
+```
+┌────────────────────────────────────────────────────────────┐
+│ 📚 Catálogo de Recomendaciones                             │
+│ Versión: a3f9c12d... | 247 entradas | Modificado: hoy      │
+│ [🔄 Sincronizar ahora]                                     │
+└────────────────────────────────────────────────────────────┘
+```
+
+- El **hash SHA-256** identifica de forma única cada versión del catálogo. Si el archivo cambia, el hash cambia.
+- El botón **Sincronizar ahora** lanza una sincronización manual con CISA KEV (puede tardar unos segundos).
+
+### 15.3 Filtros
+
+| Filtro | Descripción |
+|--------|-------------|
+| Búsqueda de texto | Busca en título, descripción y recomendación |
+| Categoría OWASP | Filtra por categoría OWASP Web o API (ej.: `A01:2021`, `API4:2023`) |
+| Severidad | Filtra por nivel: CRITICAL, HIGH, MEDIUM, LOW, INFO |
+
+Los filtros son acumulativos — puedes combinar los tres.
+
+### 15.4 Tarjetas de entrada
+
+Cada entrada del catálogo se muestra como una tarjeta con:
+
+```
+┌─────────────────────────────────────────────────────┐
+│ [HIGH] Missing X-Frame-Options Header               │
+│ OWASP: A05:2021 Security Misconfiguration           │
+│                                                     │
+│ Descripción: El header X-Frame-Options no está...   │
+│                                                     │
+│ Recomendación: Añadir X-Frame-Options: DENY en...   │
+│                                    [✏️ Editar]       │
+└─────────────────────────────────────────────────────┘
+```
+
+### 15.5 Editar una entrada
+
+Haz clic en **✏️ Editar** para abrir el modal de edición:
+
+1. **Título** — nombre descriptivo del hallazgo
+2. **Descripción** — explicación del problema (qué es y por qué importa)
+3. **Severidad** — CRITICAL / HIGH / MEDIUM / LOW / INFO
+4. **Categoría OWASP** — mapeo a la categoría OWASP correspondiente
+5. **Recomendación** — pasos de remediación concretos
+
+Haz clic en **Guardar** para aplicar los cambios. Los cambios se escriben en el archivo `recommendations_catalog.json` y se reflejan inmediatamente en los escaneos futuros.
+
+> **Para el lab:** editar el catálogo es un ejercicio avanzado. Úsalo para añadir recomendaciones específicas de tu entorno o para corregir descripciones que no se ajusten a tu contexto.
+
+### 15.6 Notificación en tiempo real (WebSocket)
+
+Si el catálogo se modifica mientras tienes la página abierta (por ejemplo, porque otro usuario lo editó, o el sistema de sincronización lo actualizó), aparece automáticamente un banner amarillo:
+
+```
+⚠️ El catálogo ha sido actualizado. [Recargar]
+```
+
+Haz clic en **Recargar** para ver la versión más reciente sin recargar toda la página.
+
+### 15.7 Registro de sincronizaciones
+
+Al final de la página aparece el historial de sincronizaciones automáticas con CISA KEV (se ejecuta cada 24 horas):
+
+| Columna | Descripción |
+|---------|-------------|
+| Fecha | Timestamp de la sincronización |
+| Fuente | `nvd` o `cisa_kev` |
+| Entradas añadidas | CVEs nuevos incorporados al catálogo |
+| Entradas actualizadas | CVEs existentes con datos actualizados |
+| Sin cambios | CVEs ya presentes y sin modificaciones |
+| Error | Mensaje de error si la sincronización falló |
+
+---
+
+## 16. Selección manual de fases
+
+La selección manual de fases permite ejecutar solo un subconjunto de las herramientas de un perfil, sin tener que crear un perfil personalizado.
+
+### 16.1 Activar el panel de fases
+
+1. Selecciona un perfil en el formulario de escaneo
+2. Aparece automáticamente el botón colapsable **⚙️ Configurar fases manualmente (opcional)**
+3. Haz clic en el botón para expandir el panel
+
+### 16.2 Tarjetas de fase
+
+Cada herramienta del perfil aparece como una tarjeta:
+
+```
+┌──────────────────────────────────────────────┐
+│ [✓] 🔍 nmap — Descubrimiento de puertos      │
+│     Escaneo de servicios y versiones          │
+│     ⏱ ~2 min                                 │
+│                                               │
+│ [✓] 🌐 nikto — Análisis de vulnerabilidades   │
+│     Detección de problemas HTTP conocidos     │
+│     ⏱ ~5 min        [Requerida]               │
+│                                               │
+│ [ ] 📁 gobuster — Enumeración de rutas        │
+│     Descubrimiento de directorios y endpoints │
+│     ⏱ ~8 min                                 │
+└──────────────────────────────────────────────┘
+```
+
+- **Marca o desmarca** cada tarjeta con el checkbox para incluir o excluir esa fase
+- Las fases con el badge **[Requerida]** pueden desmarcarse pero generan una advertencia
+- El tiempo estimado (`⏱`) se muestra por fase
+
+### 16.3 Pie del panel
+
+```
+3/4 fases · ~9 min estimado  
+[Todas] [Ninguna] [💾 Guardar preset]
+```
+
+| Control | Función |
+|---------|---------|
+| `N/M fases` | Cuántas fases están seleccionadas del total |
+| `~X min estimado` | Suma del tiempo estimado de las fases seleccionadas |
+| **Todas** | Marcar todas las fases |
+| **Ninguna** | Desmarcar todas las fases |
+| **💾 Guardar preset** | Guardar la selección actual con un nombre |
+
+### 16.4 Presets
+
+Los presets guardan una selección de fases para reutilizarla:
+
+1. Configura la selección de fases deseada
+2. Haz clic en **💾 Guardar preset**
+3. Introduce un nombre cuando el sistema lo pida (ej.: `Solo headers`, `nmap + nikto`)
+4. El preset aparece como botón de acceso rápido en la barra de presets
+
+Los presets se almacenan en el **localStorage del navegador**, por perfil. Se mantienen entre sesiones en el mismo navegador.
+
+**Para eliminar un preset:** haz clic en el `✕` junto al nombre del preset en la barra de presets.
+
+### 16.5 Resumen inline
+
+Cuando el panel de fases está cerrado pero tiene una selección activa, aparece un resumen compacto junto al botón:
+
+```
+⚙️ Configurar fases manualmente  ·  3/4 fases seleccionadas
+```
+
+Esto te recuerda que hay una selección personalizada activa sin necesidad de abrir el panel.
+
+### 16.6 Comportamiento al lanzar el escaneo
+
+- Si **todas** las fases están seleccionadas → el servidor ejecuta el perfil completo normalmente (sin diferencia)
+- Si hay una **selección parcial** → el servidor ejecuta solo las fases marcadas; las omitidas se registran en el reporte como `skipped_steps`
+- Si el panel está **cerrado** → se ejecuta el perfil completo (la selección del panel no tiene efecto)
+
+### 16.7 Badge en el historial
+
+Los escaneos lanzados con selección parcial de fases muestran el badge **⚙ personalizado** en la columna de perfil del historial:
+
+```
+juice-shop   lab ⚙ personalizado   completed   2026-05-26
+```
+
+Al hacer clic en **📄 Ver Reporte**, el reporte incluye una sección `scan_config` que detalla qué fases se ejecutaron y cuáles se omitieron.
+
+### 16.8 Casos de uso típicos en el lab
+
+| Escenario | Fases recomendadas |
+|-----------|--------------------|
+| Solo quiero ver los headers HTTP | nmap + curl |
+| Análisis rápido sin directorios | nmap + nikto (sin gobuster) |
+| Solo descubrimiento de puertos | nmap |
+| Solo análisis web (ya sé los puertos) | nikto + gobuster |
+| Auditoría TLS solamente | nmap + sslscan |
 
 ---
 
