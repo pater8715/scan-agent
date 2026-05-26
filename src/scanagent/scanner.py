@@ -43,7 +43,7 @@ class VulnerabilityScanner:
             commands=[
                 {
                     'tool': 'nmap',
-                    'args': '-Pn -sT --top-ports 100 {target}',
+                    'args': '-Pn -sT -sV -p1-1024,3000,5000,8000,8080,8443 --script=http-headers {target}',
                     'output': 'nmap_service_{target}.txt',
                     'timeout': 300,
                     'required': True
@@ -54,27 +54,48 @@ class VulnerabilityScanner:
                     'output': 'headers_{target}.txt',
                     'timeout': 30,
                     'required': False
+                },
+                {
+                    'tool': 'curl',
+                    'args': '-I https://{target}',
+                    'output': 'headers_https_{target}.txt',
+                    'timeout': 30,
+                    'required': False
                 }
             ]
         ),
-        
+
         'standard': ScanProfile(
             name='Standard Scan',
             description='Escaneo completo con detección de versiones y scripts básicos (15 min aprox)',
             commands=[
                 {
                     'tool': 'nmap',
-                    'args': '-sV -sC -p- {target}',
+                    'args': '-sV -sC --top-ports 1000 {target}',
                     'output': 'nmap_service_{target}.txt',
-                    'timeout': 900,
+                    'timeout': 1800,
                     'required': True
                 },
                 {
                     'tool': 'nmap',
-                    'args': '--script=vuln,safe {target}',
-                    'output': 'nmap_nse_{target}.txt',
+                    'args': '--script=vuln --top-ports 1000 {target}',
+                    'output': 'nmap_vuln_{target}.txt',
                     'timeout': 600,
                     'required': True
+                },
+                {
+                    'tool': 'nmap',
+                    'args': '--script=http-security-headers,http-headers --top-ports 1000 {target}',
+                    'output': 'nmap_nse_{target}.txt',
+                    'timeout': 300,
+                    'required': False
+                },
+                {
+                    'tool': 'nikto',
+                    'args': '-h http://{target} -timeout 10 -maxtime 180',
+                    'output': 'nikto_{target}.txt',
+                    'timeout': 240,
+                    'required': False
                 },
                 {
                     'tool': 'curl',
@@ -92,7 +113,7 @@ class VulnerabilityScanner:
                 }
             ]
         ),
-        
+
         'full': ScanProfile(
             name='Full Scan',
             description='Escaneo exhaustivo con todas las herramientas (30-60 min aprox)',
@@ -106,10 +127,17 @@ class VulnerabilityScanner:
                 },
                 {
                     'tool': 'nmap',
-                    'args': '--script=vuln,exploit,auth,discovery {target}',
+                    'args': '--script=vuln,auth,discovery,safe {target}',
                     'output': 'nmap_nse_{target}.txt',
                     'timeout': 1200,
                     'required': True
+                },
+                {
+                    'tool': 'whatweb',
+                    'args': 'http://{target}',
+                    'output': 'whatweb_{target}.txt',
+                    'timeout': 60,
+                    'required': False
                 },
                 {
                     'tool': 'nikto',
@@ -120,9 +148,23 @@ class VulnerabilityScanner:
                 },
                 {
                     'tool': 'gobuster',
-                    'args': 'dir -u http://{target} -w /usr/share/dirb/wordlists/common.txt -q',
+                    'args': 'dir -u http://{target} -w /usr/share/dirb/wordlists/big.txt -q',
                     'output': 'gobuster_{target}.txt',
-                    'timeout': 600,
+                    'timeout': 900,
+                    'required': False
+                },
+                {
+                    'tool': 'gobuster',
+                    'args': 'dir -u https://{target} -w /usr/share/dirb/wordlists/big.txt -q -k',
+                    'output': 'gobuster_https_{target}.txt',
+                    'timeout': 900,
+                    'required': False
+                },
+                {
+                    'tool': 'sslscan',
+                    'args': '{target}',
+                    'output': 'sslscan_{target}.txt',
+                    'timeout': 120,
                     'required': False
                 },
                 {
@@ -141,24 +183,38 @@ class VulnerabilityScanner:
                 }
             ]
         ),
-        
+
         'web': ScanProfile(
             name='Web Application Scan',
             description='Escaneo enfocado en aplicaciones web (20-30 min aprox)',
             commands=[
                 {
+                    'tool': 'wafw00f',
+                    'args': 'http://{target}',
+                    'output': 'wafw00f_{target}.txt',
+                    'timeout': 60,
+                    'required': False
+                },
+                {
                     'tool': 'nmap',
-                    'args': '-sV -p80,443,8080,8443 {target}',
+                    'args': '-sV -p80,443,3000,5000,8000,8080,8443,9000 {target}',
                     'output': 'nmap_service_{target}.txt',
                     'timeout': 300,
                     'required': True
                 },
                 {
                     'tool': 'nmap',
-                    'args': '--script=http-enum,http-headers,http-methods,http-vuln* {target}',
+                    'args': '--script=http-enum,http-headers,http-methods,http-vuln*,http-cors {target}',
                     'output': 'nmap_nse_{target}.txt',
                     'timeout': 600,
                     'required': True
+                },
+                {
+                    'tool': 'whatweb',
+                    'args': 'http://{target}',
+                    'output': 'whatweb_{target}.txt',
+                    'timeout': 60,
+                    'required': False
                 },
                 {
                     'tool': 'nikto',
@@ -169,7 +225,7 @@ class VulnerabilityScanner:
                 },
                 {
                     'tool': 'gobuster',
-                    'args': 'dir -u http://{target} -w /usr/share/dirb/wordlists/common.txt -x php,html,txt -q',
+                    'args': 'dir -u http://{target} -w /usr/share/dirb/wordlists/big.txt -x php,html,txt -q',
                     'output': 'gobuster_{target}.txt',
                     'timeout': 1200,
                     'required': False
@@ -190,14 +246,14 @@ class VulnerabilityScanner:
                 }
             ]
         ),
-        
+
         'stealth': ScanProfile(
             name='Stealth Scan',
             description='Escaneo sigiloso para evadir detección (30-45 min aprox, requiere sudo)',
             commands=[
                 {
                     'tool': 'nmap',
-                    'args': '-sS -sV -T2 -f {target}',
+                    'args': '-sS -sV -T2 -f --randomize-hosts --data-length 24 {target}',
                     'output': 'nmap_service_{target}.txt',
                     'timeout': 1800,
                     'required': True,
@@ -205,15 +261,22 @@ class VulnerabilityScanner:
                 },
                 {
                     'tool': 'nmap',
-                    'args': '--script=vuln -T2 {target}',
+                    'args': '--script=default -T2 --source-port 53 {target}',
                     'output': 'nmap_nse_{target}.txt',
                     'timeout': 1200,
                     'required': True,
                     'sudo': True
+                },
+                {
+                    'tool': 'curl',
+                    'args': '-s -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" -I http://{target}',
+                    'output': 'headers_stealth_{target}.txt',
+                    'timeout': 30,
+                    'required': False
                 }
             ]
         ),
-        
+
         'network': ScanProfile(
             name='Network Infrastructure Scan',
             description='Escaneo de infraestructura de red completa (40 min aprox, requiere sudo)',
@@ -228,42 +291,63 @@ class VulnerabilityScanner:
                 },
                 {
                     'tool': 'nmap',
-                    'args': '--script=default,discovery,version {target}',
+                    'args': '--script=default,smb-enum-shares,smb-enum-users,ftp-anon,ssh-hostkey,nfs-showmount {target}',
                     'output': 'nmap_nse_{target}.txt',
                     'timeout': 1800,
                     'required': True
+                },
+                {
+                    'tool': 'enum4linux',
+                    'args': '-a {target}',
+                    'output': 'enum4linux_{target}.txt',
+                    'timeout': 300,
+                    'required': False
+                },
+                {
+                    'tool': 'snmp-check',
+                    'args': '{target}',
+                    'output': 'snmp_{target}.txt',
+                    'timeout': 120,
+                    'required': False
                 }
             ]
         ),
-        
+
         'compliance': ScanProfile(
             name='Compliance & Best Practices',
             description='Verificación de cumplimiento y mejores prácticas (10 min aprox)',
             commands=[
                 {
                     'tool': 'nmap',
-                    'args': '-sV --script=ssl-cert,ssl-enum-ciphers,http-security-headers {target}',
+                    'args': '-sV --script=ssl-cert,ssl-enum-ciphers,http-security-headers,http-cors,http-auth-finder {target}',
                     'output': 'nmap_service_{target}.txt',
                     'timeout': 600,
                     'required': True
                 },
                 {
-                    'tool': 'nmap',
-                    'args': '--script=http-security-headers,http-headers,ssl-cert,ssl-enum-ciphers {target}',
-                    'output': 'nmap_nse_{target}.txt',
-                    'timeout': 600,
-                    'required': True
+                    'tool': 'sslscan',
+                    'args': '{target}',
+                    'output': 'sslscan_{target}.txt',
+                    'timeout': 120,
+                    'required': False
+                },
+                {
+                    'tool': 'curl',
+                    'args': '-I http://{target}',
+                    'output': 'headers_http_{target}.txt',
+                    'timeout': 30,
+                    'required': False
                 },
                 {
                     'tool': 'curl',
                     'args': '-I https://{target}',
-                    'output': 'headers_{target}.txt',
+                    'output': 'headers_https_{target}.txt',
                     'timeout': 30,
                     'required': False
                 }
             ]
         ),
-        
+
         'api': ScanProfile(
             name='API Security Scan',
             description='Escaneo enfocado en APIs REST/SOAP (15 min aprox)',
@@ -277,15 +361,50 @@ class VulnerabilityScanner:
                 },
                 {
                     'tool': 'nmap',
-                    'args': '--script=http-methods,http-auth,http-cors {target}',
+                    'args': '--script=http-methods,http-auth-finder,http-cors {target}',
                     'output': 'nmap_nse_{target}.txt',
                     'timeout': 300,
                     'required': True
                 },
                 {
+                    'tool': 'gobuster',
+                    'args': 'dir -u http://{target} -w /usr/share/wordlists/api-endpoints.txt -q -t 20 -x json',
+                    'output': 'gobuster_api_{target}.txt',
+                    'timeout': 600,
+                    'required': False
+                },
+                {
                     'tool': 'curl',
                     'args': '-I -H "Accept: application/json" http://{target}',
                     'output': 'headers_{target}.txt',
+                    'timeout': 30,
+                    'required': False
+                },
+                {
+                    'tool': 'curl',
+                    'args': '-X PUT -I -H "Accept: application/json" http://{target}/api/test',
+                    'output': 'curl_put_{target}.txt',
+                    'timeout': 30,
+                    'required': False
+                },
+                {
+                    'tool': 'curl',
+                    'args': '-X DELETE -I -H "Accept: application/json" http://{target}/api/test',
+                    'output': 'curl_delete_{target}.txt',
+                    'timeout': 30,
+                    'required': False
+                },
+                {
+                    'tool': 'curl',
+                    'args': '-X PATCH -I -H "Accept: application/json" http://{target}/api/test',
+                    'output': 'curl_patch_{target}.txt',
+                    'timeout': 30,
+                    'required': False
+                },
+                {
+                    'tool': 'curl',
+                    'args': '-s http://{target}/swagger.json http://{target}/api-docs http://{target}/graphql',
+                    'output': 'curl_apidocs_{target}.txt',
                     'timeout': 30,
                     'required': False
                 }
@@ -311,6 +430,13 @@ class VulnerabilityScanner:
                     'required': False
                 },
                 {
+                    'tool': 'gobuster',
+                    'args': 'dir -u http://{target} -w /usr/share/wordlists/api-endpoints.txt -q -t 20 -x json',
+                    'output': 'gobuster_{target}.txt',
+                    'timeout': 600,
+                    'required': False
+                },
+                {
                     'tool': 'curl',
                     'args': '-I -H "Accept: application/json" http://{target}',
                     'output': 'headers_{target}.txt',
@@ -318,10 +444,38 @@ class VulnerabilityScanner:
                     'required': False
                 },
                 {
-                    'tool': 'gobuster',
-                    'args': 'dir -u http://{target} -w /usr/share/dirb/wordlists/common.txt -q -t 20 -x json',
-                    'output': 'gobuster_{target}.txt',
-                    'timeout': 300,
+                    'tool': 'curl',
+                    'args': '-X PUT -I -H "Accept: application/json" http://{target}/api/test',
+                    'output': 'curl_put_{target}.txt',
+                    'timeout': 30,
+                    'required': False
+                },
+                {
+                    'tool': 'curl',
+                    'args': '-X DELETE -I -H "Accept: application/json" http://{target}/api/v1/resource',
+                    'output': 'curl_delete_{target}.txt',
+                    'timeout': 30,
+                    'required': False
+                },
+                {
+                    'tool': 'curl',
+                    'args': '-X OPTIONS -I http://{target}/api/v1/users',
+                    'output': 'curl_options_{target}.txt',
+                    'timeout': 30,
+                    'required': False
+                },
+                {
+                    'tool': 'curl',
+                    'args': '-s http://{target}/swagger.json http://{target}/api-docs http://{target}/graphiql',
+                    'output': 'curl_apidocs_{target}.txt',
+                    'timeout': 30,
+                    'required': False
+                },
+                {
+                    'tool': 'nikto',
+                    'args': '-h http://{target} -timeout 10 -maxtime 120',
+                    'output': 'nikto_{target}.txt',
+                    'timeout': 180,
                     'required': False
                 }
             ]
@@ -384,21 +538,21 @@ class VulnerabilityScanner:
                 },
                 {
                     'tool': 'nmap',
-                    'args': '--script=http-enum,http-headers,http-methods,http-auth-finder {target}',
+                    'args': '--script=http-enum,http-headers,http-methods,http-auth-finder,http-vuln* {target}',
                     'output': 'nmap_nse_{target}.txt',
                     'timeout': 180,
                     'required': False
                 },
                 {
                     'tool': 'nikto',
-                    'args': '-h http://{target} -timeout 3',
+                    'args': '-h http://{target} -timeout 10 -maxtime 120',
                     'output': 'nikto_{target}.txt',
-                    'timeout': 600,
+                    'timeout': 180,
                     'required': False
                 },
                 {
                     'tool': 'gobuster',
-                    'args': 'dir -u http://{target} -w /usr/share/dirb/wordlists/common.txt -q -t 20',
+                    'args': 'dir -u http://{target} -w /usr/share/dirb/wordlists/common.txt -q -t 20 -x php,js,json,html',
                     'output': 'gobuster_{target}.txt',
                     'timeout': 300,
                     'required': False
@@ -415,6 +569,20 @@ class VulnerabilityScanner:
                     'args': '-v http://{target}',
                     'output': 'curl_verbose_{target}.txt',
                     'timeout': 30,
+                    'required': False
+                },
+                {
+                    'tool': 'curl',
+                    'args': '-s http://{target}:3000/api/SecurityQuestions',
+                    'output': 'curl_juiceshop_{target}.txt',
+                    'timeout': 15,
+                    'required': False
+                },
+                {
+                    'tool': 'curl',
+                    'args': '-s http://{target}:8081/setup.php',
+                    'output': 'curl_dvwa_{target}.txt',
+                    'timeout': 15,
                     'required': False
                 }
             ]

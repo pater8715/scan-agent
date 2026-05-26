@@ -37,6 +37,10 @@ RUN apt-get update && \
     gobuster \
     dirb \
     whatweb \
+    wafw00f \
+    sslscan \
+    enum4linux \
+    snmp-check \
     # Utilidades de red
     curl \
     wget \
@@ -50,7 +54,12 @@ RUN apt-get update && \
     jq \
     # Limpieza
     && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \
+    # Wordlist de API endpoints de SecLists
+    && mkdir -p /usr/share/wordlists \
+    && wget -q "https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/Web-Content/common-api-endpoints-mazen160.txt" \
+       -O /usr/share/wordlists/api-endpoints.txt \
+    || echo "⚠️  No se pudo descargar api-endpoints.txt — usar dirb/common.txt como fallback"
 
 # ============================================================================
 # STAGE 2: Python dependencies

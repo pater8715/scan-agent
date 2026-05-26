@@ -6,7 +6,9 @@ con sus IPs fijas, puertos y perfil de escaneo recomendado.
 """
 
 import socket
+import json
 import os
+from pathlib import Path
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
@@ -138,6 +140,23 @@ async def list_lab_targets():
             entry["reachable"] = _check_reachable(t["hostname"], t["port"])
         result.append(entry)
     return result
+
+
+@router.get("/discovered-hosts")
+async def get_discovered_hosts():
+    """
+    Retorna la lista de hosts activos descubiertos en el último escaneo de red (CIDR).
+    Se actualiza cada vez que un escaneo de perfil 'network' sobre un rango CIDR completa.
+    """
+    store_path = Path("./data/last_discovered_hosts.json")
+    if not store_path.exists():
+        return {"hosts": [], "count": 0, "scan_id": None, "target": None, "scanned_at": None}
+    try:
+        with open(store_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data
+    except Exception:
+        return {"hosts": [], "count": 0, "scan_id": None, "target": None, "scanned_at": None}
 
 
 @router.get("/network-info")

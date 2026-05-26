@@ -854,11 +854,13 @@
                     : '';
                 const latency = h.latency_ms != null ? `⏱ ${h.latency_ms} ms` : '';
                 const hostname = h.hostname ? `<div class="dhc-hostname">${h.hostname}</div>` : '';
+                const vendor = h.vendor ? `<div class="dhc-vendor" style="font-size:0.75rem;color:#64748b;">🔌 ${h.vendor}</div>` : '';
 
                 return `
                 <div class="discovered-host-card">
                     <div class="dhc-ip">${h.ip}</div>
                     ${hostname}
+                    ${vendor}
                     <div class="dhc-latency">${latency}</div>
                     <div class="dhc-ports">${portBadges}${morePorts}</div>
                     <div class="dhc-actions">
@@ -882,6 +884,27 @@
                 renderDiscoveredHosts(data.hosts || [], scanId);
             } catch (_) {}
         }
+
+        async function loadPersistedDiscoveredHosts() {
+            try {
+                const r = await fetch('/api/lab/discovered-hosts');
+                if (!r.ok) return;
+                const data = await r.json();
+                if (data.hosts && data.hosts.length > 0) {
+                    const section = document.getElementById('discovered-hosts-section');
+                    if (section) {
+                        const subtitle = section.querySelector('p');
+                        if (subtitle && data.scanned_at) {
+                            const ts = new Date(data.scanned_at).toLocaleString('es-CO');
+                            subtitle.textContent = `Último escaneo de red: ${data.target} (${ts}). Selecciona un host y perfil para analizarlo.`;
+                        }
+                    }
+                    renderDiscoveredHosts(data.hosts, data.scan_id);
+                }
+            } catch (_) {}
+        }
+        // Cargar hosts del último escaneo de red al iniciar
+        loadPersistedDiscoveredHosts();
 
         function launchHostScan(ip, ipKey) {
             const profileSel = document.getElementById(`dhc-prof-${ipKey}`);

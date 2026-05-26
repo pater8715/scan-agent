@@ -389,6 +389,22 @@ async def execute_scan(scan_id: str, request: ScanRequest):
         active_scans[scan_id]["active_hosts"] = active_hosts
         _active_scanners.pop(scan_id, None)
 
+        # Persistir hosts descubiertos para el endpoint /api/lab/discovered-hosts
+        if is_cidr and active_hosts:
+            try:
+                Path("./data").mkdir(parents=True, exist_ok=True)
+                store = {
+                    "scan_id": scan_id,
+                    "target": request.target,
+                    "scanned_at": active_scans[scan_id]["completed_at"].isoformat(),
+                    "hosts": active_hosts,
+                    "count": len(active_hosts)
+                }
+                with open("./data/last_discovered_hosts.json", "w", encoding="utf-8") as _sf:
+                    json.dump(store, _sf, ensure_ascii=False, indent=2)
+            except Exception as _e:
+                print(f"⚠️  No se pudo guardar discovered hosts: {_e}")
+
         scan_metadata = {
             "scan_id": scan_id,
             "target": request.target,

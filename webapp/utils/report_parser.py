@@ -52,7 +52,7 @@ class ScanResultParser:
 
                 if 'nmap' in filename_lower:
                     self.parse_nmap_output(content)
-                    if 'nse' in filename_lower:
+                    if 'nse' in filename_lower or 'vuln' in filename_lower:
                         self.parse_nse_output(content, file.name)
                 elif 'header' in filename_lower or 'curl' in filename_lower:
                     self.parse_headers(content)
@@ -60,6 +60,12 @@ class ScanResultParser:
                     self.parse_nikto_output(content)
                 elif 'gobuster' in filename_lower or 'dirb' in filename_lower:
                     self.parse_directory_scan(content)
+                elif 'whatweb' in filename_lower:
+                    self.parse_whatweb_output(content)
+                elif 'wafw00f' in filename_lower:
+                    self.parse_wafw00f_output(content)
+                elif 'sslscan' in filename_lower:
+                    self.parse_sslscan_output(content)
 
                 self.results["raw_files"].append({
                     "filename": file.name,
@@ -112,6 +118,16 @@ class ScanResultParser:
                 })
 
     def parse_nmap_output(self, content: str):
+        # Escaneo de descubrimiento (-sn): poblar discovered_hosts con MAC/vendor
+        if "Host is up" in content and not re.search(r'\d+/(tcp|udp)\s+open', content):
+            discovered = self._parse_host_discovery(content)
+            if discovered:
+                existing_ips = {h["ip"] for h in self.results.get("active_hosts", [])}
+                for h in discovered:
+                    if h["ip"] not in existing_ips:
+                        self.results["active_hosts"].append(h)
+                        existing_ips.add(h["ip"])
+
         # Extraer hosts activos (escaneos CIDR / multi-host)
         self._parse_nmap_hosts(content)
 
@@ -257,6 +273,130 @@ class ScanResultParser:
             line = line.strip()
             if '(Status:' in line or 'CODE:' in line:
                 self.results["directories"].append(line)
+
+    def parse_whatweb_output(self, content: str):
+        """Parsea salida de whatweb — extrae tecnologías detectadas."""
+        if "whatweb_findings" not in self.results:
+            self.results["whatweb_findings"] = []
+
+        for line in content.splitlines():
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            status_m = re.search(r'\[(\d{3})[^\]]*\]', line)
+            status = int(status_m.group(1)) if status_m else None
+            techs = re.findall(r'([A-Za-z][A-Za-z0-9_\-\.]+)\[([^\]]+)\]', line)
+            entry = {
+                "raw": line[:300],
+                "http_status": status,
+                "technologies": [{"name": t[0], "version": t[1]} for t in techs if t[0] not in ("http", "https")]
+            }
+            if entry["technologies"] or entry["http_status"]:
+                self.results["whatweb_findings"].append(entry)
+                if "http_info" not in self.results:
+                    self.results["http_info"] = {}
+                for tech in entry["technologies"]:
+                    if tech["name"].lower() in ("httpserver", "server"):
+                        self.results["http_info"]["server"] = tech["version"]
+                    if tech["name"].lower() in ("title",):
+                        self.results["http_info"]["title"] = tech["version"]
+                    if tech["name"].lower() in ("x-powered-by",):
+                        self.results["http_info"]["powered_by"] = tech["version"]
+
+    def parse_wafw00f_output(self, content: str):
+        """Parsea salida de wafw00f — detecta presencia y nombre de WAF."""
+        if "waf_info" not in self.results:
+            self.results["waf_info"] = {"detected": False, "name": None, "raw": ""}
+
+        self.results["waf_info"]["raw"] = content[:500]
+        content_lower = content.lower()
+
+        if "no waf detected" in content_lower or "generic detection" in content_lower:
+            self.results["waf_info"]["detected"] = False
+            return
+
+        m = re.search(r'is behind\s+(.+?)\s+(?:WAF|web application firewall)', content, re.IGNORECASE)
+        if m:
+            self.results["waf_info"]["detected"] = True
+            self.results["waf_info"]["name"] = m.group(1).strip()
+            return
+
+        if "waf" in content_lower and any(w in content_lower for w in ("detected", "identified", "found")):
+            self.results["waf_info"]["detected"] = True
+
+    def parse_sslscan_output(self, content: str):
+        """Parsea salida de sslscan — extrae protocolos habilitados y debilidades TLS."""
+        if "ssl_info" not in self.results:
+            self.results["ssl_info"] = {
+                "protocols": {},
+                "weak_ciphers": [],
+                "certificate": {},
+                "issues": []
+            }
+
+        ssl = self.results["ssl_info"]
+
+        for line in content.splitlines():
+            stripped = line.strip()
+
+            # Protocolos habilitados/deshabilitados
+            proto_m = re.match(r'(SSLv2|SSLv3|TLSv1\.0|TLSv1\.1|TLSv1\.2|TLSv1\.3)\s+(enabled|disabled)', stripped, re.IGNORECASE)
+            if proto_m:
+                proto, state = proto_m.group(1), proto_m.group(2).lower()
+                ssl["protocols"][proto] = state == "enabled"
+                if state == "enabled" and proto in ("SSLv2", "SSLv3", "TLSv1.0", "TLSv1.1"):
+                    ssl["issues"].append(f"Protocolo inseguro habilitado: {proto}")
+
+            # Cifrados débiles
+            if re.search(r'\b(DES|RC4|EXPORT|NULL|anon|IDEA)\b', stripped):
+                ssl["weak_ciphers"].append(stripped[:120])
+
+            # Fechas de certificado
+            exp_m = re.search(r'Not valid after\s*:\s*(.+)', stripped, re.IGNORECASE)
+            if exp_m:
+                ssl["certificate"]["expires"] = exp_m.group(1).strip()
+            cn_m = re.search(r'Subject:\s*(.+)', stripped, re.IGNORECASE)
+            if cn_m:
+                ssl["certificate"]["subject"] = cn_m.group(1).strip()
+
+    def _parse_host_discovery(self, content: str) -> List[Dict]:
+        """Extrae hosts activos de salida nmap -sn, incluyendo MAC/vendor si disponible."""
+        discovered = []
+        host_re = re.compile(
+            r'Nmap scan report for (?:([^\s(]+)\s*\()?([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)\)?'
+        )
+        mac_re = re.compile(r'MAC Address:\s*([0-9A-Fa-f:]{17})\s*(?:\(([^)]+)\))?')
+
+        matches = list(host_re.finditer(content))
+        for i, m in enumerate(matches):
+            hostname = m.group(1) or ""
+            ip = m.group(2)
+            block_start = m.start()
+            block_end = matches[i + 1].start() if i + 1 < len(matches) else len(content)
+            block = content[block_start:block_end]
+
+            if "Host is up" not in block:
+                continue
+
+            latency_ms = None
+            lat_m = re.search(r'Host is up \(([0-9.]+)s latency\)', block)
+            if lat_m:
+                latency_ms = round(float(lat_m.group(1)) * 1000, 1)
+
+            mac_info = mac_re.search(block)
+            mac = mac_info.group(1) if mac_info else None
+            vendor = mac_info.group(2) if mac_info else None
+
+            discovered.append({
+                "ip": ip,
+                "hostname": hostname,
+                "latency_ms": latency_ms,
+                "mac": mac,
+                "vendor": vendor,
+                "open_ports": []
+            })
+
+        return discovered
 
 
 class VulnerabilityAnalyzer:

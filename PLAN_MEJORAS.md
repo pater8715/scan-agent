@@ -167,104 +167,104 @@ Mejoras opcionales para enriquecer la experiencia educativa.
 ---
 
 ### FASE 8 — Correcciones de Perfiles de Escaneo
-**Prioridad:** ALTA | **Estimado:** ~18h | **Estado:** ⬜ Pendiente
+**Prioridad:** ALTA | **Estimado:** ~18h | **Estado:** ✅ Completado (2026-05-26)
 
 Análisis de los 12 perfiles identificó comandos duplicados, timeouts inadecuados, puertos faltantes y ausencia de herramientas clave. Ver análisis completo en sesión del 2026-05-25.
 
 #### 8.1 — Perfil `quick`
 | # | Tarea | Estado |
 |---|-------|--------|
-| 8.1.1 | Agregar `-sV` para detección básica de versiones | ⬜ |
-| 8.1.2 | Ampliar puertos: reemplazar `--top-ports 100` por `--top-ports 200` + incluir 3000, 5000, 8000 explícitamente | ⬜ |
-| 8.1.3 | Agregar `curl -I https://{target}` como segundo curl | ⬜ |
-| 8.1.4 | Agregar `--script=http-headers` al nmap para obtener cabeceras básicas | ⬜ |
+| 8.1.1 | Agregar `-sV` para detección básica de versiones | ✅ |
+| 8.1.2 | Ampliar puertos: reemplazar `--top-ports 100` por `--top-ports 200` + incluir 3000, 5000, 8000 explícitamente | ✅ |
+| 8.1.3 | Agregar `curl -I https://{target}` como segundo curl | ✅ |
+| 8.1.4 | Agregar `--script=http-headers` al nmap para obtener cabeceras básicas | ✅ |
 
 #### 8.2 — Perfil `standard`
 | # | Tarea | Estado |
 |---|-------|--------|
-| 8.2.1 | Reemplazar `--top-ports` implícito del segundo nmap por `-p-` para coherencia con el primero | ⬜ |
-| 8.2.2 | Separar `--script=vuln,safe` en dos comandos: uno `vuln` y uno `http-security-headers,http-headers` | ⬜ |
-| 8.2.3 | Aumentar timeout del primer nmap a 1800s o restringir a `--top-ports 1000` | ⬜ |
-| 8.2.4 | Agregar nikto como herramienta opcional | ⬜ |
+| 8.2.1 | Reemplazar `--top-ports` implícito del segundo nmap por `-p-` para coherencia con el primero | ✅ |
+| 8.2.2 | Separar `--script=vuln,safe` en dos comandos: uno `vuln` y uno `http-security-headers,http-headers` | ✅ |
+| 8.2.3 | Aumentar timeout del primer nmap a 1800s o restringir a `--top-ports 1000` | ✅ |
+| 8.2.4 | Agregar nikto como herramienta opcional | ✅ |
 
 #### 8.3 — Perfil `full`
 | # | Tarea | Estado |
 |---|-------|--------|
-| 8.3.1 | Reemplazar categoría `exploit` por `exploit,safe` o eliminarla para entorno educativo | ⬜ |
-| 8.3.2 | Agregar gobuster para HTTPS: `gobuster dir -u https://{target} -w ...` | ⬜ |
-| 8.3.3 | Cambiar wordlist de gobuster a `big.txt` o equivalente de SecLists | ⬜ |
-| 8.3.4 | Agregar `sslscan {target}` como herramienta optional | ⬜ |
-| 8.3.5 | Agregar `whatweb http://{target}` para fingerprinting de framework | ⬜ |
+| 8.3.1 | Reemplazar categoría `exploit` por `exploit,safe` o eliminarla para entorno educativo | ✅ |
+| 8.3.2 | Agregar gobuster para HTTPS: `gobuster dir -u https://{target} -w ...` | ✅ |
+| 8.3.3 | Cambiar wordlist de gobuster a `big.txt` o equivalente de SecLists | ✅ |
+| 8.3.4 | Agregar `sslscan {target}` como herramienta optional | ✅ |
+| 8.3.5 | Agregar `whatweb http://{target}` para fingerprinting de framework | ✅ |
 
 #### 8.4 — Perfil `web`
 | # | Tarea | Estado |
 |---|-------|--------|
-| 8.4.1 | Agregar puertos 3000, 5000, 8000, 9000 al scan nmap | ⬜ |
-| 8.4.2 | Agregar `wafw00f http://{target}` como primer paso | ⬜ |
-| 8.4.3 | Agregar `whatweb http://{target}` para fingerprinting | ⬜ |
-| 8.4.4 | Usar wordlist más completa en gobuster (`big.txt`) | ⬜ |
-| 8.4.5 | Agregar `http-cors` al segundo nmap NSE | ⬜ |
+| 8.4.1 | Agregar puertos 3000, 5000, 8000, 9000 al scan nmap | ✅ |
+| 8.4.2 | Agregar `wafw00f http://{target}` como primer paso | ✅ |
+| 8.4.3 | Agregar `whatweb http://{target}` para fingerprinting | ✅ |
+| 8.4.4 | Usar wordlist más completa en gobuster (`big.txt`) | ✅ |
+| 8.4.5 | Agregar `http-cors` al segundo nmap NSE | ✅ |
 
 #### 8.5 — Perfil `stealth`
 | # | Tarea | Estado |
 |---|-------|--------|
-| 8.5.1 | Agregar `--randomize-hosts --data-length 24` al primer nmap | ⬜ |
-| 8.5.2 | Agregar `--source-port 53` para simular tráfico DNS | ⬜ |
-| 8.5.3 | Agregar curl con User-Agent personalizado: `curl -s -A "Mozilla/5.0" -I http://{target}` | ⬜ |
-| 8.5.4 | Cambiar scripts NSE de `vuln` a `default` para reducir firma de ataque | ⬜ |
+| 8.5.1 | Agregar `--randomize-hosts --data-length 24` al primer nmap | ✅ |
+| 8.5.2 | Agregar `--source-port 53` para simular tráfico DNS | ✅ |
+| 8.5.3 | Agregar curl con User-Agent personalizado: `curl -s -A "Mozilla/5.0" -I http://{target}` | ✅ |
+| 8.5.4 | Cambiar scripts NSE de `vuln` a `default` para reducir firma de ataque | ✅ |
 
 #### 8.6 — Perfil `network`
 | # | Tarea | Estado |
 |---|-------|--------|
-| 8.6.1 | Reemplazar categoría `discovery` por scripts específicos: `smb*,ftp-anon,ssh-hostkey,nfs-showmount` | ⬜ |
-| 8.6.2 | Eliminar categoría `version` del segundo nmap (redundante con `-sV`) | ⬜ |
-| 8.6.3 | Agregar `enum4linux -a {target}` para enumeración SMB/NetBIOS | ⬜ |
-| 8.6.4 | Agregar `snmp-check {target}` para enumeración SNMP | ⬜ |
-| 8.6.5 | **Listado de IPs activas → Objetivos de Laboratorio:** cuando el target es un rango CIDR (ej: `172.20.0.0/24`), parsear la salida del `nmap -sn` y poblar automáticamente la sección "Objetivos de Laboratorio" en la UI con las IPs respondentes, mostrando hostname (si resuelve), MAC/vendor y un botón "Escanear este host" que lanza un nuevo escaneo sobre esa IP individual | ⬜ |
-| 8.6.6 | En `report_parser.py`, agregar método `_parse_host_discovery()` que extrae IPs activas de la salida de `nmap -sn` y las guarda en el campo `discovered_hosts` del resultado | ⬜ |
-| 8.6.7 | Crear endpoint `GET /api/lab/targets` en la webapp que retorna la lista de hosts activos del último escaneo de red, accesible desde el dashboard | ⬜ |
-| 8.6.8 | En la UI del dashboard, añadir sección "Objetivos de Laboratorio" que muestra la tabla de hosts descubiertos con: IP, hostname, vendor (MAC OUI), estado, y botón "Escanear" por cada host | ⬜ |
+| 8.6.1 | Reemplazar categoría `discovery` por scripts específicos: `smb*,ftp-anon,ssh-hostkey,nfs-showmount` | ✅ |
+| 8.6.2 | Eliminar categoría `version` del segundo nmap (redundante con `-sV`) | ✅ |
+| 8.6.3 | Agregar `enum4linux -a {target}` para enumeración SMB/NetBIOS | ✅ |
+| 8.6.4 | Agregar `snmp-check {target}` para enumeración SNMP | ✅ |
+| 8.6.5 | **Listado de IPs activas → Objetivos de Laboratorio:** cuando el target es un rango CIDR (ej: `172.20.0.0/24`), parsear la salida del `nmap -sn` y poblar automáticamente la sección "Objetivos de Laboratorio" en la UI con las IPs respondentes, mostrando hostname (si resuelve), MAC/vendor y un botón "Escanear este host" que lanza un nuevo escaneo sobre esa IP individual | ✅ |
+| 8.6.6 | En `report_parser.py`, agregar método `_parse_host_discovery()` que extrae IPs activas de la salida de `nmap -sn` y las guarda en el campo `discovered_hosts` del resultado | ✅ |
+| 8.6.7 | Crear endpoint `GET /api/lab/targets` en la webapp que retorna la lista de hosts activos del último escaneo de red, accesible desde el dashboard | ✅ |
+| 8.6.8 | En la UI del dashboard, añadir sección "Objetivos de Laboratorio" que muestra la tabla de hosts descubiertos con: IP, hostname, vendor (MAC OUI), estado, y botón "Escanear" por cada host | ✅ |
 
 #### 8.7 — Perfil `compliance`
 | # | Tarea | Estado |
 |---|-------|--------|
-| 8.7.1 | **Eliminar el segundo nmap** (comandos idénticos al primero — 100% redundante) | ⬜ |
-| 8.7.2 | Agregar `curl -I http://{target}` para verificar redirección HTTP→HTTPS | ⬜ |
-| 8.7.3 | Agregar `sslscan {target}` para análisis TLS profundo (POODLE, BEAST, etc.) | ⬜ |
-| 8.7.4 | Agregar `http-cors,http-auth-finder` al nmap NSE | ⬜ |
+| 8.7.1 | **Eliminar el segundo nmap** (comandos idénticos al primero — 100% redundante) | ✅ |
+| 8.7.2 | Agregar `curl -I http://{target}` para verificar redirección HTTP→HTTPS | ✅ |
+| 8.7.3 | Agregar `sslscan {target}` para análisis TLS profundo (POODLE, BEAST, etc.) | ✅ |
+| 8.7.4 | Agregar `http-cors,http-auth-finder` al nmap NSE | ✅ |
 
 #### 8.8 — Perfil `api`
 | # | Tarea | Estado |
 |---|-------|--------|
-| 8.8.1 | Agregar gobuster con wordlist de API endpoints | ⬜ |
-| 8.8.2 | Agregar curl para métodos PUT, DELETE, PATCH (`-X PUT/DELETE`) | ⬜ |
-| 8.8.3 | Agregar curl a endpoints de documentación: `/swagger.json`, `/api-docs`, `/graphql` | ⬜ |
-| 8.8.4 | Reemplazar `http-auth` por `http-auth-finder` en NSE | ⬜ |
+| 8.8.1 | Agregar gobuster con wordlist de API endpoints | ✅ |
+| 8.8.2 | Agregar curl para métodos PUT, DELETE, PATCH (`-X PUT/DELETE`) | ✅ |
+| 8.8.3 | Agregar curl a endpoints de documentación: `/swagger.json`, `/api-docs`, `/graphql` | ✅ |
+| 8.8.4 | Reemplazar `http-auth` por `http-auth-finder` en NSE | ✅ |
 
 #### 8.9 — Perfil `api-owasp`
 | # | Tarea | Estado |
 |---|-------|--------|
-| 8.9.1 | Reemplazar wordlist `common.txt` por wordlist específica de API endpoints | ⬜ |
-| 8.9.2 | Agregar curl para métodos REST: PUT, DELETE, OPTIONS | ⬜ |
-| 8.9.3 | Agregar curl a `/swagger.json`, `/api-docs`, `/graphiql`, `/api/v1/users` | ⬜ |
-| 8.9.4 | Agregar nikto básico como herramienta opcional | ⬜ |
+| 8.9.1 | Reemplazar wordlist `common.txt` por wordlist específica de API endpoints | ✅ |
+| 8.9.2 | Agregar curl para métodos REST: PUT, DELETE, OPTIONS | ✅ |
+| 8.9.3 | Agregar curl a `/swagger.json`, `/api-docs`, `/graphiql`, `/api/v1/users` | ✅ |
+| 8.9.4 | Agregar nikto básico como herramienta opcional | ✅ |
 
 #### 8.10 — Perfil `lab`
 | # | Tarea | Estado |
 |---|-------|--------|
-| 8.10.1 | Cambiar `nikto -timeout 3` por `nikto -timeout 10 -maxtime 120` | ⬜ |
-| 8.10.2 | Agregar extensiones a gobuster: `-x php,js,json,html` | ⬜ |
-| 8.10.3 | Agregar `http-vuln*` al nmap NSE | ⬜ |
-| 8.10.4 | Agregar curl específico por app del lab: `curl -s http://{target}:3000/api/SecurityQuestions` y `curl -s http://{target}:8081/setup.php` | ⬜ |
+| 8.10.1 | Cambiar `nikto -timeout 3` por `nikto -timeout 10 -maxtime 120` | ✅ |
+| 8.10.2 | Agregar extensiones a gobuster: `-x php,js,json,html` | ✅ |
+| 8.10.3 | Agregar `http-vuln*` al nmap NSE | ✅ |
+| 8.10.4 | Agregar curl específico por app del lab: `curl -s http://{target}:3000/api/SecurityQuestions` y `curl -s http://{target}:8081/setup.php` | ✅ |
 
 #### 8.11 — Integración de nuevas herramientas
 | # | Tarea | Estado |
 |---|-------|--------|
-| 8.11.1 | Agregar `whatweb` a la imagen Docker (Kali tiene paquete disponible) | ⬜ |
-| 8.11.2 | Agregar `wafw00f` a la imagen Docker | ⬜ |
-| 8.11.3 | Agregar `sslscan` a la imagen Docker (para perfiles compliance y full) | ⬜ |
-| 8.11.4 | Agregar wordlist de API endpoints de SecLists al contenedor | ⬜ |
-| 8.11.5 | Actualizar `report_parser.py` para parsear salida de `whatweb`, `wafw00f` y `sslscan` | ⬜ |
+| 8.11.1 | Agregar `whatweb` a la imagen Docker (Kali tiene paquete disponible) | ✅ |
+| 8.11.2 | Agregar `wafw00f` a la imagen Docker | ✅ |
+| 8.11.3 | Agregar `sslscan` a la imagen Docker (para perfiles compliance y full) | ✅ |
+| 8.11.4 | Agregar wordlist de API endpoints de SecLists al contenedor | ✅ |
+| 8.11.5 | Actualizar `report_parser.py` para parsear salida de `whatweb`, `wafw00f` y `sslscan` | ✅ |
 
 ---
 
@@ -427,7 +427,7 @@ Al iniciar un escaneo, después de elegir el perfil, el usuario puede activar op
 | 5 | Reportes educativos | MEDIA | ~25h | ✅ |
 | 6 | Seguridad y arquitectura | MEDIA | ~15h | ✅ |
 | 7 | Funcionalidades avanzadas | BAJA | ~30h | ✅ |
-| 8 | Correcciones de perfiles de escaneo | ALTA | ~18h | ⬜ |
+| 8 | Correcciones de perfiles de escaneo | ALTA | ~18h | ✅ |
 | 9 | Reportes dinámicos con actualización automática | ALTA | ~22h | ⬜ |
 | 10 | Selección manual de fases por escaneo | MEDIA | ~20h | ⬜ |
 | | **TOTAL** | | **~237h** | |
@@ -444,8 +444,8 @@ SEMANA 9-11: Fase 3 — Integración ZAP (pruebas activas profundas)            
 SEMANA 12-13: Fase 5 — Reportes educativos                                               ✅
 SEMANA 14:   Fase 6 — Seguridad y arquitectura                                           ✅
 SEMANA 15:   Fase 7 — Funcionalidades avanzadas                                          ✅
-SEMANA 16:   Fase 8 — Correcciones de perfiles (calidad de datos del escaneo)            ⬜  ← ACTUAL
-SEMANA 17-18: Fase 9 — Reportes dinámicos (actualización automática de catálogo)         ⬜
+SEMANA 16:   Fase 8 — Correcciones de perfiles (calidad de datos del escaneo)            ✅
+SEMANA 17-18: Fase 9 — Reportes dinámicos (actualización automática de catálogo)         ⬜  ← ACTUAL
 SEMANA 19-20: Fase 10 — Selección manual de fases (configuración personalizada por sesión) ⬜
 ```
 
@@ -473,6 +473,7 @@ SEMANA 19-20: Fase 10 — Selección manual de fases (configuración personaliza
 | 2026-05-25 | Análisis completo de 12 perfiles de escaneo — identificadas brechas en comandos, timeouts, puertos y herramientas faltantes | 8 |
 | 2026-05-25 | Adición de Fase 8 (correcciones de perfiles) y Fase 9 (reportes dinámicos con catálogo auto-actualizable) al plan | — |
 | 2026-05-25 | Adición de tarea 8.6.5: escaneo de red genera listado de IPs disponibles visible en sección "Objetivos de Laboratorio" de la UI | 8 |
+| 2026-05-26 | Implementación completa Fase 8 — correcciones de 10 perfiles (8.1–8.10), 3 nuevas herramientas Docker (wafw00f, sslscan, enum4linux+snmp-check), 3 parsers nuevos (whatweb, wafw00f, sslscan), endpoint discovered-hosts, UI hosts activos con vendor MAC | 8 |
 | 2026-05-25 | Modal de perfil enriquecido con contenido educativo: objetivos de aprendizaje, propósito por herramienta, qué detecta y referencia OWASP por cada comando | — |
 | 2026-05-25 | Adición de Fase 10: selección manual de fases por escaneo — 9 subsecciones, 3 capas (backend scanner+agent+API, frontend panel+historial, presets opcionales) | 10 |
 
