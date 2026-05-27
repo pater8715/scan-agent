@@ -768,9 +768,9 @@ def _generate_profile_html_sections(scan_data: dict) -> str:
     if profile == "api-owasp":
         html += _generate_owasp_api_table_html(vulnerabilities)
 
-    # Hallazgos Nikto para web y api-owasp
-    if profile in ("web", "api-owasp") and nikto:
-        html += _generate_nikto_html(nikto)
+    # Nota: los hallazgos Nikto ya se muestran como tarjetas individuales en la
+    # sección "Hallazgos de Seguridad". No se repite la tabla cruda aquí para
+    # evitar redundancia en el reporte.
 
     # Directorios encontrados para web y api-owasp
     if profile in ("web", "api-owasp") and directories:

@@ -626,8 +626,13 @@ class VulnerabilityAnalyzer:
         for sev in ("CRITICAL", "HIGH", "MEDIUM", "LOW"):
             kw = catalog.get("nikto_severity_keywords", {}).get(sev)
             if kw is not None:
-                _, score = self._nikto_keywords[sev]
-                self._nikto_keywords[sev] = (kw, score)
+                existing_kw, score = self._nikto_keywords[sev]
+                # Combinar keywords del catálogo con los predeterminados (sin duplicados).
+                # Se usa merge en lugar de reemplazar para que los valores hardcoded
+                # (ej: "access-control-allow-origin", "cors", "suggested") no se pierdan
+                # cuando el catálogo define sus propias keywords para ese nivel de severidad.
+                merged = list(dict.fromkeys(list(existing_kw) + list(kw)))
+                self._nikto_keywords[sev] = (merged, score)
 
     def analyze(self) -> Dict:
         # Análisis de infraestructura (todos los perfiles)
