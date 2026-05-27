@@ -1,26 +1,40 @@
 services:
   - type: web
     name: scan-agent-web
-    runtime: python
+    runtime: docker
+    dockerfilePath: ./Dockerfile.render
+    dockerContext: .
     plan: starter
-    buildCommand: pip install -r webapp/requirements.txt
-    startCommand: python3 -m uvicorn webapp.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
+
+    # ── Disco persistente (opcional, requiere plan de pago en Render) ────────
+    # Si se activa, el historial de escaneos y el catálogo editado sobreviven
+    # a los reinicios y nuevos deploys.  El script de inicio siembra el
+    # catálogo automáticamente la primera vez que el disco está vacío.
+    #
+    # disk:
+    #   name: scan-agent-data
+    #   mountPath: /app/data
+    #   sizeGB: 1
+
     envVars:
       - key: SCAN_MODE
         value: web
+
       - key: LOG_LEVEL
-        value: INFO
+        value: info
+
       - key: JSON_LOGGING
         value: "true"
+
+      # Solo se permiten IPs privadas/locales por defecto.
+      # Cambia a "true" con precaución si necesitas escanear hosts externos.
       - key: ALLOW_PUBLIC_TARGETS
         value: "false"
-      # Descomenta y configura para activar autenticación por API key:
+
+      # API Key de autenticación — descomenta y configura en el dashboard de
+      # Render para proteger la API cuando el servicio sea público.
       # - key: SCAN_AGENT_API_KEY
       #   generateValue: true
+
     autoDeploy: true
-
-
-
-
-

@@ -249,15 +249,14 @@ class VulnerabilityScanner:
 
         'stealth': ScanProfile(
             name='Stealth Scan',
-            description='Escaneo sigiloso para evadir detección (30-45 min aprox, requiere sudo)',
+            description='Escaneo sigiloso para evadir detección (30-45 min aprox)',
             commands=[
                 {
                     'tool': 'nmap',
-                    'args': '-sS -sV -T2 -f --randomize-hosts --data-length 24 {target}',
+                    'args': '-sT -sV -T2 --randomize-hosts {target}',
                     'output': 'nmap_service_{target}.txt',
                     'timeout': 1800,
                     'required': True,
-                    'sudo': True
                 },
                 {
                     'tool': 'nmap',
@@ -265,7 +264,6 @@ class VulnerabilityScanner:
                     'output': 'nmap_nse_{target}.txt',
                     'timeout': 1200,
                     'required': True,
-                    'sudo': True
                 },
                 {
                     'tool': 'curl',

@@ -1,42 +1,69 @@
-# Dockerfile para despliegue en Render.com
-# ==========================================
-# Usa python:3.12-slim (Debian) — NO incluye gobuster ni las herramientas Kali.
-# Las herramientas de escaneo que no estén disponibles se omiten automáticamente.
+# Dockerfile.render — Imagen optimizada para Render.com
+# =======================================================
+# Base: python:3.12-slim (Debian bookworm)
+# Incluye: nmap, nikto, gobuster, sslscan, wafw00f, whatweb, curl
+# NO incluye: enum4linux, snmp-check (requieren dependencias pesadas)
+# El perfil 'internal' queda deshabilitado en este entorno.
 
 FROM python:3.12-slim
 
-# Instalar solo las herramientas disponibles en Debian
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        nmap \
-        nikto \
-        curl \
-        sqlite3 \
-        dirb \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-
-WORKDIR /app
-
-# Copiar e instalar dependencias Python
-COPY webapp/requirements.txt ./webapp-requirements.txt
-RUN pip install --no-cache-dir -r webapp-requirements.txt
-
-# Copiar código fuente
-COPY src/ ./src/
-COPY webapp/ ./webapp/
-COPY config/ ./config/
-COPY scripts/ ./scripts/
-COPY README.md ./
-
-# Crear carpetas de trabajo
-RUN mkdir -p outputs reports data logs
-
-EXPOSE 8080
-
+ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV SCAN_MODE=web
 
-# Render inyecta $PORT; usamos 8080 como fallback para desarrollo local
-CMD ["/bin/sh", "-c", "python3 -m uvicorn webapp.main:app --host 0.0.0.0 --port ${PORT:-8080}"]
+WORKDIR /app
+
+# ── Herramientas de seguridad (disponibles en Debian bookworm) ──────────────
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        nmap \
+        nikto \
+        gobuster \
+        sslscan \
+        whatweb \
+        curl \
+        wget \
+        sqlite3 \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+# wafw00f es Python puro → pip (más ligero que el paquete apt)
+RUN pip install --no-cache-dir wafw00f==0.24
+
+# Wordlist para gobuster y nikto
+RUN mkdir -p /usr/share/wordlists && \
+    wget -q \
+    "https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/Web-Content/common-api-endpoints-mazen160.txt" \
+    -O /usr/share/wordlists/api-endpoints.txt \
+    || echo "[warn] Wordlist no descargada — se usará dirb/common.txt como fallback"
+
+# ── Dependencias Python de la webapp ───────────────────────────────────────
+COPY webapp/requirements.txt ./requirements-webapp.txt
+RUN pip install --no-cache-dir -r requirements-webapp.txt
+
+# ── Código fuente ───────────────────────────────────────────────────────────
+COPY src/       ./src/
+COPY webapp/    ./webapp/
+COPY config/    ./config/
+COPY scripts/   ./scripts/
+COPY README.md  ./
+
+# ── Catálogo de recomendaciones ─────────────────────────────────────────────
+# Se copia en dos ubicaciones:
+#   1. data_seed/ → semilla permanente en la imagen (nunca sobreescrita por el disco)
+#   2. data/      → ubicación de trabajo por defecto (puede montarse un disco aquí)
+COPY data/recommendations_catalog.json ./data_seed/recommendations_catalog.json
+RUN mkdir -p data outputs reports logs && \
+    cp data_seed/recommendations_catalog.json data/recommendations_catalog.json
+
+# ── Permisos de scripts ─────────────────────────────────────────────────────
+RUN chmod +x /app/scripts/render-entrypoint.sh && \
+    (chmod +x /app/scripts/scan-agent.py 2>/dev/null || true) && \
+    (chmod +x /app/scripts/*.sh 2>/dev/null || true)
+
+EXPOSE 8080
+
+# Render verifica /health vía healthCheckPath en render.yaml
+# El CMD usa ${PORT} que Render inyecta automáticamente
+CMD ["/app/scripts/render-entrypoint.sh"]
