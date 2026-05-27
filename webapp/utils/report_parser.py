@@ -54,6 +54,9 @@ class ScanResultParser:
                     self.parse_nmap_output(content)
                     if 'nse' in filename_lower or 'vuln' in filename_lower:
                         self.parse_nse_output(content, file.name)
+                    if 'service' in filename_lower:
+                        # Fallback: extraer cabeceras del fingerprint nmap cuando curl falla
+                        self.parse_nmap_fingerprint_for_headers(content)
                 elif 'header' in filename_lower or 'curl' in filename_lower:
                     self.parse_headers(content)
                 elif 'nikto' in filename_lower:
@@ -254,6 +257,95 @@ class ScanResultParser:
                 except Exception:
                     pass
 
+    def parse_nmap_fingerprint_for_headers(self, content: str):
+        """
+        Extrae cabeceras HTTP del bloque de fingerprint de nmap (SF-Port...-TCP:).
+        Se usa como fallback cuando curl falla y http_headers queda vacío.
+        El fingerprint de nmap usa secuencias de escape: \\x20 (espacio), \\r\\n (CRLF),
+        \\. (punto literal), líneas de continuación prefijadas con SF:.
+        Solo extrae headers de la primera respuesta 200 OK (GET request).
+        """
+        # No sobreescribir si ya hay cabeceras de curl/nmap http-scripts
+        if self.results.get("headers"):
+            return
+
+        # 1. Unir todas las líneas SF: en un único string crudo
+        sf_lines = []
+        in_sf = False
+        for line in content.splitlines():
+            stripped = line.strip()
+            if re.match(r'SF-Port\d+-TCP:', stripped):
+                in_sf = True
+                sf_lines.append(stripped)
+            elif in_sf and stripped.startswith('SF:'):
+                sf_lines.append(stripped[3:])  # quitar el prefijo "SF:"
+            elif in_sf:
+                break  # fin del bloque SF
+
+        if not sf_lines:
+            return
+
+        raw_fp = ''.join(sf_lines)
+
+        # 2. Extraer el bloque %r(GetRequest,...,"<datos>")
+        m = re.search(r'%r\(GetRequest,\w+,"(.*?)"\)', raw_fp)
+        if not m:
+            return
+
+        escaped = m.group(1)
+
+        # 3. Desescapar secuencias nmap: \xNN, \r, \n, \.
+        def _unescape(s: str) -> str:
+            out = []
+            i = 0
+            while i < len(s):
+                if s[i] == '\\' and i + 1 < len(s):
+                    nxt = s[i + 1]
+                    if nxt == 'x' and i + 3 < len(s):
+                        try:
+                            out.append(chr(int(s[i+2:i+4], 16)))
+                            i += 4
+                            continue
+                        except ValueError:
+                            pass
+                    elif nxt == 'r':
+                        out.append('\r'); i += 2; continue
+                    elif nxt == 'n':
+                        out.append('\n'); i += 2; continue
+                    elif nxt == '\\':
+                        out.append('\\'); i += 2; continue
+                    else:
+                        out.append(nxt); i += 2; continue
+                out.append(s[i])
+                i += 1
+            return ''.join(out)
+
+        decoded = _unescape(escaped)
+
+        # 4. Parsear cabeceras HTTP de la respuesta
+        lines = decoded.replace('\r\n', '\n').replace('\r', '\n').split('\n')
+        if not lines or not lines[0].startswith('HTTP/'):
+            return
+
+        found_any = False
+        for line in lines[1:]:
+            if not line.strip():
+                break  # fin de cabeceras (línea vacía antes del cuerpo)
+            if ':' in line:
+                key, _, value = line.partition(':')
+                key = key.strip()
+                value = value.strip()
+                if key and value and len(key) < 80:
+                    self.results["headers"][key] = value
+                    found_any = True
+                    if key.lower() == 'server':
+                        self.results.setdefault("http_info", {})["server"] = value
+                    if key.lower() == 'x-powered-by':
+                        self.results.setdefault("http_info", {})["powered_by"] = value
+
+        if found_any and self.verbose:
+            print(f"   [+] Cabeceras HTTP extraidas del fingerprint nmap ({len(self.results['headers'])} headers)")
+
     def parse_nikto_output(self, content: str):
         """
         Parsea el output de Nikto extrayendo SOLO hallazgos reales (con ID Nikto).
@@ -293,20 +385,27 @@ class ScanResultParser:
             if '(Status:' in line or 'CODE:' in line:
                 self.results["directories"].append(line)
 
+    # Patrón para eliminar secuencias de escape ANSI (colores, negrita, etc.)
+    _ANSI_ESCAPE = re.compile(r'\x1b\[[0-9;]*[mK]')
+
     def parse_whatweb_output(self, content: str):
-        """Parsea salida de whatweb — extrae tecnologías detectadas."""
+        """Parsea salida de whatweb — extrae tecnologías detectadas.
+        Limpia los códigos de color ANSI que whatweb embebe entre nombre y versión
+        (ej: JQuery\\e[0m[\\e[32m2.2.4\\e[0m]) antes de parsear con regex."""
         if "whatweb_findings" not in self.results:
             self.results["whatweb_findings"] = []
 
-        for line in content.splitlines():
-            line = line.strip()
-            if not line or line.startswith('#'):
+        for raw_line in content.splitlines():
+            raw_line = raw_line.strip()
+            if not raw_line or raw_line.startswith('#'):
                 continue
+            # Limpiar ANSI antes de parsear para que el regex encuentre Tech[version]
+            line = self._ANSI_ESCAPE.sub('', raw_line)
             status_m = re.search(r'\[(\d{3})[^\]]*\]', line)
             status = int(status_m.group(1)) if status_m else None
             techs = re.findall(r'([A-Za-z][A-Za-z0-9_\-\.]+)\[([^\]]+)\]', line)
             entry = {
-                "raw": line[:300],
+                "raw": raw_line[:300],
                 "http_status": status,
                 "technologies": [{"name": t[0], "version": t[1]} for t in techs if t[0] not in ("http", "https")]
             }
@@ -643,6 +742,7 @@ class VulnerabilityAnalyzer:
         if self.profile in ("web", "api-owasp", "compliance"):
             self._analyze_web_security_headers()
             self._analyze_nikto_findings()
+            self._analyze_whatweb_findings()
             self._analyze_sensitive_directories()
             self._analyze_nse_web_scripts()
 
@@ -1145,6 +1245,135 @@ class VulnerabilityAnalyzer:
                 "recommendations": recommendations,
                 "cves": []
             })
+
+    # Versiones vulnerables conocidas de librerías frontend
+    # Formato: {nombre_lower: [(version_prefix, severity, [CVEs], descripción), ...]}
+    _KNOWN_VULN_LIBS = {
+        "jquery": [
+            ("1.", "HIGH",
+             ["CVE-2011-4969", "CVE-2012-6708", "CVE-2015-9251"],
+             "jQuery 1.x contiene múltiples vulnerabilidades XSS (CVE-2015-9251) y manipulación del DOM que permiten ejecución de scripts arbitrarios. Esta rama ya no recibe soporte de seguridad."),
+            ("2.", "HIGH",
+             ["CVE-2015-9251", "CVE-2019-11358", "CVE-2020-11022"],
+             "jQuery 2.x contiene CVE-2015-9251 (XSS mediante HTML con contenido especial), CVE-2019-11358 (prototype pollution) y CVE-2020-11022 (XSS en .html()/.append()). Esta rama ya no recibe soporte de seguridad."),
+            ("3.0.", "MEDIUM",
+             ["CVE-2019-11358", "CVE-2020-11022", "CVE-2020-11023"],
+             "jQuery 3.0.x contiene CVE-2019-11358 (prototype pollution) y CVE-2020-11022/11023 (XSS). Actualizar a 3.7.0+ o migrar a JavaScript nativo."),
+            ("3.1.", "MEDIUM",
+             ["CVE-2019-11358", "CVE-2020-11022", "CVE-2020-11023"],
+             "jQuery 3.1.x contiene CVE-2019-11358 (prototype pollution) y CVE-2020-11022/11023 (XSS). Actualizar a 3.7.0+."),
+            ("3.2.", "MEDIUM",
+             ["CVE-2019-11358", "CVE-2020-11022", "CVE-2020-11023"],
+             "jQuery 3.2.x contiene CVE-2019-11358 (prototype pollution) y CVE-2020-11022/11023 (XSS). Actualizar a 3.7.0+."),
+            ("3.3.", "MEDIUM",
+             ["CVE-2019-11358", "CVE-2020-11022", "CVE-2020-11023"],
+             "jQuery 3.3.x contiene CVE-2020-11022 y CVE-2020-11023 (XSS). Actualizar a 3.7.0+."),
+            ("3.4.", "MEDIUM",
+             ["CVE-2020-11022", "CVE-2020-11023"],
+             "jQuery 3.4.x contiene CVE-2020-11022 y CVE-2020-11023 (XSS mediante .html()). Actualizar a 3.7.0+."),
+            ("3.5.", "LOW",
+             ["CVE-2020-23064"],
+             "jQuery 3.5.x contiene CVE-2020-23064 (XSS en htmlPrefilter). Actualizar a 3.7.0+."),
+            ("3.6.", "LOW",
+             [],
+             "jQuery 3.6.x es una versión antigua sin soporte activo. Se recomienda actualizar a 3.7.0+."),
+        ],
+        "bootstrap": [
+            ("2.", "HIGH",
+             ["CVE-2019-8331", "CVE-2018-14041"],
+             "Bootstrap 2.x contiene múltiples vulnerabilidades XSS (CVE-2019-8331). Esta rama lleva años sin soporte. Actualizar a Bootstrap 5.x."),
+            ("3.", "MEDIUM",
+             ["CVE-2019-8331", "CVE-2018-14041", "CVE-2018-14042"],
+             "Bootstrap 3.x contiene CVE-2019-8331 (XSS en tooltip/popover), CVE-2018-14041 y CVE-2018-14042. Actualizar a Bootstrap 5.x."),
+            ("4.0.", "LOW",
+             ["CVE-2019-8331"],
+             "Bootstrap 4.0.x contiene CVE-2019-8331 (XSS). Actualizar a Bootstrap 5.x."),
+            ("4.1.", "LOW",
+             ["CVE-2019-8331"],
+             "Bootstrap 4.1.x contiene CVE-2019-8331 (XSS en tooltip/popover vía data-template). Actualizar a Bootstrap 5.x."),
+        ],
+        "angularjs": [
+            ("1.", "HIGH",
+             ["CVE-2019-14863", "CVE-2020-7676"],
+             "AngularJS 1.x (Angular.js) está en fin de vida desde diciembre 2021. Contiene CVE-2019-14863 (XSS) y CVE-2020-7676 (XSS en ng-template). Migrar a Angular 2+."),
+        ],
+        "lodash": [
+            ("4.17.1", "HIGH",
+             ["CVE-2020-28500", "CVE-2021-23337"],
+             "Lodash 4.17.15 o anterior contiene CVE-2021-23337 (inyección de comandos) y CVE-2020-28500 (ReDoS). Actualizar a 4.17.21+."),
+            ("3.", "HIGH",
+             ["CVE-2019-10744", "CVE-2020-28500"],
+             "Lodash 3.x contiene múltiples vulnerabilidades críticas incluyendo prototype pollution (CVE-2019-10744). Actualizar a 4.17.21+."),
+        ],
+    }
+
+    def _analyze_whatweb_findings(self):
+        """
+        Analiza los hallazgos de WhatWeb buscando versiones de librerías conocidas
+        con CVEs activos. Genera findings de vulnerabilidad con severidad y referencias.
+        """
+        whatweb_findings = self.results.get("whatweb_findings", [])
+        if not whatweb_findings:
+            return
+
+        reported_libs = set()  # evitar duplicados si hay múltiples URLs
+
+        for entry in whatweb_findings:
+            techs = entry.get("technologies", [])
+            for tech in techs:
+                name = tech.get("name", "").lower()
+                version = tech.get("version", "")
+                if not name or not version:
+                    continue
+
+                lib_rules = self._KNOWN_VULN_LIBS.get(name)
+                if not lib_rules:
+                    continue
+
+                key = f"{name}:{version}"
+                if key in reported_libs:
+                    continue
+
+                matched_severity = None
+                matched_cves = []
+                matched_desc = None
+
+                for (ver_prefix, severity, cves, desc) in lib_rules:
+                    if version.startswith(ver_prefix):
+                        matched_severity = severity
+                        matched_cves = cves
+                        matched_desc = desc
+                        break
+
+                if not matched_severity:
+                    continue
+
+                reported_libs.add(key)
+                score_map = {"CRITICAL": 40, "HIGH": 25, "MEDIUM": 12, "LOW": 5}
+                self.risk_score += score_map.get(matched_severity, 5)
+
+                display_name = tech.get("name", name)
+                cve_list_str = ", ".join(matched_cves) if matched_cves else "sin CVE público asignado"
+
+                self.findings.append({
+                    "vuln_id": f"outdated_lib_{re.sub(r'[^a-z0-9]', '_', name)}_{re.sub(r'[^a-z0-9]', '_', version)}",
+                    "severity": matched_severity,
+                    "title": f"Librería frontend obsoleta con CVEs: {display_name} {version}",
+                    "description": matched_desc or (
+                        f"Se detectó {display_name} versión {version}, que contiene vulnerabilidades conocidas ({cve_list_str})."
+                    ),
+                    "port": 80,
+                    "service": "http",
+                    "version": version,
+                    "category": "web-outdated-lib",
+                    "recommendations": [
+                        f"Actualizar {display_name} a la última versión estable disponible.",
+                        f"CVEs confirmados: {cve_list_str}. Revisar el impacto en el contexto de la aplicación.",
+                        "Integrar una herramienta de análisis de dependencias (npm audit, Dependabot) para detectar librerías vulnerables de forma continua.",
+                        "Implementar Subresource Integrity (SRI) en scripts cargados desde CDNs externos."
+                    ],
+                    "cves": matched_cves
+                })
 
     def _analyze_sensitive_directories(self):
         """Analiza directorios/rutas sensibles encontradas"""

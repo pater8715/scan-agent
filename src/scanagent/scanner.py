@@ -770,9 +770,9 @@ class VulnerabilityScanner:
         http_target = f"{hostname}:{port}" if port else hostname
 
         args_template = command['args']
-        # Herramientas HTTP (curl, gobuster, nikto) necesitan hostname:port
+        # Herramientas HTTP (curl, gobuster, nikto, wafw00f) necesitan hostname:port
         # Herramientas de red (nmap) solo aceptan hostname; el puerto se inyecta en -p
-        _http_tools = {"curl", "wget", "gobuster", "dirb", "whatweb", "nikto"}
+        _http_tools = {"curl", "wget", "gobuster", "dirb", "whatweb", "nikto", "wafw00f"}
         if tool in _http_tools:
             args = args_template.format(target=http_target)
         else:
