@@ -396,42 +396,76 @@ class ScanParser:
         try:
             with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                 content = f.read()
-            
-            # Parsear líneas de vulnerabilidades de Nikto
-            # Formato típico: + OSVDB-XXXX: /path: Description
-            vuln_pattern = r'\+\s+(OSVDB-\d+)?:?\s*([^\:]+):\s*(.+)'
-            
-            for match in re.finditer(vuln_pattern, content):
-                osvdb_id = match.group(1) if match.group(1) else "N/A"
-                location = match.group(2).strip()
-                description = match.group(3).strip()
-                
+
+            # Nikto imprime líneas de metadato con "+" que NO son hallazgos de seguridad.
+            # Solo se procesan líneas que contienen un ID Nikto real: [XXXXXX] o OSVDB-XXXXX.
+            META_PREFIXES = (
+                'Target IP:', 'Target Hostname:', 'Target Port:', 'Platform:',
+                'Start Time:', 'End Time:', 'Scan terminated:', 'host(s) tested',
+                'Server:', 'No CGI', 'CGI tests', 'Scan Summary:', 'Multiple IPs',
+            )
+
+            # Regex para extraer: [ID] ruta: descripción
+            # Formato Nikto moderno: + [999986] /: descripción
+            # Formato Nikto clásico: + OSVDB-12345: /ruta: descripción
+            nikto_id_pattern = re.compile(
+                r'^\+\s+(?:\[(\d+)\]\s+)?(?:(OSVDB-\d+):?\s+)?(/[^:]*)?:?\s*(.+)$',
+                re.IGNORECASE
+            )
+
+            for line in content.splitlines():
+                line = line.strip()
+                if not line.startswith('+'):
+                    continue
+                content_part = line[1:].strip()
+                # Descartar líneas de metadato/resumen
+                if any(content_part.startswith(p) for p in META_PREFIXES):
+                    continue
+                # Solo procesar si tiene ID Nikto [XXXXXX] o OSVDB-XXXXX
+                has_id = (
+                    re.search(r'\[\d+\]', content_part) or
+                    re.search(r'OSVDB-\d+', content_part, re.I)
+                )
+                if not has_id:
+                    continue
+
+                # Extraer ID, ubicación y descripción
+                m = nikto_id_pattern.match(line)
+                if m:
+                    nikto_id  = m.group(1) or m.group(2) or "N/A"
+                    location  = (m.group(3) or "/").strip()
+                    description = (m.group(4) or content_part).strip()
+                else:
+                    nikto_id    = "N/A"
+                    location    = "/"
+                    description = content_part
+
                 vuln_entry = {
-                    "id_osvdb": osvdb_id,
-                    "ubicacion": location,
+                    "id_osvdb":   nikto_id,
+                    "ubicacion":  location,
                     "descripcion": description,
-                    "fuente": "nikto"
+                    "fuente":     "nikto"
                 }
-                
                 self.parsed_data["vulnerabilidades_nikto"].append(vuln_entry)
-                
-                # Clasificar según severidad basada en palabras clave
-                severidad = "media"
-                if any(word in description.lower() for word in ['critical', 'sql injection', 'rce', 'remote code']):
+
+                # Clasificar severidad basada en palabras clave
+                desc_lower = description.lower()
+                if any(w in desc_lower for w in ['sql injection', 'rce', 'remote code', 'authentication bypass']):
                     severidad = "critica"
-                elif any(word in description.lower() for word in ['high', 'xss', 'csrf', 'authentication']):
+                elif any(w in desc_lower for w in ['xss', 'csrf', 'credential', 'password', 'vulnerable']):
                     severidad = "alta"
-                elif any(word in description.lower() for word in ['info', 'information', 'disclosure']):
+                elif any(w in desc_lower for w in ['missing', 'disclosure', 'misconfiguration', 'cors']):
+                    severidad = "media"
+                else:
                     severidad = "baja"
-                
-                # Agregar a indicadores OWASP
+
                 self.parsed_data["indicadores_owasp_top10"].append({
-                    "fuente": "nikto",
-                    "tipo": "vulnerabilidad_nikto",
-                    "osvdb_id": osvdb_id,
+                    "fuente":     "nikto",
+                    "tipo":       "vulnerabilidad_nikto",
+                    "osvdb_id":   nikto_id,
                     "descripcion": description,
-                    "ubicacion": location,
-                    "severidad": severidad
+                    "ubicacion":  location,
+                    "severidad":  severidad
                 })
             
             # Detectar versión del servidor desde Nikto

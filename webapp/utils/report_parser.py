@@ -255,17 +255,36 @@ class ScanResultParser:
                     pass
 
     def parse_nikto_output(self, content: str):
+        """
+        Parsea el output de Nikto extrayendo SOLO hallazgos reales (con ID Nikto).
+        Filtra líneas de metadato y resumen que Nikto imprime pero no son vulnerabilidades:
+        Target IP/Hostname/Port, Platform, Start/End Time, Server, Scan terminated, etc.
+        """
+        # Prefijos de líneas de metadato/cabecera que Nikto siempre imprime
+        # y que NO representan hallazgos de seguridad
+        META_PREFIXES = (
+            'Target IP:', 'Target Hostname:', 'Target Port:', 'Platform:',
+            'Start Time:', 'End Time:', 'Scan terminated:', 'host(s) tested',
+            'Server:', 'No CGI', 'CGI tests', 'Scan Summary:',
+            'Multiple IPs', 'Using robotstxt',
+        )
+
         lines = content.split('\n')
         for line in lines:
             line = line.strip()
-            if line.startswith('+'):
-                finding = line[1:].strip()
-                # Omitir líneas de error, advertencia o muy cortas
-                if (finding and not finding.startswith('-') and len(finding) > 15
-                        and not finding.upper().startswith('ERROR:')
-                        and not finding.upper().startswith('WARNING:')
-                        and not finding.upper().startswith('NOTICE:')):
-                    self.results["nikto_findings"].append(finding)
+            if not line.startswith('+'):
+                continue
+            finding = line[1:].strip()
+            if not finding:
+                continue
+            # Descartar líneas de metadato/resumen
+            if any(finding.startswith(p) for p in META_PREFIXES):
+                continue
+            # Solo conservar hallazgos con ID Nikto: [XXXXXX] o OSVDB-XXXXX
+            # Estas son las únicas líneas que representan vulnerabilidades reales
+            if not (re.search(r'\[\d+\]', finding) or re.search(r'OSVDB-\d+', finding, re.I)):
+                continue
+            self.results["nikto_findings"].append(finding)
 
     def parse_directory_scan(self, content: str):
         lines = content.split('\n')
@@ -555,7 +574,8 @@ class VulnerabilityAnalyzer:
         self._nikto_keywords: Dict = {
             "CRITICAL": (["sql injection", "remote code execution", "rce", "arbitrary file"], 35),
             "HIGH": (["vulnerable", "exploit", "xss", "cross-site scripting", "directory traversal", "lfi", "rfi"], 20),
-            "MEDIUM": (["security", "warning", "disclosure", "exposed", "insecure cookie", "missing"], 8),
+            "MEDIUM": (["security", "warning", "disclosure", "exposed", "insecure cookie", "missing",
+                        "access-control-allow-origin", "cors", "robots.txt", "suggested"], 8),
             "LOW": ([], 3),
         }
         if self._catalog:
@@ -880,6 +900,107 @@ class VulnerabilityAnalyzer:
                     "Aplicar el parche o actualización del proveedor de forma inmediata — esta vulnerabilidad es de prioridad máxima.",
                     "Revisar logs de acceso para detectar si ya ha sido explotada.",
                     "Considerar aislar o apagar el servidor afectado hasta aplicar la corrección."
+                ]
+            )
+
+        # CORS wildcard o misconfiguration
+        if "access-control-allow-origin" in fl or "cors" in fl:
+            is_wildcard = "*" in finding
+            if is_wildcard:
+                return (
+                    "El servidor tiene CORS configurado con origen comodín ('*'). Cualquier dominio del mundo "
+                    "puede realizar peticiones autenticadas a esta API y leer las respuestas, lo que permite "
+                    f"ataques de tipo Cross-Origin Request Forgery (CORS abuse). Detalle: {finding}",
+                    [
+                        "Reemplazar '*' por el origen exacto de la aplicación frontend: Access-Control-Allow-Origin: https://tu-dominio.com.",
+                        "Nunca usar '*' junto con Access-Control-Allow-Credentials: true — el navegador lo bloquea por spec.",
+                        "Mantener una lista blanca de orígenes permitidos y validarla en el servidor."
+                    ]
+                )
+            return (
+                f"El servidor devuelve una cabecera CORS que puede permitir acceso desde orígenes externos no esperados. Detalle: {finding}",
+                [
+                    "Revisar la configuración CORS y restringir los orígenes permitidos a los estrictamente necesarios.",
+                    "Evitar usar expresiones regulares laxas para validar orígenes (ej: endsWith es inseguro)."
+                ]
+            )
+
+        # Cabecera de seguridad faltante (Suggested security header missing)
+        if "security header missing" in fl or ("suggested" in fl and "missing" in fl):
+            hm = re.search(r'missing[:\s]+([a-z][\w-]+)', finding, re.IGNORECASE)
+            header = hm.group(1).lower() if hm else ""
+            header_guides = {
+                "content-security-policy": (
+                    "Falta el header Content-Security-Policy (CSP). Sin CSP, el navegador ejecutará cualquier "
+                    "script inyectado vía XSS, incluyendo scripts de terceros maliciosos.",
+                    ["Añadir: Content-Security-Policy: default-src 'self'; script-src 'self'.",
+                     "Usar el modo 'report-only' primero para detectar violaciones sin bloquear.",
+                     "Referencia: https://content-security-policy.com/"]
+                ),
+                "strict-transport-security": (
+                    "Falta el header Strict-Transport-Security (HSTS). Sin él, el navegador no fuerza HTTPS "
+                    "y el tráfico puede viajar en texto plano, expuesto a ataques man-in-the-middle.",
+                    ["Añadir: Strict-Transport-Security: max-age=31536000; includeSubDomains.",
+                     "Solo aplica sobre conexiones HTTPS — asegurarse de que el servicio use TLS.",
+                     "Considerar incluir el dominio en la lista HSTS Preload: https://hstspreload.org/"]
+                ),
+                "referrer-policy": (
+                    "Falta el header Referrer-Policy. Sin él, el navegador envía la URL completa en el "
+                    "header Referer al navegar fuera del sitio, pudiendo filtrar rutas internas o tokens.",
+                    ["Añadir: Referrer-Policy: no-referrer o strict-origin-when-cross-origin.",
+                     "Evitar 'unsafe-url' — envía la URL completa incluyendo parámetros de query."]
+                ),
+                "permissions-policy": (
+                    "Falta el header Permissions-Policy. Sin él, cualquier script en la página puede "
+                    "solicitar acceso a cámara, micrófono, geolocalización u otros sensores del dispositivo.",
+                    ["Añadir: Permissions-Policy: camera=(), microphone=(), geolocation=().",
+                     "Deshabilitar explícitamente los permisos que la aplicación no usa."]
+                ),
+                "x-frame-options": (
+                    "Falta el header X-Frame-Options. Sin él, la página puede ser incrustada en un iframe "
+                    "de un sitio malicioso para ataques de clickjacking.",
+                    ["Añadir: X-Frame-Options: DENY o SAMEORIGIN.",
+                     "Alternativa moderna: usar frame-ancestors en la política CSP."]
+                ),
+                "x-content-type-options": (
+                    "Falta el header X-Content-Type-Options. Sin él, el navegador puede inferir el tipo MIME "
+                    "de archivos y ejecutar contenido inesperado (MIME sniffing).",
+                    ["Añadir: X-Content-Type-Options: nosniff.",
+                     "Asegurarse de que todos los recursos tienen Content-Type correcto."]
+                ),
+            }
+            if header in header_guides:
+                desc, recs = header_guides[header]
+                return (f"{desc} Detalle: {finding}", recs)
+            return (
+                f"El servidor no envía la cabecera de seguridad recomendada '{header}'. Esta cabecera "
+                f"protege a los usuarios frente a ataques del lado del cliente. Detalle: {finding}",
+                [f"Añadir la cabecera '{header}' con valores seguros según la guía OWASP Secure Headers Project.",
+                 "Referencia: https://owasp.org/www-project-secure-headers/"]
+            )
+
+        # robots.txt
+        if "robots.txt" in fl:
+            return (
+                "El archivo robots.txt está presente y contiene entradas que podrían revelar rutas internas "
+                "o páginas sensibles que el propietario intentó ocultar de los buscadores. Los atacantes "
+                f"revisan robots.txt antes de cualquier escaneo manual. Detalle: {finding}",
+                [
+                    "Visitar /robots.txt y revisar qué rutas se listan en 'Disallow'.",
+                    "No usar robots.txt como mecanismo de control de acceso — proteger las rutas con autenticación.",
+                    "Considerar eliminar entradas de Disallow que revelen rutas sensibles."
+                ]
+            )
+
+        # x-recruiting / headers informativos inusuales
+        if "x-recruiting" in fl or "uncommon header" in fl:
+            return (
+                "El servidor incluye cabeceras HTTP no estándar que revelan información sobre la organización "
+                f"o el sistema. Aunque no es una vulnerabilidad crítica, estas cabeceras pueden usarse para "
+                f"reconocimiento. Detalle: {finding}",
+                [
+                    "Revisar todas las cabeceras de respuesta HTTP y eliminar las que no sean necesarias.",
+                    "Aplicar el principio de mínima exposición en las respuestas del servidor."
                 ]
             )
 
