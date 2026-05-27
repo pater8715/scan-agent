@@ -1,6 +1,6 @@
 # Manual de Usuario — Scan Agent Lab
 
-**Versión:** 3.2  
+**Versión:** 3.3  
 **Audiencia:** Estudiantes de desarrollo de aplicaciones web y APIs REST  
 **Requisito previo:** Docker Desktop instalado y funcionando
 
@@ -41,8 +41,10 @@
 | Puerto | Servicio |
 |--------|---------|
 | 8080 | Scan Agent Web UI |
-| 3000 | OWASP Juice Shop |
-| 8081 | DVWA |
+| 8000 | Scan Agent API (perfil web/lab) |
+| 3000 | OWASP Juice Shop (perfil lab) |
+| 8081 | DVWA (perfil lab) |
+| 8090 | OWASP ZAP API (perfil lab/zap) |
 
 ### Recursos del sistema
 
@@ -63,8 +65,20 @@ cd scan-agent
 
 ### Paso 2 — Arrancar el laboratorio
 
+**En Windows (recomendado):** usa el lanzador interactivo `start.ps1`:
+
+```powershell
+# Menú interactivo (selecciona perfil y acción en pantalla)
+.\start.ps1
+
+# O directamente con parámetros
+.\start.ps1 -Perfil lab -Accion iniciar
+```
+
+**En Linux/macOS o con Make:**
+
 ```bash
-# Con Make (recomendado)
+# Con Make
 make lab-start
 
 # O directamente con Docker Compose
@@ -77,19 +91,24 @@ La primera vez este comando descarga las imágenes Docker (~2 GB). Puede tardar 
 
 ```bash
 make lab-status
+
+# O en Windows con el lanzador:
+.\start.ps1 -Perfil lab -Accion estado
 ```
 
 Resultado esperado:
 
 ```
-NAMES            STATUS          PORTS
-scan-agent-web   Up (healthy)    0.0.0.0:8080->8080/tcp
-juice-shop       Up              0.0.0.0:3000->3000/tcp
-dvwa             Up              0.0.0.0:8081->80/tcp
-dvwa-db          Up              3306/tcp
+NAMES                  STATUS          PORTS
+scan-agent-web         Up (healthy)    0.0.0.0:8080->8080/tcp
+juice-shop             Up              0.0.0.0:3000->3000/tcp
+dvwa                   Up              0.0.0.0:8081->80/tcp
+dvwa-db                Up              3306/tcp
+zap                    Up (healthy)    0.0.0.0:8090->8090/tcp
+scan-agent-analyzer    Exited (0)
 ```
 
-Todos los contenedores deben mostrar `Up`. Si alguno aparece como `Restarting`, consulta la sección [Solución de problemas](#10-solución-de-problemas).
+> **Nota:** `scan-agent-analyzer` mostrando `Exited (0)` es **completamente normal**. Es un job de análisis que se ejecuta una vez al arrancar, procesa los resultados disponibles y termina limpiamente. No es un error. Consulta la sección [Solución de problemas](#10-solución-de-problemas) si algún otro contenedor aparece como `Restarting`.
 
 ### Paso 4 — Configurar DVWA (solo la primera vez)
 
@@ -106,6 +125,7 @@ Todos los contenedores deben mostrar `Up`. Si alguno aparece como `Restarting`, 
 | Scan Agent | http://localhost:8080 | — |
 | Juice Shop | http://localhost:3000 | Registrar cuenta nueva |
 | DVWA | http://localhost:8081 | admin / password |
+| ZAP API | http://localhost:8090 | Clave: `zap-scan-agent-lab` |
 | API Docs | http://localhost:8080/api/docs | — |
 
 ---
@@ -121,7 +141,11 @@ Todos los contenedores deben mostrar `Up`. Si alguno aparece como `Restarting`, 
 │  │ :8080        │             │  :3000           │  │
 │  │              │ ──────────► │  dvwa            │  │
 │  └──────────────┘             │  :8081           │  │
-│                               └──────────────────┘  │
+│        │                      └──────────────────┘  │
+│        │ integra               ┌──────────────────┐  │
+│        └─────────────────────► │  zap (OWASP ZAP) │  │
+│                                │  :8090           │  │
+│                                └──────────────────┘  │
 │                               ┌──────────────────┐  │
 │                               │  dvwa-db (MySQL) │  │
 │                               │  :3306 (interno) │  │
@@ -143,8 +167,10 @@ Herramienta de análisis que orquesta múltiples escáneres:
 | **sslscan** | Auditoría de configuración TLS/SSL (protocolos, ciphers, certificado) |
 | **whatweb** | Identificación de tecnologías web (CMS, frameworks, versiones) |
 | **enum4linux** | Enumeración de recursos SMB/Samba en redes internas |
-| **snmp-check** | Auditoría de servicios SNMP (cadenas de comunidad por defecto) |
+| **snmp-check** *(opcional)* | Auditoría de servicios SNMP (cadenas de comunidad por defecto) |
 | **módulo propio** | Pruebas OWASP API Security Top 10 2023 |
+
+> **Nota:** Las herramientas marcadas como *opcional* se instalan durante la construcción de la imagen. Si la versión de Kali Linux usada como base no las incluye en sus repositorios, se omiten automáticamente sin romper el build. La disponibilidad real puede verificarse con `docker exec scan-agent-web which snmp-check`.
 
 ### OWASP Juice Shop
 
@@ -511,6 +537,18 @@ Si un CVE detectado está en el catálogo CISA KEV (Known Exploited Vulnerabilit
 
 ## 10. Solución de problemas
 
+### `scan-agent-analyzer` aparece como `Exited (0)`
+
+Este comportamiento es **completamente normal y esperado**. `scan-agent-analyzer` es un job de análisis por lotes (*batch job*): arranca, procesa los archivos de salida disponibles en `outputs/`, genera los reportes y termina limpiamente con código de salida 0.
+
+No necesita estar corriendo continuamente; se relanza automáticamente la próxima vez que levantes el perfil. Si prefieres relanzarlo manualmente:
+
+```bash
+docker compose -f docker/docker-compose.yml --profile analyzer up scan-agent-analyzer
+# O en Windows:
+.\start.ps1 -Perfil analyzer -Accion iniciar
+```
+
 ### Un contenedor aparece como `Restarting`
 
 ```bash
@@ -588,13 +626,34 @@ make lab-stop
 # Detener y eliminar volúmenes (libera espacio)
 docker compose -f docker/docker-compose.yml --profile lab down --volumes
 
-# Eliminar todas las imágenes del proyecto
-docker rmi scan-agent:3.0.0 bkimminich/juice-shop:v17.1.1
+# En Windows con el lanzador (acción limpiar pide confirmación):
+.\start.ps1 -Perfil lab -Accion limpiar
 ```
+
+> **Nota sobre `docker rmi`:** En instalaciones recientes de Docker Desktop con el **almacén de imágenes containerd** activado, el comando `docker rmi` puede no encontrar las imágenes aunque existan. Usa `.\start.ps1 -Perfil lab -Accion limpiar` (Windows) o `make clean-all` (Linux/Mac) en su lugar, ya que ambos usan `docker compose ... down --rmi all` que sí funciona en modo containerd.
 
 ---
 
 ## 11. Referencia rápida
+
+### Lanzador Windows (`start.ps1`)
+
+```powershell
+# Menú interactivo completo
+.\start.ps1
+
+# Uso directo con parámetros
+.\start.ps1 -Perfil <perfil> -Accion <accion>
+
+# Perfiles disponibles: cli, web, lab, analyzer, zap, dev, all
+# Acciones disponibles: iniciar, detener, reiniciar, estado, logs, reconstruir, limpiar
+
+# Ejemplos
+.\start.ps1 -Perfil lab   -Accion iniciar
+.\start.ps1 -Perfil lab   -Accion estado
+.\start.ps1 -Perfil web   -Accion logs
+.\start.ps1 -Perfil lab   -Accion limpiar    # Pide confirmación antes de borrar
+```
 
 ### Comandos Make
 
@@ -634,6 +693,7 @@ make ctf-start CHALLENGE_ID=CTF-01 STUDENT_ID=alumno01  # Iniciar desafío
 | http://localhost:8081 | DVWA |
 | http://localhost:8081/setup.php | DVWA — Configuración inicial |
 | http://localhost:8081/security.php | DVWA — Cambiar nivel de dificultad |
+| http://localhost:8090 | OWASP ZAP — API REST (clave: `zap-scan-agent-lab`) |
 
 ### Targets de escaneo válidos (dentro de Docker)
 

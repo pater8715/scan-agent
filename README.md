@@ -1,4 +1,4 @@
-# 🛡️ Scan Agent v3.1
+# 🛡️ Scan Agent v3.3
 
 [![Python Version](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://www.docker.com/)
@@ -129,14 +129,21 @@ Todos los servicios del lab tienen IPs estáticas en la subred `172.20.0.0/24`:
 
 ### Opción 1: Entorno de Práctica (Lab)
 
+**Windows** — usa el lanzador interactivo incluido:
+```powershell
+.\start.ps1 -Perfil lab -Accion iniciar
+```
+
+**Linux / macOS:**
 ```bash
-# Inicia Scan Agent Web + Juice Shop + DVWA
+# Inicia Scan Agent Web + Juice Shop + DVWA + ZAP
 docker compose -f docker/docker-compose.yml --profile lab up -d
 
 # Acceder a:
 # - Scan Agent:  http://localhost:8080
 # - Juice Shop:  http://localhost:3000
 # - DVWA:        http://localhost:8081  (admin / password)
+# - ZAP API:     http://localhost:8090
 
 # Escanear Juice Shop desde dentro de la red Docker (usar hostname de servicio)
 docker compose -f docker/docker-compose.yml run --rm scan-agent-cli \
@@ -270,11 +277,29 @@ scan-agent/
 
 ---
 
+## 🖥️ Lanzador Windows (`start.ps1`)
+
+```powershell
+# Menú interactivo completo
+.\start.ps1
+
+# Uso directo con parámetros
+.\start.ps1 -Perfil lab   -Accion iniciar     # Iniciar lab
+.\start.ps1 -Perfil lab   -Accion estado      # Ver estado
+.\start.ps1 -Perfil web   -Accion logs        # Ver logs
+.\start.ps1 -Perfil lab   -Accion reconstruir # Rebuild (con cache)
+.\start.ps1 -Perfil lab   -Accion limpiar     # Borrar todo (pide confirmación)
+
+# Perfiles: cli, web, lab, analyzer, zap, dev, all
+```
+
+---
+
 ## 🔧 Comandos Make
 
 ```bash
 # Lab de práctica
-make lab-start        # Iniciar Juice Shop + DVWA + Scan Agent
+make lab-start        # Iniciar Juice Shop + DVWA + Scan Agent + ZAP
 make lab-stop         # Detener lab
 make lab-status       # Estado de contenedores del lab
 make lab-scan-juice   # Escanear Juice Shop (usa hostname juice-shop:3000)

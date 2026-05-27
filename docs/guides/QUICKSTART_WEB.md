@@ -4,8 +4,15 @@
 
 ### 1. Arrancar el laboratorio
 
+**Windows (recomendado):**
+```powershell
+.\start.ps1 -Perfil lab -Accion iniciar
+# O con el menú interactivo:
+.\start.ps1
+```
+
+**Linux / macOS / Make:**
 ```bash
-# Con Make (recomendado)
 make lab-start
 
 # O directamente con Docker Compose
@@ -16,9 +23,11 @@ docker compose -f docker/docker-compose.yml --profile lab up -d
 
 ```bash
 make lab-status
+# En Windows:
+.\start.ps1 -Perfil lab -Accion estado
 ```
 
-Todos los contenedores deben mostrar `Up`. El servicio web estará disponible en:
+Todos los contenedores deben mostrar `Up` (excepto `scan-agent-analyzer` que aparece `Exited (0)` — es normal, es un job de análisis). El servicio web estará disponible en:
 
 ### 3. Abrir el navegador
 
@@ -35,6 +44,7 @@ Todos los contenedores deben mostrar `Up`. El servicio web estará disponible en
 | Health Check | http://localhost:8080/health |
 | Juice Shop | http://localhost:3000 |
 | DVWA | http://localhost:8081 |
+| OWASP ZAP API | http://localhost:8090 |
 
 ---
 

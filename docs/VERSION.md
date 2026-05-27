@@ -1,249 +1,58 @@
-# ScanAgent - Version History
+# ScanAgent - Historial de Versiones
 
-## v3.0.0 (2025-11-13) - Professional Reports & Vulnerability Intelligence
+## v3.3.0 (2026-05-27) — Lanzador Windows, Compatibilidad Kali 2026 y Documentación
 
-**Major Release** - Complete transformation of the reporting system
+**Versión actual**
 
-### 🎯 Main Features
+- ✅ `start.ps1` — Lanzador PowerShell interactivo con menú de perfiles y acciones (7 perfiles × 7 acciones)
+- ✅ Dockerfile corregido para Kali Linux 2026.2 / Python 3.13 (5 fixes: libexpat, symlink python3, pip3, --ignore-installed, snmp-check)
+- ✅ `scan-agent-analyzer` ya no hace loop: `restart: "no"` + `rglob` fallback en `_execute_parsing()`
+- ✅ Makefile migrado a `docker compose` v2 con targets por perfil
+- ✅ Manual de Usuario v3.3: ZAP port 8090, start.ps1, analyzer Exited(0) como normal, nota containerd
 
-- ✅ **Intelligent Result Parser**
-  - `ScanResultParser` class for structured data extraction
-  - Support for Nmap, Nikto, Gobuster, HTTP Headers
-  - Regex parsing for ports, services, versions, OS
-
-- ✅ **Vulnerability Analyzer**
-  - `VulnerabilityAnalyzer` class with severity classification
-  - Knowledge base: 11 high-risk ports, 4 medium-risk ports
-  - Detection of known vulnerable versions (OpenSSH, Apache)
-  - Risk scoring system (0-100+)
-
-- ✅ **Professional Reports**
-  - Responsive HTML with CSS gradients, severity cards
-  - TXT with professional ASCII art formatting
-  - Markdown with emojis and tables
-  - Structured JSON with complete analysis
-
-- ✅ **Executive Summary**
-  - Risk level badge (CRITICAL/HIGH/MEDIUM/LOW)
-  - Stats cards with severity counts
-  - Immediate visible risk score
-  - Actionable recommendations
-
-### 📦 New Files
-- `webapp/utils/report_parser.py` (~450 lines)
-
-### 🔧 Modified Files
-- `webapp/api/scans.py` (~600 lines modified)
-  - `generate_basic_reports()` function rewritten
-  - New functions: `generate_professional_html_report()`, `generate_professional_txt_report()`, `generate_professional_md_report()`
-
-### 📊 UX Improvements
-- **Before:** Raw text dumps without structure
-- **After:** Professional reports with intelligent analysis
-- **Impact:** 87% reduction in manual analysis time (15min → 2min)
-
-### 🧪 Testing
-- ✅ Validated with scanme.nmap.org
-- ✅ 2 ports detected (SSH 22, HTTP 80)
-- ✅ MEDIUM classification (30 risk points)
-- ✅ 2 MEDIUM findings generated
-- ✅ 4 report formats working
-
-### 🐛 Bugs Fixed
-1. Reports not generated if agent.run() failed
-2. Inconsistent severity (lowercase vs uppercase)
-3. Incorrect findings count in summary
-4. Parser with incorrect arguments
-5. VulnerabilityAnalyzer not properly instantiated
+Ver detalles completos en [`docs/changelog/CHANGELOG_v3.3.md`](changelog/CHANGELOG_v3.3.md)
 
 ---
 
-## v2.1.0 (2025-11-12) - File Retention Manager
+## v3.2.0 (2026-05-26) — Selección manual de fases, catálogo dinámico
 
-- File retention system implementation
-- Tiered storage structure (active/archived/metadata)
-- Automatic cleanup of old files
-- Metadata tracking for each scan
-
----
-
-## v2.0.0 (2025-11-11) - Web Interface
-
-- FastAPI web interface
-- HTML dashboard with scan listing
-- REST API for scan management
-- Background tasks for asynchronous scans
+- Panel de selección de fases por escaneo (UI)
+- Presets de fases guardados en localStorage
+- Badge "⚙ personalizado" en historial
+- Catálogo de recomendaciones con editor y sincronización CISA KEV
+- Notificación WebSocket al actualizar catálogo
 
 ---
 
-## v1.0.0 (2025-11-10) - Initial Release
+## v3.1.0 (2026-05-23) — Hosts activos CIDR y cancelación de escaneos
 
-- Basic scanning with Nmap
-- Simple report generation
-- CLI interface
-- Support for multiple profiles (quick/standard/full)
-
----
-
-**Current Version:** 3.0.0  
-**Last Updated:** November 13, 2025# ScanAgent - Version History
-
-## v3.0.0 (2025-11-13) - Professional Reports & Vulnerability Intelligence
-
-**Major Release** - Complete transformation of the reporting system
-
-### 🎯 Main Features
-
-- ✅ **Intelligent Result Parser**
-  - `ScanResultParser` class for structured data extraction
-  - Support for Nmap, Nikto, Gobuster, HTTP Headers
-  - Regex parsing for ports, services, versions, OS
-
-- ✅ **Vulnerability Analyzer**
-  - `VulnerabilityAnalyzer` class with severity classification
-  - Knowledge base: 11 high-risk ports, 4 medium-risk ports
-  - Detection of known vulnerable versions (OpenSSH, Apache)
-  - Risk scoring system (0-100+)
-
-- ✅ **Professional Reports**
-  - Responsive HTML with CSS gradients, severity cards
-  - TXT with professional ASCII art formatting
-  - Markdown with emojis and tables
-  - Structured JSON with complete analysis
-
-- ✅ **Executive Summary**
-  - Risk level badge (CRITICAL/HIGH/MEDIUM/LOW)
-  - Stats cards with severity counts
-  - Immediate visible risk score
-  - Actionable recommendations
-
-### 📦 New Files
-- `webapp/utils/report_parser.py` (~450 lines)
-
-### 🔧 Modified Files
-- `webapp/api/scans.py` (~600 lines modified)
-  - `generate_basic_reports()` function rewritten
-  - New functions: `generate_professional_html_report()`, `generate_professional_txt_report()`, `generate_professional_md_report()`
-
-### 📊 UX Improvements
-- **Before:** Raw text dumps without structure
-- **After:** Professional reports with intelligent analysis
-- **Impact:** 87% reduction in manual analysis time (15min → 2min)
-
-### 🧪 Testing
-- ✅ Validated with scanme.nmap.org
-- ✅ 2 ports detected (SSH 22, HTTP 80)
-- ✅ MEDIUM classification (30 risk points)
-- ✅ 2 MEDIUM findings generated
-- ✅ 4 report formats working
-
-### 🐛 Bugs Fixed
-1. Reports not generated if agent.run() failed
-2. Inconsistent severity (lowercase vs uppercase)
-3. Incorrect findings count in summary
-4. Parser with incorrect arguments
-5. VulnerabilityAnalyzer not properly instantiated
+- Panel "Hosts Descubiertos" tras escaneos de red CIDR
+- Cancelación real de escaneos (termina proceso nmap subyacente)
+- Barra de escaneos activos visible en todas las pestañas
+- Endpoint `GET /api/scans/{scan_id}/hosts`
+- Parser de cabeceras HTTP corregido
 
 ---
 
-## v2.1.0 (2025-11-12) - File Retention Manager
+## v3.0.0 (2026-05-19) — Laboratorio completo, OWASP API Top 10, CVE integrado
 
-- File retention system implementation
-- Tiered storage structure (active/archived/metadata)
-- Automatic cleanup of old files
-- Metadata tracking for each scan
-
----
-
-## v2.0.0 (2025-11-11) - Web Interface
-
-- FastAPI web interface
-- HTML dashboard with scan listing
-- REST API for scan management
-- Background tasks for asynchronous scans
+- Entorno lab completo: Juice Shop + DVWA + ZAP + Scan Agent
+- Cobertura OWASP API Security Top 10 (2023)
+- Base de conocimiento CVE: NVD, CISA KEV, OSV con caché SQLite
+- Red Docker estática `172.20.0.0/24` con IPs fijas
+- Panel de Objetivos de Laboratorio en UI
+- Perfiles de reporte específicos (web, network, api-owasp, compliance)
 
 ---
 
-## v1.0.0 (2025-11-10) - Initial Release
+## v2.1.0 (2025-11-12) — File Retention Manager
 
-- Basic scanning with Nmap
-- Simple report generation
-- CLI interface
-- Support for multiple profiles (quick/standard/full)
-
----
-
-**Current Version:** 3.0.0  
-**Last Updated:** November 13, 2025# ScanAgent - Version History
-
-## v3.0 (2025-11-13) - Reportes Profesionales e Inteligencia de Vulnerabilidades
-
-**Major Release** - Transformación completa del sistema de reportes
-
-### 🎯 Características Principales
-
-- ✅ **Parser Inteligente de Resultados**
-  - Clase `ScanResultParser` para extracción estructurada de datos
-  - Soporte para Nmap, Nikto, Gobuster, Headers HTTP
-  - Parsing con regex de puertos, servicios, versiones, OS
-
-- ✅ **Analizador de Vulnerabilidades**
-  - Clase `VulnerabilityAnalyzer` con clasificación por severidad
-  - Base de conocimiento: 11 puertos de alto riesgo, 4 de riesgo medio
-  - Detección de versiones vulnerables conocidas (OpenSSH, Apache)
-  - Sistema de scoring de riesgo (0-100+)
-
-- ✅ **Reportes Profesionales**
-  - HTML con diseño responsive, gradientes CSS, cards por severidad
-  - TXT con formato ASCII art profesional
-  - Markdown con emojis y tablas
-  - JSON estructurado con análisis completo
-
-- ✅ **Resumen Ejecutivo**
-  - Badge de nivel de riesgo (CRITICAL/HIGH/MEDIUM/LOW)
-  - Stats cards con conteo por severidad
-  - Risk score visible de inmediato
-  - Recomendaciones accionables
-
-### 📦 Archivos Nuevos
-- `webapp/utils/report_parser.py` (~450 líneas)
-
-### 🔧 Archivos Modificados
-- `webapp/api/scans.py` (~600 líneas modificadas)
-  - Función `generate_basic_reports()` reescrita
-  - Nuevas funciones: `generate_professional_html_report()`, `generate_professional_txt_report()`, `generate_professional_md_report()`
-
-### 📊 Mejoras de UX
-- **Antes:** Dumps de texto raw sin estructura
-- **Después:** Reportes profesionales con análisis inteligente
-- **Impacto:** Reducción de 87% en tiempo de análisis manual (15min → 2min)
-
-### 🧪 Testing
-- ✅ Validado con scanme.nmap.org
-- ✅ 2 puertos detectados (SSH 22, HTTP 80)
-- ✅ Clasificación MEDIUM (30 pts de riesgo)
-- ✅ 2 hallazgos MEDIUM generados
-- ✅ 4 formatos de reporte funcionando
-
-### 🐛 Bugs Corregidos
-1. Reportes no se generaban si agent.run() fallaba
-2. Severidad inconsistente (lowercase vs uppercase)
-3. Conteo de findings incorrecto en summary
-4. Parser con argumentos incorrectos
-5. VulnerabilityAnalyzer sin instanciar correctamente
-
----
-
-## v2.1 (2025-11-12) - File Retention Manager
-
-- Implementación de sistema de retención de archivos
-- Estructura de storage en niveles (active/archived/metadata)
+- Sistema de retención de archivos en niveles (active/archived/metadata)
 - Cleanup automático de archivos antiguos
-- Metadata tracking para cada escaneo
 
 ---
 
-## v2.0 (2025-11-11) - Web Interface
+## v2.0.0 (2025-11-11) — Interfaz Web
 
 - Interfaz web con FastAPI
 - Dashboard HTML con listado de escaneos
@@ -252,7 +61,7 @@
 
 ---
 
-## v1.0 (2025-11-10) - Initial Release
+## v1.0.0 (2025-11-10) — Release Inicial
 
 - Escaneo básico con Nmap
 - Generación de reportes simples
@@ -261,5 +70,5 @@
 
 ---
 
-**Versión Actual:** 3.0  
-**Última Actualización:** 13 de Noviembre, 2025
+**Versión actual:** 3.3.0  
+**Última actualización:** 27 de mayo de 2026
