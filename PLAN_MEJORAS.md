@@ -417,7 +417,7 @@ Al iniciar un escaneo, después de elegir el perfil, el usuario puede activar op
 ---
 
 ### FASE 11 — Correcciones al Parser de Reportes — Calidad de Datos
-**Prioridad:** ALTA–BAJA (mixta) | **Estimado:** ~6h | **Estado:** ⬜ Pendiente
+**Prioridad:** ALTA–BAJA (mixta) | **Estimado:** ~6h | **Estado:** ✅ Completada
 
 Identificadas durante la revisión del escaneo `fb010e24` (juice-shop:3000, perfil `web`, 2026-05-27).
 Siete problemas de calidad en el JSON de resultados y en los textos generados por `report_parser.py` y `scanner.py`.
@@ -441,8 +441,8 @@ Siete problemas de calidad en el JSON de resultados y en los textos generados po
 
 | # | Tarea | Archivo | Estado |
 |---|-------|---------|--------|
-| 11.1.1 | Reordenar el perfil `web` para que gobuster corra ANTES de nikto: en `PROFILES["web"]["commands"]`, mover el comando gobuster (actualmente índice 5) al índice 2, antes del comando nikto. | `src/scanagent/scanner.py` | ⬜ |
-| 11.1.2 | Alternativa/complemento: añadir mecanismo de reintento en `execute_command()` para herramientas de enumeración de directorios: si el error de salida contiene "connection refused", reintentar hasta 2 veces con `time.sleep(5)` entre intentos. | `src/scanagent/scanner.py` | ⬜ |
+| 11.1.1 | Reordenar el perfil `web` para que gobuster corra ANTES de nikto: en `PROFILES["web"]["commands"]`, mover el comando gobuster (actualmente índice 5) al índice 2, antes del comando nikto. | `src/scanagent/scanner.py` | ✅ |
+| 11.1.2 | Alternativa/complemento: añadir mecanismo de reintento en `execute_command()` para herramientas de enumeración de directorios: si el error de salida contiene "connection refused", reintentar hasta 2 veces con `time.sleep(5)` entre intentos. | `src/scanagent/scanner.py` | ✅ |
 
 **Contexto:** Juice Shop queda temporalmente inaccesible después de las ~6 700 peticiones de Nikto. Gobuster se ejecuta inmediatamente después y recibe "connection refused" (evidencia en `outputs/scan_fb010e24/gobuster_juice-shop_3000.txt`).
 
@@ -453,9 +453,9 @@ Siete problemas de calidad en el JSON de resultados y en los textos generados po
 
 | # | Tarea | Archivo | Estado |
 |---|-------|---------|--------|
-| 11.2.1 | Añadir `-sV` al comando nmap NSE del perfil `web` para forzar detección de versión antes de ejecutar scripts `http-*`. Cambiar `'args': '--script=http-enum,...'` a `'args': '-sV --script=http-enum,...'`. | `src/scanagent/scanner.py` | ⬜ |
-| 11.2.2 | Aplicar el mismo fix a los perfiles `api-owasp` y `compliance`, que comparten el mismo patrón NSE. | `src/scanagent/scanner.py` | ⬜ |
-| 11.2.3 | Reconstruir la imagen Docker después del cambio (`docker build` o `make build`) para que el scanner en el contenedor use los perfiles actualizados. | `docker/Dockerfile` | ⬜ |
+| 11.2.1 | Añadir `-sV` al comando nmap NSE del perfil `web` para forzar detección de versión antes de ejecutar scripts `http-*`. Cambiar `'args': '--script=http-enum,...'` a `'args': '-sV --script=http-enum,...'`. | `src/scanagent/scanner.py` | ✅ |
+| 11.2.2 | Aplicar el mismo fix a los perfiles `api-owasp` y `compliance`, que comparten el mismo patrón NSE. | `src/scanagent/scanner.py` | ✅ (web + api-owasp; compliance ya tenía -sV) |
+| 11.2.3 | Reconstruir la imagen Docker después del cambio (`docker build` o `make build`) para que el scanner en el contenedor use los perfiles actualizados. | `docker/Dockerfile` | ⬜ (pendiente rebuild) |
 
 **Contexto:** Nmap identifica el puerto 3000 como "ppp" en lugar de "http". Sin `-sV`, los scripts `http-enum`, `http-headers` y `http-vuln*` no se activan porque Nmap no sabe que es HTTP. Con `-sV`, Nmap detecta el protocolo real antes de lanzar los scripts (evidencia en `outputs/scan_fb010e24/nmap_nse_juice-shop_3000.txt`).
 
@@ -473,9 +473,9 @@ Siete problemas de calidad en el JSON de resultados y en los textos generados po
 
 | # | Tarea | Archivo | Estado |
 |---|-------|---------|--------|
-| 11.3.1 | En `VulnerabilityAnalyzer.__init__`, extraer el puerto real del target usando `ScanResultParser.normalize_target(target)` y almacenarlo en `self._target_port`. Si el parse falla, usar `80` como valor de resguardo. | `webapp/utils/report_parser.py` | ⬜ |
-| 11.3.2 | Derivar `self._target_service` del puerto: `"https"` si `_target_port == 443`, de lo contrario `"http"`. | `webapp/utils/report_parser.py` | ⬜ |
-| 11.3.3 | En los métodos `_analyze_headers()`, `_analyze_nikto_findings()` y `_analyze_api_owasp()`, reemplazar los literales `"port": 80` y `"service": "http"` por `"port": self._target_port` y `"service": self._target_service`. | `webapp/utils/report_parser.py` | ⬜ |
+| 11.3.1 | En `VulnerabilityAnalyzer.__init__`, extraer el puerto real del target usando `ScanResultParser.normalize_target(target)` y almacenarlo en `self._target_port`. Si el parse falla, usar `80` como valor de resguardo. | `webapp/utils/report_parser.py` | ✅ |
+| 11.3.2 | Derivar `self._target_service` del puerto: `"https"` si `_target_port == 443`, de lo contrario `"http"`. | `webapp/utils/report_parser.py` | ✅ |
+| 11.3.3 | En los métodos `_analyze_headers()`, `_analyze_nikto_findings()` y `_analyze_api_owasp()`, reemplazar los literales `"port": 80` y `"service": "http"` por `"port": self._target_port` y `"service": self._target_service`. | `webapp/utils/report_parser.py` | ✅ (todos los findings: web-headers, web-nikto, api-owasp, nse-scripts, web-outdated-lib, web-directories) |
 
 **Contexto:** Todos los findings de categoría `web-headers`, `web-nikto` y `api-owasp` tienen `"port": 80` aunque el servicio esté en el puerto 3000 (visible en `scan_fb010e24.json`, líneas 128, 145, 162, etc.).
 
@@ -494,8 +494,8 @@ self._target_service = "https" if self._target_port == 443 else "http"
 
 | # | Tarea | Archivo | Estado |
 |---|-------|---------|--------|
-| 11.4.1 | En `parse_wafw00f_output()`, aplicar `_ANSI_ESCAPE.sub('', ...)` al valor asignado a `self.results["waf_info"]["raw"]`. | `webapp/utils/report_parser.py` | ⬜ |
-| 11.4.2 | En `parse_whatweb_output()`, aplicar `_ANSI_ESCAPE.sub('', ...)` al campo `"raw"` de cada entrada en `whatweb_findings` (actualmente guarda el `raw_line` sin limpiar). | `webapp/utils/report_parser.py` | ⬜ |
+| 11.4.1 | En `parse_wafw00f_output()`, aplicar `_ANSI_ESCAPE.sub('', ...)` al valor asignado a `self.results["waf_info"]["raw"]`. | `webapp/utils/report_parser.py` | ✅ |
+| 11.4.2 | En `parse_whatweb_output()`, aplicar `_ANSI_ESCAPE.sub('', ...)` al campo `"raw"` de cada entrada en `whatweb_findings` (actualmente guarda el `raw_line` sin limpiar). | `webapp/utils/report_parser.py` | ✅ |
 
 **Contexto:** `waf_info.raw` y `whatweb_findings[0].raw` contienen secuencias ANSI como `\x1b[1;97m`, `\x1b[1m\x1b[34m`, etc. que contaminan el JSON y dificultan la visualización (visible en `scan_fb010e24.json`, líneas 67 y 103–104). El regex `_ANSI_ESCAPE` ya está definido como atributo de clase en `ScanResultParser`.
 
@@ -514,8 +514,8 @@ self.results["waf_info"]["raw"] = self._ANSI_ESCAPE.sub('', content[:500])
 
 | # | Tarea | Archivo | Estado |
 |---|-------|---------|--------|
-| 11.5.1 | Definir un conjunto de clase `_WHATWEB_NOISE` en `ScanResultParser` con los nombres de atributos de WhatWeb que no son tecnologías reales: `country`, `ip`, `script`, `title`, `uncommonheaders`, `x-frame-options`, `httpserver`, `html5`, `redirect-location`, `email`, `meta-author`, `meta-generator`. | `webapp/utils/report_parser.py` | ⬜ |
-| 11.5.2 | En `parse_whatweb_output()`, al construir la lista `"technologies"`, filtrar con `if t[0].lower() not in _WHATWEB_NOISE`. | `webapp/utils/report_parser.py` | ⬜ |
+| 11.5.1 | Definir un conjunto de clase `_WHATWEB_NOISE` en `ScanResultParser` con los nombres de atributos de WhatWeb que no son tecnologías reales: `country`, `ip`, `script`, `title`, `uncommonheaders`, `x-frame-options`, `httpserver`, `html5`, `redirect-location`, `email`, `meta-author`, `meta-generator`. | `webapp/utils/report_parser.py` | ✅ |
+| 11.5.2 | En `parse_whatweb_output()`, al construir la lista `"technologies"`, filtrar con `if t[0].lower() not in _WHATWEB_NOISE`. | `webapp/utils/report_parser.py` | ✅ |
 
 **Contexto:** En `scan_fb010e24.json`, `whatweb_findings[0].technologies` incluye 7 entradas: `Country[RESERVED]`, `IP[172.20.0.3]`, `JQuery[2.2.4]`, `Script[module]`, `Title[OWASP Juice Shop]`, `UncommonHeaders[...]`, `X-Frame-Options[SAMEORIGIN]`. Solo `JQuery` es una tecnología útil; el resto es ruido que complica el análisis y muestra atributos HTTP como si fueran frameworks.
 
@@ -540,8 +540,8 @@ _WHATWEB_NOISE = {
 
 | # | Tarea | Archivo | Estado |
 |---|-------|---------|--------|
-| 11.6.1 | Definir un dict de clase `_LIB_DISPLAY_NAMES` en `VulnerabilityAnalyzer` con nombres canónicos: `{"jquery": "jQuery", "angularjs": "AngularJS", "bootstrap": "Bootstrap", "lodash": "Lodash"}`. | `webapp/utils/report_parser.py` | ⬜ |
-| 11.6.2 | En `_analyze_whatweb_findings()`, al construir el título y la descripción del finding, obtener el nombre de display con `display_name = _LIB_DISPLAY_NAMES.get(name.lower(), tech.get("name", name))`. | `webapp/utils/report_parser.py` | ⬜ |
+| 11.6.1 | Definir un dict de clase `_LIB_DISPLAY_NAMES` en `VulnerabilityAnalyzer` con nombres canónicos: `{"jquery": "jQuery", "angularjs": "AngularJS", "bootstrap": "Bootstrap", "lodash": "Lodash"}`. | `webapp/utils/report_parser.py` | ✅ |
+| 11.6.2 | En `_analyze_whatweb_findings()`, al construir el título y la descripción del finding, obtener el nombre de display con `display_name = _LIB_DISPLAY_NAMES.get(name.lower(), tech.get("name", name))`. | `webapp/utils/report_parser.py` | ✅ |
 
 **Contexto:** El finding generado tiene título `"Librería frontend obsoleta con CVEs: JQuery 2.2.4"` porque WhatWeb usa esa capitalización. La capitalización correcta y reconocida es `jQuery`. El dict `_KNOWN_VULN_LIBS` ya usa claves en minúsculas, por lo que el lookup `.lower()` ya existe; solo falta el paso de normalización del nombre de salida.
 
@@ -552,7 +552,7 @@ _WHATWEB_NOISE = {
 
 | # | Tarea | Archivo | Estado |
 |---|-------|---------|--------|
-| 11.7.1 | En `_generate_recommendations()`, envolver la recomendación `"Revisar y bloquear el acceso a recursos sensibles encontrados durante el escaneo de directorios"` en un condicional que solo la añada si `self.results.get("directories")` es una lista no vacía. | `webapp/utils/report_parser.py` | ⬜ |
+| 11.7.1 | En `_generate_recommendations()`, envolver la recomendación `"Revisar y bloquear el acceso a recursos sensibles encontrados durante el escaneo de directorios"` en un condicional que solo la añada si `self.results.get("directories")` es una lista no vacía. | `webapp/utils/report_parser.py` | ✅ (la lógica condicional ya existía en report_parser.py; se eliminó la entrada duplicada del catálogo `data/recommendations_catalog.json` que la añadía incondicionalmente) |
 
 **Contexto:** En `scan_fb010e24.json`, `directories: []` (gobuster falló) pero la recomendación aparece igual en la sección `recommendations` del reporte (línea 278). Esto confunde al lector, que puede asumir que se encontraron directorios cuando no fue así.
 
@@ -580,7 +580,7 @@ if self.results.get("directories"):
 | 8 | Correcciones de perfiles de escaneo | ALTA | ~18h | ✅ |
 | 9 | Reportes dinámicos con actualización automática | ALTA | ~22h | ✅ |
 | 10 | Selección manual de fases por escaneo | MEDIA | ~20h | ✅ |
-| 11 | Correcciones al parser de reportes — calidad de datos | ALTA–BAJA | ~6h | ⬜ |
+| 11 | Correcciones al parser de reportes — calidad de datos | ALTA–BAJA | ~6h | ✅ |
 | | **TOTAL** | | **~243h** | |
 
 ---
@@ -598,7 +598,7 @@ SEMANA 15:   Fase 7 — Funcionalidades avanzadas                               
 SEMANA 16:   Fase 8 — Correcciones de perfiles (calidad de datos del escaneo)            ✅
 SEMANA 17-18: Fase 9 — Reportes dinámicos (actualización automática de catálogo)         ✅
 SEMANA 19-20: Fase 10 — Selección manual de fases (configuración personalizada por sesión) ✅
-SEMANA 21:   Fase 11 — Correcciones al parser (NSE -sV, gobuster retry, port real, limpieza JSON) ⬜
+SEMANA 21:   Fase 11 — Correcciones al parser (NSE -sV, gobuster retry, port real, limpieza JSON) ✅
 ```
 
 **Justificación del orden Fase 8 → 9 → 10:**
@@ -632,6 +632,7 @@ SEMANA 21:   Fase 11 — Correcciones al parser (NSE -sV, gobuster retry, port r
 | 2026-05-25 | Adición de Fase 10: selección manual de fases por escaneo — 9 subsecciones, 3 capas (backend scanner+agent+API, frontend panel+historial, presets opcionales) | 10 |
 | 2026-05-27 | Revisión completa del escaneo fb010e24 (juice-shop:3000, perfil web) — identificados 7 problemas de calidad de datos: NSE sin -sV, gobuster timing, port 80 hardcodeado, ANSI en raw, ruido technologies, capitalización jQuery, recomendación huérfana | — |
 | 2026-05-27 | Adición de Fase 11: correcciones al parser de reportes — 7 fixes de calidad, 2 archivos afectados (scanner.py, report_parser.py), esfuerzo ~6h | 11 |
+| 2026-05-27 | Implementación completa Fase 11 — NSE -sV en web+api-owasp, gobuster reorden+retry, _target_port/_target_service en todos los findings (web-headers, web-nikto, api-owasp, nse-scripts, web-outdated-lib, web-directories), ANSI cleanup en waf_info.raw y whatweb raw, _WHATWEB_NOISE filter, _LIB_DISPLAY_NAMES (jQuery), recomendación directorios condicional vía catálogo | 11 |
 
 ---
 

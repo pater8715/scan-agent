@@ -204,7 +204,10 @@ class VulnerabilityScanner:
                 },
                 {
                     'tool': 'nmap',
-                    'args': '--script=http-enum,http-headers,http-methods,http-vuln*,http-cors {target}',
+                    # Fix 11.2: -sV fuerza detección de protocolo antes de scripts http-*
+                    # Sin -sV, nmap clasifica puertos no estándar (ej: 3000) como "ppp"
+                    # y los scripts http-enum, http-headers, etc. no se activan.
+                    'args': '-sV --script=http-enum,http-headers,http-methods,http-vuln*,http-cors {target}',
                     'output': 'nmap_nse_{target}.txt',
                     'timeout': 600,
                     'required': True
@@ -217,17 +220,20 @@ class VulnerabilityScanner:
                     'required': False
                 },
                 {
-                    'tool': 'nikto',
-                    'args': '-h http://{target} -Tuning 123456789ab',
-                    'output': 'nikto_{target}.txt',
-                    'timeout': 1800,
-                    'required': False
-                },
-                {
+                    # Fix 11.1: gobuster corre ANTES de nikto para evitar el fallo de
+                    # "connection refused" que ocurre cuando juice-shop queda temporalmente
+                    # inaccesible tras las ~6700 peticiones de nikto.
                     'tool': 'gobuster',
                     'args': 'dir -u http://{target} -w /usr/share/dirb/wordlists/big.txt -x php,html,txt -q',
                     'output': 'gobuster_{target}.txt',
                     'timeout': 1200,
+                    'required': False
+                },
+                {
+                    'tool': 'nikto',
+                    'args': '-h http://{target} -Tuning 123456789ab',
+                    'output': 'nikto_{target}.txt',
+                    'timeout': 1800,
                     'required': False
                 },
                 {
@@ -422,7 +428,8 @@ class VulnerabilityScanner:
                 },
                 {
                     'tool': 'nmap',
-                    'args': '--script=http-methods,http-auth,http-auth-finder,http-cors,http-security-headers {target}',
+                    # Fix 11.2: -sV fuerza detección de protocolo antes de scripts http-*
+                    'args': '-sV --script=http-methods,http-auth,http-auth-finder,http-cors,http-security-headers {target}',
                     'output': 'nmap_nse_{target}.txt',
                     'timeout': 300,
                     'required': False
@@ -818,39 +825,63 @@ class VulnerabilityScanner:
             print(f"   Salida: {output_file}")
         
         try:
-            # Ejecutar comando
-            start_time = datetime.now()
-            
-            process = subprocess.Popen(
-                shlex.split(full_command),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True
-            )
-            self._current_process = process
+            # Fix 11.1: Herramientas de directorio (gobuster, dirb) pueden fallar con
+            # "connection refused" si el objetivo quedó inaccesible temporalmente tras
+            # una carga intensa (ej: nikto). Reintentamos hasta 2 veces con 5s de espera.
+            _DIR_TOOLS = {"gobuster", "dirb"}
+            _MAX_RETRIES = 2
+            _RETRY_DELAY = 5  # segundos entre reintentos
+            attempt = 0
 
-            try:
-                stdout, stderr = process.communicate(timeout=timeout)
-                returncode = process.returncode
-            except subprocess.TimeoutExpired:
-                process.kill()
-                stdout, stderr = process.communicate()
-                if self.verbose:
-                    print(f"   ⚠️  Comando excedió timeout de {timeout}s")
-                return False
-            finally:
-                self._current_process = None
-            
-            end_time = datetime.now()
-            duration = (end_time - start_time).total_seconds()
-            
+            while True:
+                # Ejecutar comando
+                start_time = datetime.now()
+
+                process = subprocess.Popen(
+                    shlex.split(full_command),
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True
+                )
+                self._current_process = process
+
+                try:
+                    stdout, stderr = process.communicate(timeout=timeout)
+                    returncode = process.returncode
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    stdout, stderr = process.communicate()
+                    if self.verbose:
+                        print(f"   ⚠️  Comando excedió timeout de {timeout}s")
+                    self._current_process = None
+                    return False
+                finally:
+                    self._current_process = None
+
+                end_time = datetime.now()
+                duration = (end_time - start_time).total_seconds()
+
+                # Reintento: si es herramienta de directorios y stderr indica "connection refused"
+                if (tool in _DIR_TOOLS
+                        and returncode != 0
+                        and "connection refused" in stderr.lower()
+                        and attempt < _MAX_RETRIES):
+                    attempt += 1
+                    if self.verbose:
+                        print(f"   ⚠️  {tool} recibió 'connection refused' — reintento {attempt}/{_MAX_RETRIES} en {_RETRY_DELAY}s")
+                    import time as _time
+                    _time.sleep(_RETRY_DELAY)
+                    continue  # reintentar el bucle
+
+                break  # éxito o error no recuperable
+
             # Guardar salida
             with open(output_file, 'w') as f:
                 f.write(stdout)
                 if stderr:
                     f.write("\n\n=== STDERR ===\n")
                     f.write(stderr)
-            
+
             # Registrar resultado
             self.results['commands_executed'].append({
                 'tool': tool,
@@ -859,9 +890,9 @@ class VulnerabilityScanner:
                 'duration': duration,
                 'returncode': returncode
             })
-            
+
             self.results['outputs_generated'].append(output_file)
-            
+
             if self.verbose:
                 status = "✅" if returncode == 0 else "⚠️"
                 print(f"   {status} Completado en {duration:.2f}s (código: {returncode})")

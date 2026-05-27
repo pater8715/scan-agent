@@ -509,6 +509,14 @@ class ScanResultParser:
     # Patrón para eliminar secuencias de escape ANSI (colores, negrita, etc.)
     _ANSI_ESCAPE = re.compile(r'\x1b\[[0-9;]*[mK]')
 
+    # Fix 11.5: Atributos de WhatWeb que no son tecnologías reales — se filtran de
+    # whatweb_findings.technologies para evitar ruido en el JSON (IP, país, título, etc.)
+    _WHATWEB_NOISE = frozenset({
+        "country", "ip", "script", "title", "uncommonheaders",
+        "x-frame-options", "httpserver", "meta-author", "meta-generator",
+        "email", "html5", "redirect-location", "http-server", "server",
+    })
+
     def parse_whatweb_output(self, content: str):
         """Parsea salida de whatweb — extrae tecnologías detectadas.
         Limpia los códigos de color ANSI que whatweb embebe entre nombre y versión
@@ -526,9 +534,16 @@ class ScanResultParser:
             status = int(status_m.group(1)) if status_m else None
             techs = re.findall(r'([A-Za-z][A-Za-z0-9_\-\.]+)\[([^\]]+)\]', line)
             entry = {
-                "raw": raw_line[:300],
+                # Fix 11.4: limpiar ANSI del campo raw (evita secuencias \x1b[... en JSON)
+                "raw": self._ANSI_ESCAPE.sub('', raw_line[:300]),
                 "http_status": status,
-                "technologies": [{"name": t[0], "version": t[1]} for t in techs if t[0] not in ("http", "https")]
+                # Fix 11.5: filtrar atributos que no son tecnologías reales (Country, IP, Title…)
+                "technologies": [
+                    {"name": t[0], "version": t[1]}
+                    for t in techs
+                    if t[0].lower() not in self._WHATWEB_NOISE
+                    and t[0].lower() not in ("http", "https")
+                ]
             }
             if entry["technologies"] or entry["http_status"]:
                 self.results["whatweb_findings"].append(entry)
@@ -547,7 +562,8 @@ class ScanResultParser:
         if "waf_info" not in self.results:
             self.results["waf_info"] = {"detected": False, "name": None, "raw": ""}
 
-        self.results["waf_info"]["raw"] = content[:500]
+        # Fix 11.4: limpiar secuencias ANSI del campo raw (wafw00f usa colores en stdout)
+        self.results["waf_info"]["raw"] = self._ANSI_ESCAPE.sub('', content[:500])
         content_lower = content.lower()
 
         if "no waf detected" in content_lower or "generic detection" in content_lower:
@@ -777,12 +793,29 @@ class VulnerabilityAnalyzer:
         "/api/v2": "INFO",
     }
 
+    # Fix 11.6: nombres canónicos de display para librerías (WhatWeb usa capitalización propia)
+    _LIB_DISPLAY_NAMES = {
+        "jquery": "jQuery",
+        "angularjs": "AngularJS",
+        "bootstrap": "Bootstrap",
+        "lodash": "Lodash",
+        "react": "React",
+        "vuejs": "Vue.js",
+    }
+
     def __init__(self, scan_results: Dict, profile: str = "web",
                  catalog: Optional[Dict] = None):
         self.results = scan_results
         self.profile = profile.lower() if profile else "web"
         self.findings = []
         self.risk_score = 0
+
+        # Fix 11.3: extraer puerto real del target para usarlo en los findings
+        # en vez del literal 80 hardcodeado. Ej: "juice-shop:3000" → port=3000, service="http"
+        target_str = scan_results.get("target", "")
+        _port_match = re.search(r':(\d+)$', target_str)
+        self._target_port: int = int(_port_match.group(1)) if _port_match else 80
+        self._target_service: str = "https" if self._target_port == 443 else "http"
         # Si se pasa catálogo externo (ej: desde CatalogLoader), úsarlo directamente.
         # Si no, cargar desde disco como siempre (comportamiento legacy).
         self._catalog = catalog if catalog is not None else self._load_catalog()
@@ -989,8 +1022,9 @@ class VulnerabilityAnalyzer:
                     "severity": severity,
                     "title": info["title"],
                     "description": info["description"],
-                    "port": 443 if "strict-transport-security" in headers_lower else 80,
-                    "service": "https" if "strict-transport-security" in headers_lower else "http",
+                    # Fix 11.3: usar puerto real del target en vez de hardcoded 80
+                    "port": self._target_port,
+                    "service": self._target_service,
                     "version": "",
                     "category": "web-headers",
                     "recommendations": recs,
@@ -1006,8 +1040,8 @@ class VulnerabilityAnalyzer:
                 "severity": "LOW",
                 "title": f"Divulgación de versión del servidor web: {server}",
                 "description": f"La cabecera 'Server' revela la tecnología y versión exacta del servidor: '{server}'. Esta información es útil para atacantes que buscan exploits específicos.",
-                "port": 80,
-                "service": "http",
+                "port": self._target_port,   # Fix 11.3
+                "service": self._target_service,
                 "version": server,
                 "category": "web-headers",
                 "recommendations": [
@@ -1023,8 +1057,8 @@ class VulnerabilityAnalyzer:
                 "severity": "LOW",
                 "title": f"Divulgación de tecnología backend: X-Powered-By: {powered_by}",
                 "description": f"La cabecera 'X-Powered-By' revela el framework o lenguaje backend: '{powered_by}'. Esto facilita la identificación de vulnerabilidades específicas.",
-                "port": 80,
-                "service": "http",
+                "port": self._target_port,   # Fix 11.3
+                "service": self._target_service,
                 "version": powered_by,
                 "category": "web-headers",
                 "recommendations": [
@@ -1384,8 +1418,8 @@ class VulnerabilityAnalyzer:
                 "severity": severity,
                 "title": f"Hallazgo Nikto: {finding[:80]}",
                 "description": description,
-                "port": 80,
-                "service": "http",
+                "port": self._target_port,   # Fix 11.3
+                "service": self._target_service,
                 "version": "",
                 "category": "web-nikto",
                 "recommendations": recommendations,
@@ -1498,7 +1532,8 @@ class VulnerabilityAnalyzer:
                 score_map = {"CRITICAL": 40, "HIGH": 25, "MEDIUM": 12, "LOW": 5}
                 self.risk_score += score_map.get(matched_severity, 5)
 
-                display_name = tech.get("name", name)
+                # Fix 11.6: usar nombre canónico (ej: "JQuery" → "jQuery")
+                display_name = self._LIB_DISPLAY_NAMES.get(name, tech.get("name", name))
                 cve_list_str = ", ".join(matched_cves) if matched_cves else "sin CVE público asignado"
 
                 self.findings.append({
@@ -1508,8 +1543,8 @@ class VulnerabilityAnalyzer:
                     "description": matched_desc or (
                         f"Se detectó {display_name} versión {version}, que contiene vulnerabilidades conocidas ({cve_list_str})."
                     ),
-                    "port": 80,
-                    "service": "http",
+                    "port": self._target_port,   # Fix 11.3
+                    "service": self._target_service,
                     "version": version,
                     "category": "web-outdated-lib",
                     "recommendations": [
@@ -1557,8 +1592,8 @@ class VulnerabilityAnalyzer:
                         "severity": severity,
                         "title": f"Recurso sensible expuesto: {sensitive_path}",
                         "description": descriptions.get(severity, f"Recurso encontrado: {sensitive_path}. Detalle: {dir_entry}"),
-                        "port": 80,
-                        "service": "http",
+                        "port": self._target_port,   # Fix 11.3
+                        "service": self._target_service,
                         "version": "",
                         "category": "web-directories",
                         "recommendations": recommendations,
@@ -1599,8 +1634,8 @@ class VulnerabilityAnalyzer:
                         "severity": severity,
                         "title": f"Script NSE '{script}': {label}",
                         "description": f"El script NSE de nmap '{script}' reportó: {label}. Salida (extracto): {nse.get('output', '')[:300]}",
-                        "port": 80,
-                        "service": "http",
+                        "port": self._target_port,   # Fix 11.3
+                        "service": self._target_service,
                         "version": "",
                         "category": "nse-scripts",
                         "recommendations": [
@@ -1636,8 +1671,8 @@ class VulnerabilityAnalyzer:
                     "Además, la cabecera Access-Control-Allow-Methods expone: "
                     f"{self.results.get('curl_responses', {}).get('OPTIONS', {}).get('headers', {}).get('Access-Control-Allow-Methods', 'no detectado')}."
                 ),
-                "port": 80,
-                "service": "http",
+                "port": self._target_port,   # Fix 11.3
+                "service": self._target_service,
                 "version": "",
                 "category": "api-owasp",
                 "owasp_category": "API7:2023 - Security Misconfiguration",
@@ -1660,8 +1695,8 @@ class VulnerabilityAnalyzer:
                 "severity": "MEDIUM",
                 "title": "OWASP API2 - Sin indicadores de autenticación en respuestas",
                 "description": "No se detectaron cabeceras de autenticación (WWW-Authenticate, X-Api-Key) en las respuestas del servidor. Esto puede indicar endpoints sin protección de autenticación.",
-                "port": 80,
-                "service": "http",
+                "port": self._target_port,   # Fix 11.3
+                "service": self._target_service,
                 "version": "",
                 "category": "api-owasp",
                 "owasp_category": "API2:2023 - Broken Authentication",
@@ -1685,8 +1720,8 @@ class VulnerabilityAnalyzer:
                 "severity": "MEDIUM",
                 "title": "OWASP API4 - Sin Rate Limiting detectado",
                 "description": "No se detectaron cabeceras de limitación de solicitudes (X-RateLimit-Limit, Retry-After). Sin rate limiting, la API es vulnerable a ataques de fuerza bruta, enumeración de recursos y denegación de servicio.",
-                "port": 80,
-                "service": "http",
+                "port": self._target_port,   # Fix 11.3
+                "service": self._target_service,
                 "version": "",
                 "category": "api-owasp",
                 "owasp_category": "API4:2023 - Unrestricted Resource Consumption",
@@ -1745,8 +1780,8 @@ class VulnerabilityAnalyzer:
                     "endpoints disponibles, parámetros, modelos de datos y ejemplos de peticiones, "
                     "facilitando enormemente el reconocimiento para un atacante."
                 ),
-                "port": 80,
-                "service": "http",
+                "port": self._target_port,   # Fix 11.3
+                "service": self._target_service,
                 "version": "",
                 "category": "api-owasp",
                 "owasp_category": "API9:2023 - Improper Inventory Management",
@@ -1816,8 +1851,8 @@ class VulnerabilityAnalyzer:
                 f"modificar y eliminar recursos sin necesidad de autenticación explícita verificada. "
                 f"Esto puede derivar en destrucción de datos o escalada de privilegios.{error_detail}"
             ),
-            "port": 80,
-            "service": "http",
+            "port": self._target_port,   # Fix 11.3
+            "service": self._target_service,
             "version": "",
             "category": "api-owasp",
             "owasp_category": "API5:2023 - Broken Function Level Authorization",

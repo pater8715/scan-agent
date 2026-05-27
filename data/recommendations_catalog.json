@@ -587,7 +587,6 @@
       "Implementar una política Content-Security-Policy (CSP) estricta para prevenir ataques XSS e inyección de contenido.",
       "Habilitar HTTPS y configurar la cabecera HSTS (Strict-Transport-Security) para forzar conexiones cifradas.",
       "Aplicar el conjunto completo de cabeceras de seguridad HTTP recomendadas por OWASP Secure Headers Project.",
-      "Revisar y bloquear el acceso a recursos sensibles encontrados durante el escaneo de directorios.",
       "Implementar un Web Application Firewall (WAF) para filtrar tráfico malicioso y proteger la aplicación."
     ],
     "api-owasp": [
