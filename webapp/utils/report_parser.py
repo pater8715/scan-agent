@@ -31,7 +31,13 @@ class ScanResultParser:
             "directories": [],
             "raw_files": [],
             "nse_findings": [],
-            "active_hosts": []
+            "active_hosts": [],
+            # Siempre inicializados con defaults para evitar {} vacío en el reporte
+            "waf_info": {"detected": False, "name": None, "raw": ""},
+            "ssl_info": {},
+            "whatweb_findings": [],
+            # Respuestas individuales de curl por método HTTP (no se mezclan con headers)
+            "curl_responses": {}
         }
 
     def parse_all_files(self, output_path: Path, target: str) -> Dict:
@@ -57,8 +63,14 @@ class ScanResultParser:
                     if 'service' in filename_lower:
                         # Fallback: extraer cabeceras del fingerprint nmap cuando curl falla
                         self.parse_nmap_fingerprint_for_headers(content)
-                elif 'header' in filename_lower or 'curl' in filename_lower:
+                elif 'header' in filename_lower and 'curl' not in filename_lower:
+                    # Solo headers_*.txt alimenta el dict principal de cabeceras HTTP
                     self.parse_headers(content)
+                elif 'curl' in filename_lower:
+                    # Archivos curl_*.txt: parsear respuesta por método sin contaminar headers
+                    self.parse_curl_response(content, file.name)
+                    # Extraer versiones de librerías JS desde el HTML devuelto
+                    self.parse_html_for_libraries(content, file.name)
                 elif 'nikto' in filename_lower:
                     self.parse_nikto_output(content)
                 elif 'gobuster' in filename_lower or 'dirb' in filename_lower:
@@ -345,6 +357,115 @@ class ScanResultParser:
 
         if found_any and self.verbose:
             print(f"   [+] Cabeceras HTTP extraidas del fingerprint nmap ({len(self.results['headers'])} headers)")
+
+    def parse_curl_response(self, content: str, filename: str):
+        """
+        Parsea una respuesta HTTP de un archivo curl_*.txt y la almacena en
+        curl_responses por método HTTP. NO modifica results["headers"] para
+        evitar mezclar cabeceras de distintas respuestas (GET, PUT, DELETE, OPTIONS).
+        Extrae: método inferido del nombre, HTTP status, cabeceras de respuesta.
+        """
+        # Inferir método HTTP del nombre del fichero (curl_put_*, curl_options_*, etc.)
+        method = "GET"
+        fname = filename.lower()
+        for m in ("options", "put", "delete", "patch", "post"):
+            if m in fname:
+                method = m.upper()
+                break
+
+        # Limpiar el "=== STDERR ===" que los scripts añaden
+        body = content.split("=== STDERR ===")[0].strip()
+
+        status_code = None
+        response_headers = {}
+        lines = body.splitlines()
+
+        for line in lines:
+            if re.match(r'^HTTP/\d', line):
+                m = re.search(r'HTTP/[\d.]+ (\d+)', line)
+                if m:
+                    status_code = int(m.group(1))
+                continue
+            if ':' in line and status_code is not None:
+                key, _, value = line.partition(':')
+                key = key.strip()
+                value = value.strip()
+                if key and len(key) < 80 and not key.startswith((' ', '*', '>')):
+                    response_headers[key] = value
+
+        if status_code is not None:
+            self.results["curl_responses"][method] = {
+                "status": status_code,
+                "headers": response_headers
+            }
+
+        # Si aún no hay cabeceras principales (headers_*.txt no se procesó o falló),
+        # usar la respuesta GET como fallback
+        if method == "GET" and not self.results["headers"] and response_headers:
+            self.results["headers"].update(response_headers)
+
+    # Patrones de CDN conocidos para detectar versiones de librerías JS
+    _CDN_PATTERNS = [
+        re.compile(r'cdnjs\.cloudflare\.com/ajax/libs/([a-zA-Z0-9_\-\.]+)/([0-9][^/]+)/', re.I),
+        re.compile(r'ajax\.googleapis\.com/ajax/libs/([a-zA-Z0-9_\-\.]+)/([0-9][^/]+)/', re.I),
+        re.compile(r'unpkg\.com/([a-zA-Z0-9_\-\.@]+)@([0-9][^/]+)/', re.I),
+        re.compile(r'cdn\.jsdelivr\.net/npm/([a-zA-Z0-9_\-\.]+)@([0-9][^/]+)/', re.I),
+        re.compile(r'cdn\.jsdelivr\.net/gh/[^/]+/([a-zA-Z0-9_\-\.]+)@([0-9][^/]+)/', re.I),
+    ]
+    # Normalizar nombres de CDN a nombres canónicos
+    _CDN_NAME_MAP = {
+        "jquery": "jQuery",
+        "jquery.min": "jQuery",
+        "bootstrap": "Bootstrap",
+        "angular": "AngularJS",
+        "angular.min": "AngularJS",
+        "lodash": "Lodash",
+        "lodash.min": "Lodash",
+        "cookieconsent2": "cookieconsent",
+        "cookieconsent": "cookieconsent",
+    }
+
+    def parse_html_for_libraries(self, content: str, filename: str):
+        """
+        Escanea el HTML de respuestas curl en busca de cargas de librerías JS desde CDNs.
+        Extrae nombre y versión para que _analyze_whatweb_findings() detecte CVEs.
+        No duplica entradas ya existentes en whatweb_findings.
+        """
+        if not content or len(content) < 50:
+            return
+
+        found = {}
+        for pattern in self._CDN_PATTERNS:
+            for m in pattern.finditer(content):
+                raw_name = m.group(1).split('/')[-1]  # quitar subfolders en unpkg
+                version = m.group(2).split('/')[0]
+                # limpiar sufijos tipo ".min", ".js"
+                clean_name = re.sub(r'\.min$|\.js$', '', raw_name.lower())
+                canonical = self._CDN_NAME_MAP.get(clean_name, raw_name)
+                key = canonical.lower() + ":" + version
+                if key not in found:
+                    found[key] = {"name": canonical, "version": version}
+
+        if not found:
+            return
+
+        # Obtener nombres ya en whatweb_findings para no duplicar
+        existing = {
+            (t["name"].lower() + ":" + t["version"])
+            for entry in self.results.get("whatweb_findings", [])
+            for t in entry.get("technologies", [])
+        }
+
+        new_techs = [v for k, v in found.items() if k not in existing]
+        if not new_techs:
+            return
+
+        self.results["whatweb_findings"].append({
+            "raw": f"[HTML source from {filename}]",
+            "http_status": None,
+            "technologies": new_techs,
+            "source": "html-cdn-scan"
+        })
 
     def parse_nikto_output(self, content: str):
         """
@@ -749,6 +870,9 @@ class VulnerabilityAnalyzer:
         # Análisis específico API OWASP
         if self.profile == "api-owasp":
             self._analyze_api_owasp()
+        elif self.profile == "api":
+            # Perfil api básico: solo métodos HTTP peligrosos
+            self._analyze_http_methods()
 
         # Para network, análisis de Nikto se omite pero NSE sí se incluye
         if self.profile == "network":
@@ -1215,11 +1339,34 @@ class VulnerabilityAnalyzer:
         )
 
     def _analyze_nikto_findings(self):
-        """Analiza hallazgos de Nikto con clasificación mejorada"""
+        """Analiza hallazgos de Nikto con clasificación mejorada.
+        Elimina duplicados con hallazgos ya generados por _analyze_web_security_headers
+        (cabeceras de seguridad faltantes) y por _analyze_api_owasp (CORS wildcard).
+        """
         nikto_findings = self.results.get("nikto_findings", [])
+
+        # Cabeceras ya reportadas por _analyze_web_security_headers
+        reported_header_ids = {f["vuln_id"] for f in self.findings if f["category"] == "web-headers"}
+        # Nombres de cabeceras cuyos findings ya existen (normalizado a minúsculas)
+        reported_header_names = set()
+        for h in self._security_headers:
+            vuln_id = "header_" + re.sub(r'[^a-z0-9]', '_', h.lower())
+            if vuln_id in reported_header_ids:
+                reported_header_names.add(h.lower())
 
         for finding in nikto_findings[:20]:
             finding_lower = finding.lower()
+
+            # ── Dedup 1: "Suggested security header missing: X" ya cubierto por web-headers ──
+            if "suggested" in finding_lower and "missing" in finding_lower:
+                already_reported = any(h in finding_lower for h in reported_header_names)
+                if already_reported:
+                    continue  # web-headers ya lo reportó con más detalle
+
+            # ── Dedup 2: CORS wildcard en perfil api-owasp → lo cubre API7 con contexto OWASP ──
+            if self.profile == "api-owasp" and "access-control-allow-origin" in finding_lower:
+                continue
+
             severity = "LOW"
             score_add = 3
 
@@ -1231,7 +1378,6 @@ class VulnerabilityAnalyzer:
 
             description, recommendations = self._enrich_nikto_finding(finding)
             self.risk_score += score_add
-            # ID basado en severidad y primeras palabras del hallazgo para identificación única
             nikto_slug = re.sub(r'[^a-z0-9]+', '_', finding[:40].lower()).strip('_')
             self.findings.append({
                 "vuln_id": f"nikto_{severity.lower()}_{nikto_slug}",
@@ -1466,7 +1612,11 @@ class VulnerabilityAnalyzer:
                     break
 
     def _analyze_api_owasp(self):
-        """Mapea hallazgos al OWASP API Security Top 10 2023"""
+        """Mapea hallazgos al OWASP API Security Top 10 2023.
+        - No genera hallazgo API8 (cabeceras de seguridad): ya cubierto por _analyze_web_security_headers.
+        - API9 detecta documentación expuesta tanto de gobuster como de curl_apidocs.
+        - API5 detecta métodos HTTP peligrosos habilitados (se delega a _analyze_http_methods).
+        """
         headers = self.results.get("headers", {})
         headers_lower = {k.lower(): v for k, v in headers.items()}
         directories = self.results.get("directories", [])
@@ -1479,7 +1629,13 @@ class VulnerabilityAnalyzer:
                 "vuln_id": "owasp_api7_cors_wildcard",
                 "severity": "HIGH",
                 "title": "OWASP API7 - CORS Wildcard: Access-Control-Allow-Origin: *",
-                "description": "La API permite solicitudes de cualquier origen (CORS wildcard '*'). Esto puede permitir que scripts maliciosos de cualquier dominio accedan a datos de la API en nombre de usuarios autenticados.",
+                "description": (
+                    "La API permite solicitudes de cualquier origen (CORS wildcard '*'). "
+                    "Esto permite que scripts maliciosos de cualquier dominio accedan a datos "
+                    "de la API en nombre de usuarios autenticados (CSRF cross-origin). "
+                    "Además, la cabecera Access-Control-Allow-Methods expone: "
+                    f"{self.results.get('curl_responses', {}).get('OPTIONS', {}).get('headers', {}).get('Access-Control-Allow-Methods', 'no detectado')}."
+                ),
                 "port": 80,
                 "service": "http",
                 "version": "",
@@ -1488,7 +1644,8 @@ class VulnerabilityAnalyzer:
                 "recommendations": [
                     "Restringir Access-Control-Allow-Origin a dominios específicos de confianza.",
                     "Nunca usar '*' en APIs que manejan datos sensibles o requieren autenticación.",
-                    "Implementar una whitelist de orígenes permitidos en la configuración CORS."
+                    "Implementar una whitelist de orígenes permitidos y validarla en el servidor.",
+                    "Restringir Access-Control-Allow-Methods a solo los métodos necesarios (ej: GET, POST)."
                 ],
                 "cves": []
             })
@@ -1542,54 +1699,138 @@ class VulnerabilityAnalyzer:
             })
             self.risk_score += 10
 
+        # API5 - Métodos HTTP peligrosos habilitados
+        self._analyze_http_methods()
+
         # API9 - Documentación expuesta
-        doc_paths = ["/swagger", "/swagger-ui", "/api-docs", "/openapi", "/redoc"]
-        for doc_path in doc_paths:
+        # Detecta tanto desde resultados de gobuster/dirb como desde respuestas curl_apidocs
+        doc_found = False
+        doc_paths_gobuster = ["/swagger", "/swagger-ui", "/api-docs", "/openapi", "/redoc"]
+        for doc_path in doc_paths_gobuster:
             if doc_path in dirs_text:
-                doc_slug = doc_path.strip('/').replace('-', '_')
-                self.findings.append({
-                    "vuln_id": f"owasp_api9_docs_{doc_slug}",
-                    "severity": "MEDIUM",
-                    "title": f"OWASP API9 - Documentación API expuesta: {doc_path}",
-                    "description": f"Se encontró documentación de la API accesible públicamente en '{doc_path}'. La exposición pública de Swagger/OpenAPI revela todos los endpoints, parámetros y modelos de datos de la API a potenciales atacantes.",
-                    "port": 80,
-                    "service": "http",
-                    "version": "",
-                    "category": "api-owasp",
-                    "owasp_category": "API9:2023 - Improper Inventory Management",
-                    "recommendations": [
-                        "Restringir el acceso a la documentación de la API solo a usuarios autenticados.",
-                        "Deshabilitar o proteger el acceso a swagger/openapi en entornos de producción.",
-                        "Implementar autenticación básica o token ante de acceder a /swagger-ui y /api-docs."
-                    ],
-                    "cves": []
-                })
-                self.risk_score += 8
+                doc_found = True
                 break
 
-        # API8 - Cabeceras de seguridad (ya analizadas pero con contexto OWASP)
-        missing_security_headers = [
-            h for h in ["content-security-policy", "strict-transport-security"]
-            if h not in headers_lower
-        ]
-        if missing_security_headers:
+        # Comprobar también respuestas curl que indiquen docs accesibles (200 OK en /api-docs)
+        curl_responses = self.results.get("curl_responses", {})
+        for method, resp in curl_responses.items():
+            raw_files = self.results.get("raw_files", [])
+            for rf in raw_files:
+                fname = rf.get("filename", "").lower()
+                if "apidoc" in fname or "swagger" in fname or "openapi" in fname:
+                    if resp.get("status") in (200, 301, 302):
+                        doc_found = True
+                        break
+
+        # Verificar directamente si algún raw_file de curl_apidocs devolvió HTML con contenido de docs
+        if not doc_found:
+            for rf in self.results.get("raw_files", []):
+                fname = rf.get("filename", "").lower()
+                if "apidoc" in fname or "swagger" in fname:
+                    content_snippet = rf.get("content", "")
+                    # Indicadores de que /api-docs devolvió documentación real
+                    if any(sig in content_snippet.lower() for sig in
+                           ["swagger", "openapi", "api-docs", "/api-docs/", "redirecting"]):
+                        doc_found = True
+                        break
+
+        if doc_found:
             self.findings.append({
-                "vuln_id": "owasp_api8_security_config",
+                "vuln_id": "owasp_api9_docs_exposed",
                 "severity": "MEDIUM",
-                "title": "OWASP API8 - Configuración de seguridad HTTP incompleta",
-                "description": f"Faltan cabeceras de seguridad críticas: {', '.join(missing_security_headers)}. Las APIs mal configuradas son vulnerables a ataques de inyección de contenido y robo de sesión.",
+                "title": "OWASP API9 - Documentación API expuesta públicamente (/api-docs)",
+                "description": (
+                    "Se confirmó que la documentación de la API (Swagger/OpenAPI) es accesible "
+                    "públicamente sin autenticación. La exposición de /api-docs revela todos los "
+                    "endpoints disponibles, parámetros, modelos de datos y ejemplos de peticiones, "
+                    "facilitando enormemente el reconocimiento para un atacante."
+                ),
                 "port": 80,
                 "service": "http",
                 "version": "",
                 "category": "api-owasp",
-                "owasp_category": "API8:2023 - Security Misconfiguration",
+                "owasp_category": "API9:2023 - Improper Inventory Management",
                 "recommendations": [
-                    "Aplicar todas las cabeceras de seguridad HTTP recomendadas (OWASP Secure Headers Project).",
-                    "Usar HTTPS exclusivamente y configurar HSTS.",
-                    "Revisar la configuración de CORS, autenticación y autorización en todos los endpoints."
+                    "Restringir el acceso a /api-docs, /swagger-ui y /openapi solo a usuarios autenticados.",
+                    "Deshabilitar la documentación interactiva en entornos de producción.",
+                    "Implementar autenticación básica o token antes de acceder a la documentación.",
+                    "Considerar generar la documentación offline (sin endpoint público) usando OpenAPI spec."
                 ],
                 "cves": []
             })
+            self.risk_score += 8
+
+        # NOTA: API8 (cabeceras de seguridad) NO se genera aquí porque
+        # _analyze_web_security_headers() ya crea findings individuales más detallados
+        # para cada cabecera faltante. Generarlo de nuevo sería redundante.
+
+    def _analyze_http_methods(self):
+        """
+        OWASP API5:2023 - Broken Function Level Authorization.
+        Detecta métodos HTTP peligrosos habilitados (PUT, DELETE, PATCH) a partir de:
+        - La cabecera Access-Control-Allow-Methods en respuesta OPTIONS
+        - Respuestas curl_put / curl_delete que devuelven 2xx o 5xx (método aceptado)
+        """
+        curl_responses = self.results.get("curl_responses", {})
+        options_resp = curl_responses.get("OPTIONS", {})
+        options_headers = {k.lower(): v for k, v in options_resp.get("headers", {}).items()}
+
+        allowed_methods_raw = options_headers.get("access-control-allow-methods", "")
+        allowed_methods = [m.strip().upper() for m in allowed_methods_raw.split(",") if m.strip()]
+
+        dangerous_methods = {"PUT", "DELETE", "PATCH"}
+        found_dangerous = [m for m in allowed_methods if m in dangerous_methods]
+
+        # También comprobar por respuestas directas (si options no respondió)
+        if not found_dangerous:
+            for method in dangerous_methods:
+                resp = curl_responses.get(method, {})
+                status = resp.get("status")
+                # 2xx = éxito, 4xx/5xx = método aceptado pero con error (no 405 = Not Allowed)
+                if status is not None and status != 405:
+                    found_dangerous.append(method)
+
+        if not found_dangerous:
+            return
+
+        error_methods = []
+        for method in found_dangerous:
+            resp = curl_responses.get(method, {})
+            if resp.get("status", 0) >= 500:
+                error_methods.append(f"{method} → HTTP {resp['status']}")
+
+        method_list = ", ".join(found_dangerous)
+        error_detail = ""
+        if error_methods:
+            error_detail = (
+                f" Además, los métodos {', '.join(error_methods)} devuelven errores internos "
+                f"del servidor (5xx), lo que puede filtrar stack traces o información interna."
+            )
+
+        self.findings.append({
+            "vuln_id": "owasp_api5_unsafe_methods",
+            "severity": "HIGH",
+            "title": f"OWASP API5 - Métodos HTTP peligrosos habilitados: {method_list}",
+            "description": (
+                f"La API acepta los métodos HTTP {method_list}, que permiten crear, "
+                f"modificar y eliminar recursos sin necesidad de autenticación explícita verificada. "
+                f"Esto puede derivar en destrucción de datos o escalada de privilegios.{error_detail}"
+            ),
+            "port": 80,
+            "service": "http",
+            "version": "",
+            "category": "api-owasp",
+            "owasp_category": "API5:2023 - Broken Function Level Authorization",
+            "recommendations": [
+                "Restringir los métodos HTTP habilitados a los estrictamente necesarios para cada endpoint.",
+                "Implementar control de acceso basado en roles (RBAC) para métodos de escritura (PUT, DELETE, PATCH).",
+                "Validar que los métodos de modificación requieren autenticación y autorización explícita.",
+                "Responder con HTTP 405 (Method Not Allowed) para métodos no soportados.",
+                "Auditar todos los endpoints que acepten PUT/DELETE para verificar que requieren autorización."
+            ],
+            "cves": []
+        })
+        self.risk_score += 20
 
     def _generate_recommendations(self) -> List[str]:
         """Genera recomendaciones según el perfil de escaneo"""
