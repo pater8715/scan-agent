@@ -111,7 +111,7 @@ async def check_rate_limit(request: Request):
 app = FastAPI(
     title="Scan Agent Web",
     description="Interfaz web para ejecutar y gestionar escaneos de vulnerabilidades",
-    version="1.0.0",
+    version="3.3.0",
     docs_url="/api/docs",
     redoc_url="/api/redoc"
 )
@@ -299,19 +299,19 @@ async def websocket_endpoint(websocket: WebSocket, scan_id: str):
 @app.get("/health")
 async def health_check():
     """Endpoint de health check"""
-    return {"status": "healthy", "version": "1.0.0"}
+    return {"status": "healthy", "version": "3.3.0"}
 
 
 if __name__ == "__main__":
     print("""
     ╔══════════════════════════════════════════════════════════════╗
-    ║                    SCAN AGENT WEB v1.0                       ║
+    ║                   SCAN AGENT WEB v3.3.0                      ║
     ║              Interfaz Web de Escaneo de Seguridad            ║
     ╚══════════════════════════════════════════════════════════════╝
-    
+
     🌐 Servidor iniciando en: http://localhost:8000
     📚 Documentación API: http://localhost:8000/api/docs
-    
+
     Presiona Ctrl+C para detener el servidor
     """)
     

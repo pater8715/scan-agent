@@ -680,6 +680,65 @@ Revisión aplicando principios de Clean Code (SRP, DRY, organización de archivo
 
 ---
 
+### FASE 13 — Dashboard de Análisis + Mejoras de Historial
+**Prioridad:** MEDIA | **Estimado:** ~4h | **Estado:** ✅ Completada (2026-05-27)
+
+Añadir visibilidad analítica al proyecto: una página de Dashboard con métricas agregadas de todos los escaneos, y mejoras de usabilidad en el historial (conteo de hallazgos y re-escaneo rápido). Sin dependencias externas — todo con CSS nativo y las APIs existentes.
+
+---
+
+#### 13.1 — Endpoint `/api/scans/stats`
+**Impacto:** Habilita la página Dashboard y el widget de resumen en historial.
+
+| # | Tarea | Estado |
+|---|-------|--------|
+| 13.1.1 | Agregar `GET /api/scans/stats` en `scans.py` — lee todos los `reports/scan_*.json` y computa: `total_scans`, `total_vulnerabilities`, `by_severity`, `by_profile`, `most_scanned_targets`, `top_vulnerabilities` | ✅ |
+
+---
+
+#### 13.2 — Enriquecer `/api/scans/list` con `vulnerabilities_count`
+**Impacto:** La tabla del historial puede mostrar columna "Hallazgos" sin una petición extra por fila.
+
+| # | Tarea | Estado |
+|---|-------|--------|
+| 13.2.1 | En `scans.py`, al construir la lista desde `file_manager.list_scans_metadata()` o desde `active_scans`, incluir `vulnerabilities_count` leyendo el campo del JSON de reporte o del metadata guardado | ✅ |
+
+---
+
+#### 13.3 — Página "Dashboard" en la UI
+**Impacto:** Vista consolidada para el profesor y para el estudiante. Sin librería externa — barras CSS.
+
+| # | Tarea | Estado |
+|---|-------|--------|
+| 13.3.1 | Agregar botón "📊 Dashboard" en el nav de `index.html` (primer puesto) | ✅ |
+| 13.3.2 | Crear `<div id="dashboard-page" class="page">` con: 4 cards de métricas (Total Escaneos, Total Hallazgos, Criticidad Promedio, Perfil Más Usado), gráfica de barras CSS por severidad, gráfica de perfiles usados, tabla Top-5 vulnerabilidades, tabla de actividad reciente | ✅ |
+| 13.3.3 | En `app.js`, agregar `loadDashboard()` que llama a `/api/scans/stats` y renderiza los widgets | ✅ |
+| 13.3.4 | En `styles.css`, agregar clases `.dash-grid`, `.dash-card`, `.dash-bar`, `.dash-bar-fill` para el layout y las barras | ✅ |
+
+---
+
+#### 13.4 — Mejoras en la tabla del historial
+**Impacto:** Permite re-ejecutar un escaneo anterior con un clic y ver de inmediato cuántos hallazgos tuvo.
+
+| # | Tarea | Estado |
+|---|-------|--------|
+| 13.4.1 | Agregar columna "Hallazgos" en `<thead>` de la tabla en `index.html` (entre Perfil y Estado) | ✅ |
+| 13.4.2 | En `app.js`, mostrar `scan.vulnerabilities_count ?? '—'` en la nueva columna de cada fila | ✅ |
+| 13.4.3 | Agregar botón "↩ Re-escanear" en las acciones de cada fila de historial; al pulsarlo: cambiar a página Scanner, seleccionar el perfil correspondiente y rellenar el campo `target` con el target del escaneo anterior | ✅ |
+
+---
+
+#### 13.5 — Actualizar versión del sistema
+**Impacto:** Consistencia: todos los lugares que aún dicen "1.0.0" o "v1.0" deben reflejar la versión real.
+
+| # | Tarea | Estado |
+|---|-------|--------|
+| 13.5.1 | En `webapp/main.py`, cambiar `version="1.0.0"` → `"3.3.0"` y texto del banner | ✅ |
+| 13.5.2 | En `webapp/templates/index.html`, cambiar footer `"Scan Agent Web v1.0"` → `"Scan Agent v3.3.0"` | ✅ |
+| 13.5.3 | En `webapp/templates/index.html`, cambiar subtítulo `"Documentación completa de Scan Agent v3.1"` → `"v3.3"` | ✅ |
+
+---
+
 ## Resumen de Prioridades
 
 | Fase | Descripción | Prioridad | Esfuerzo | Estado |
@@ -696,7 +755,8 @@ Revisión aplicando principios de Clean Code (SRP, DRY, organización de archivo
 | 10 | Selección manual de fases por escaneo | MEDIA | ~20h | ✅ |
 | 11 | Correcciones al parser de reportes — calidad de datos | ALTA–BAJA | ~6h | ✅ |
 | 12 | Limpieza de código (Clean Code) + Bugs de usabilidad | MEDIA | ~6h | ✅ |
-| | **TOTAL** | | **~248h** | |
+| 13 | Dashboard de Análisis + Mejoras de Historial | MEDIA | ~4h | ✅ |
+| | **TOTAL** | | **~252h** | |
 
 ---
 
@@ -715,6 +775,7 @@ SEMANA 17-18: Fase 9 — Reportes dinámicos (actualización automática de cat�
 SEMANA 19-20: Fase 10 — Selección manual de fases (configuración personalizada por sesión) ✅
 SEMANA 21:   Fase 11 — Correcciones al parser (NSE -sV, gobuster retry, port real, limpieza JSON) ✅
 SEMANA 22:   Fase 12 — Limpieza de código (eliminar obsoletos, extraer report_builder, .gitignore, pipeline docs) + Bugs B-01/B-02
+SEMANA 23:   Fase 13 — Dashboard de análisis + mejoras de historial (stats endpoint, re-escaneo, versión)
 ```
 
 **Justificación del orden Fase 8 → 9 → 10:**
@@ -755,6 +816,8 @@ SEMANA 22:   Fase 12 — Limpieza de código (eliminar obsoletos, extraer report
 | 2026-05-27 | Test de usabilidad post-Fase 12 — 6 bloques ejecutados contra entorno Docker live; 7 fixes de Fase 11 verificados; 2 bugs encontrados (B-01: capitalización de tecnologías en JSON raw, B-02: mensaje "falló" sin indicar reintento en progreso) | — |
 | 2026-05-27 | Corrección B-01 — `_TECH_DISPLAY_NAMES` en `ScanResultParser.parse_whatweb_output()`: `whatweb_findings[].technologies[].name` ahora usa la misma normalización que `VulnerabilityAnalyzer` | 12 |
 | 2026-05-27 | Corrección B-02 — `on_retry` callback en `execute_command()`, closure `_make_retry_cb` en `run_scan()`, `retry_msg` en `step_callback`: mensaje "reintentando N/M…" visible en UI durante pausa entre reintentos | 12 |
+| 2026-05-27 | Adición de Fase 13: Dashboard de Análisis + Mejoras de Historial — 5 subtareas: stats endpoint, vuln count en list, página Dashboard CSS, columna Hallazgos + Re-escanear, versión 3.3.0 | 13 |
+| 2026-05-27 | Implementación completa Fase 13 — GET /api/scans/stats (agregación de JSON reports), vulnerabilities_count en ScanStatus + list endpoint, página Dashboard (4 cards, 2 gráficas barras CSS, top vulns, actividad reciente), columna Hallazgos + botón Re-escanear en historial, versión 3.3.0 en main.py/index.html | 13 |
 
 ---
 

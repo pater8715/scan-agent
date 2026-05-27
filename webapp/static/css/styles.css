@@ -850,3 +850,140 @@ body {
         max-height: 220px;
     }
 }
+
+/* ============================================
+   FASE 13 — Dashboard de Análisis
+   ============================================ */
+
+/* Grid de tarjetas */
+.dash-grid {
+    display: grid;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+.dash-grid-4 { grid-template-columns: repeat(4, 1fr); }
+.dash-grid-2 { grid-template-columns: 1fr 1fr; }
+
+/* Tarjeta métrica */
+.dash-card {
+    padding: 20px 24px;
+    text-align: center;
+}
+.dash-card-label {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 8px;
+}
+.dash-card-value {
+    font-size: 2.2rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1;
+}
+.dash-card-value-small { font-size: 1.25rem; font-weight: 600; }
+.dash-card-value-danger { color: #ef4444; }
+.dash-card-accent { border-top: 3px solid var(--primary-color); }
+.dash-card-danger { border-top: 3px solid #ef4444; }
+.dash-card-success { border-top: 3px solid #10b981; }
+.dash-card-warning { border-top: 3px solid #f59e0b; }
+
+/* Barras de distribución */
+.dash-chart { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+
+.dash-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.dash-bar-label {
+    width: 76px;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    text-align: right;
+    flex-shrink: 0;
+}
+.dash-bar-track {
+    flex: 1;
+    height: 14px;
+    background: var(--border-color);
+    border-radius: 99px;
+    overflow: hidden;
+    min-width: 60px;
+}
+.dash-bar-fill {
+    height: 100%;
+    border-radius: 99px;
+    transition: width 0.5s ease;
+    min-width: 2px;
+}
+.dash-bar-fill.critical { background: #ef4444; }
+.dash-bar-fill.high     { background: #f97316; }
+.dash-bar-fill.medium   { background: #f59e0b; }
+.dash-bar-fill.low      { background: #3b82f6; }
+.dash-bar-fill.info     { background: #94a3b8; }
+.dash-bar-fill.profile  { background: var(--primary-color); }
+.dash-bar-count {
+    width: 36px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    text-align: right;
+    flex-shrink: 0;
+}
+
+/* Tablas del dashboard */
+.dash-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-top: 6px; }
+.dash-table th {
+    padding: 8px 10px;
+    text-align: left;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border-color);
+}
+.dash-table td {
+    padding: 9px 10px;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-primary);
+    vertical-align: middle;
+}
+.dash-table tr:last-child td { border-bottom: none; }
+.dash-table tr:hover td { background: var(--bg-color); }
+
+.dash-vuln-name {
+    max-width: 240px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.83rem;
+}
+.dash-count-badge {
+    display: inline-block;
+    background: var(--primary-color);
+    color: #fff;
+    border-radius: 99px;
+    padding: 1px 9px;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+/* Placeholder vacío */
+.dash-empty {
+    text-align: center;
+    color: var(--text-secondary);
+    padding: 32px 16px;
+    font-size: 0.9rem;
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+    .dash-grid-4 { grid-template-columns: 1fr 1fr; }
+    .dash-grid-2 { grid-template-columns: 1fr; }
+}
+@media (max-width: 500px) {
+    .dash-grid-4 { grid-template-columns: 1fr 1fr; }
+    .dash-card-value { font-size: 1.6rem; }
+}

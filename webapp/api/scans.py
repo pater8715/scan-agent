@@ -70,6 +70,7 @@ class ScanStatus(BaseModel):
     message: str
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
+    vulnerabilities_count: Optional[int] = None  # Fase 13: incluido en list
 
 
 class ScanResult(BaseModel):
@@ -195,18 +196,34 @@ async def list_scans(limit: int = 20, status: Optional[str] = None):
     try:
         db_scans = db.get_all_scans(limit=limit)
         for db_scan in db_scans:
-            if db_scan['id'] not in active_scans:
+            sid = str(db_scan['id'])
+            if sid not in active_scans:
+                # Fase 13: obtener vulnerabilities_count desde metadata o JSON report
+                vuln_count = None
+                meta = file_manager.load_scan_metadata(sid)
+                if meta:
+                    vuln_count = meta.get('vulnerabilities_count')
+                if vuln_count is None:
+                    json_report = Path("./reports") / f"scan_{sid}.json"
+                    if json_report.exists():
+                        try:
+                            with open(json_report, "r", encoding="utf-8") as _f:
+                                _jdata = json.load(_f)
+                            vuln_count = len(_jdata.get("vulnerabilities", []))
+                        except Exception:
+                            pass
                 scans.append({
-                    "scan_id": str(db_scan['id']),  # Convertir a string
+                    "scan_id": sid,
                     "target": db_scan.get('target', 'Unknown'),
                     "profile": db_scan.get('profile', 'Unknown'),
                     "status": "completed",
                     "progress": 100,
                     "message": "Completado",
                     "started_at": db_scan.get('start_time'),
-                    "completed_at": db_scan.get('end_time')
+                    "completed_at": db_scan.get('end_time'),
+                    "vulnerabilities_count": vuln_count,
                 })
-    except:
+    except Exception:
         pass
     
     # Filtrar por estado si se especifica
@@ -483,6 +500,85 @@ async def execute_scan(scan_id: str, request: ScanRequest):
             active_scans[scan_id]["reports"] = []
             active_scans[scan_id]["vulnerabilities_count"] = 0
         _active_scanners.pop(scan_id, None)
+
+@router.get("/stats")
+async def get_scan_stats():
+    """
+    Fase 13 — Métricas agregadas de todos los escaneos disponibles.
+
+    Lee los reportes JSON persistidos en ./reports/ y computa:
+    - Totales: scans, vulnerabilidades
+    - Distribución por severidad
+    - Distribución por perfil usado
+    - Top-10 vulnerabilidades más frecuentes
+    - 5 escaneos más recientes
+    """
+    reports_dir = Path("./reports")
+
+    total_scans = 0
+    total_vulnerabilities = 0
+    by_severity: dict = {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0}
+    by_profile: dict = {}
+    vuln_counter: dict = {}
+    recent_scans: list = []
+
+    if reports_dir.exists():
+        json_files = sorted(
+            reports_dir.glob("scan_*.json"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
+        for json_file in json_files:
+            try:
+                with open(json_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            except Exception:
+                continue
+
+            scan_id = json_file.stem.replace("scan_", "")
+            target = data.get("target", "unknown")
+            profile = data.get("profile_used", data.get("profile", "unknown"))
+            vulns = data.get("vulnerabilities", [])
+
+            total_scans += 1
+            total_vulnerabilities += len(vulns)
+
+            for v in vulns:
+                sev = v.get("severity", "info").lower()
+                if sev not in by_severity:
+                    sev = "info"
+                by_severity[sev] += 1
+
+                name = v.get("title", v.get("type", "Desconocida"))
+                if len(name) > 65:
+                    name = name[:62] + "..."
+                vuln_counter[name] = vuln_counter.get(name, 0) + 1
+
+            by_profile[profile] = by_profile.get(profile, 0) + 1
+
+            if len(recent_scans) < 5:
+                meta = data.get("metadata", {})
+                recent_scans.append({
+                    "scan_id": scan_id,
+                    "target": target,
+                    "profile": profile,
+                    "vuln_count": len(vulns),
+                    "completed_at": meta.get("scan_date", ""),
+                })
+
+    top_vulns = sorted(vuln_counter.items(), key=lambda x: x[1], reverse=True)[:10]
+    most_used_profile = max(by_profile, key=lambda k: by_profile[k]) if by_profile else "—"
+
+    return {
+        "total_scans": total_scans,
+        "total_vulnerabilities": total_vulnerabilities,
+        "by_severity": by_severity,
+        "by_profile": by_profile,
+        "most_used_profile": most_used_profile,
+        "top_vulnerabilities": [{"name": n, "count": c} for n, c in top_vulns],
+        "recent_scans": recent_scans,
+    }
+
 
 # Las funciones generate_basic_reports, generate_professional_html_report,
 # generate_professional_txt_report y generate_professional_md_report han sido

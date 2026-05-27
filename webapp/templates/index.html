@@ -23,8 +23,11 @@
                     <button class="nav-btn" data-page="history">
                         <span class="icon">📋</span> Historial
                     </button>
+                    <button class="nav-btn" data-page="dashboard">
+                        <span class="icon">📊</span> Dashboard
+                    </button>
                     <button class="nav-btn" data-page="reports">
-                        <span class="icon">📊</span> Reportes
+                        <span class="icon">🗂️</span> Reportes
                     </button>
                     <button class="nav-btn" data-page="manual">
                         <span class="icon">📖</span> Manual
@@ -264,6 +267,7 @@
                                     <th>ID</th>
                                     <th>Objetivo</th>
                                     <th>Perfil</th>
+                                    <th>Hallazgos</th>
                                     <th>Estado</th>
                                     <th>Fecha</th>
                                     <th>Acciones</th>
@@ -271,7 +275,7 @@
                             </thead>
                             <tbody id="scans-tbody">
                                 <tr>
-                                    <td colspan="6" class="loading">Cargando historial...</td>
+                                    <td colspan="7" class="loading">Cargando historial...</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -345,7 +349,7 @@
             <div id="manual-page" class="page">
                 <div class="page-header">
                     <h2>Manual de Usuario</h2>
-                    <p class="subtitle">Documentación completa de Scan Agent v3.1</p>
+                    <p class="subtitle">Documentación completa de Scan Agent v3.3</p>
                 </div>
 
                 <div class="manual-layout">
@@ -436,13 +440,81 @@
                 </div>
             </div>
 
+            <!-- ======================================================= -->
+            <!-- Dashboard Page — Fase 13                                 -->
+            <!-- ======================================================= -->
+            <div id="dashboard-page" class="page">
+                <div class="page-header">
+                    <h2>📊 Dashboard de Análisis</h2>
+                    <p class="subtitle">Resumen de actividad y métricas de todos los escaneos realizados</p>
+                </div>
+
+                <!-- Barra de acciones -->
+                <div style="display:flex; justify-content:flex-end; margin-bottom:16px;">
+                    <button class="btn btn-secondary" onclick="loadDashboard(true)">🔄 Actualizar</button>
+                </div>
+
+                <!-- Fila 1 — Tarjetas métricas -->
+                <div class="dash-grid dash-grid-4">
+                    <div class="card dash-card dash-card-accent">
+                        <div class="dash-card-label">Total Escaneos</div>
+                        <div class="dash-card-value" id="dash-total-scans">—</div>
+                    </div>
+                    <div class="card dash-card dash-card-success">
+                        <div class="dash-card-label">Total Hallazgos</div>
+                        <div class="dash-card-value" id="dash-total-vulns">—</div>
+                    </div>
+                    <div class="card dash-card dash-card-danger">
+                        <div class="dash-card-label">Críticos + Altos</div>
+                        <div class="dash-card-value dash-card-value-danger" id="dash-high-critical">—</div>
+                    </div>
+                    <div class="card dash-card dash-card-warning">
+                        <div class="dash-card-label">Perfil Más Usado</div>
+                        <div class="dash-card-value dash-card-value-small" id="dash-top-profile">—</div>
+                    </div>
+                </div>
+
+                <!-- Fila 2 — Gráficas CSS -->
+                <div class="dash-grid dash-grid-2">
+                    <div class="card">
+                        <div class="card-title">Distribución por Severidad</div>
+                        <div id="dash-severity-chart" class="dash-chart">
+                            <div class="loading">Cargando...</div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">Perfiles Utilizados</div>
+                        <div id="dash-profile-chart" class="dash-chart">
+                            <div class="loading">Cargando...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Fila 3 — Tablas -->
+                <div class="dash-grid dash-grid-2">
+                    <div class="card">
+                        <div class="card-title">🔴 Top Vulnerabilidades Frecuentes</div>
+                        <div id="dash-top-vulns-container">
+                            <div class="loading">Cargando...</div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">🕐 Actividad Reciente</div>
+                        <div id="dash-recent-container">
+                            <div class="loading">Cargando...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- / Dashboard Page -->
+
         </div>
     </main>
 
     <!-- Footer -->
     <footer class="footer">
         <div class="container">
-            <p>Scan Agent Web v1.0 | Desarrollado para análisis de seguridad</p>
+            <p>Scan Agent v3.3.0 | Desarrollado para análisis de seguridad</p>
         </div>
     </footer>
 

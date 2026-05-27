@@ -53,6 +53,8 @@ function showPage(pageId) {
             loadScansHistory();
         } else if (pageId === 'manual') {
             loadManual();
+        } else if (pageId === 'dashboard') {
+            loadDashboard();
         }
     }
 }
@@ -539,8 +541,17 @@ async function loadScansHistory() {
                 ? `<button class="btn btn-danger btn-sm" onclick="cancelScan('${scan.scan_id}')">⛔ Cancelar</button>`
                 : '';
             const reportBtn = scan.status === 'completed'
-                ? `<button class="btn btn-secondary btn-sm" onclick="viewScanReport('${scan.scan_id}')">📄 Ver Reporte</button>`
+                ? `<button class="btn btn-secondary btn-sm" onclick="viewScanReport('${scan.scan_id}')">📄 Reporte</button>`
                 : '';
+            // Fase 13: botón Re-escanear y columna Hallazgos
+            const reScanBtn = `<button class="btn btn-secondary btn-sm"
+                onclick="reScanFrom('${scan.target.replace(/'/g,"\\'")}','${scan.profile}')"
+                title="Rellenar formulario con este objetivo y perfil">↩ Re-escanear</button>`;
+            const vulnBadge = (scan.vulnerabilities_count != null)
+                ? `<span style="font-weight:600; color:${scan.vulnerabilities_count > 0 ? '#f97316' : '#10b981'};">
+                       ${scan.vulnerabilities_count}
+                   </span>`
+                : '<span style="color:#64748b;">—</span>';
             return `
             <tr>
                 <td><code>${scan.scan_id}</code></td>
@@ -552,12 +563,14 @@ async function loadScansHistory() {
                             style="margin-left:5px; background:#1e3a5f; color:#93c5fd; border-radius:4px; padding:1px 7px; font-size:0.72rem; cursor:help;">⚙ personalizado</span>`
                         : ''}
                 </td>
+                <td style="text-align:center;">${vulnBadge}</td>
                 <td><span class="status-badge ${scan.status}">${getStatusLabel(scan.status)}</span></td>
                 <td>${formatDate(scan.started_at)}</td>
-                <td style="display:flex;gap:6px;flex-wrap:wrap;">
+                <td style="display:flex;gap:5px;flex-wrap:wrap;">
                     ${reportBtn}
                     ${cancelBtn}
-                    <button class="btn btn-secondary btn-sm" onclick="showProfileDetail('${scan.profile}')">ℹ️ Detalle</button>
+                    ${reScanBtn}
+                    <button class="btn btn-secondary btn-sm" onclick="showProfileDetail('${scan.profile}')">ℹ️ Perfil</button>
                 </td>
             </tr>`;
         }).join('');
@@ -1021,6 +1034,161 @@ function _renderPresets(profileId) {
                     title="Eliminar preset"
                     style="background:none; border:none; color:#64748b; cursor:pointer; font-size:0.75rem; padding:0 2px;">✕</button>
             </span>`).join('');
+}
+
+// ── Integración con el envío del formulario ───────────────────────────────
+
+// ============================================
+// Fase 13 — Dashboard de Análisis
+// ============================================
+
+let _dashboardLoaded = false;
+
+async function loadDashboard(force = false) {
+    if (_dashboardLoaded && !force) return;
+
+    try {
+        const r = await fetch(`${API_BASE}/scans/stats`);
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const data = await r.json();
+
+        // --- Tarjetas métricas ---
+        document.getElementById('dash-total-scans').textContent  = data.total_scans ?? 0;
+        document.getElementById('dash-total-vulns').textContent  = data.total_vulnerabilities ?? 0;
+        const hiCrit = (data.by_severity?.critical ?? 0) + (data.by_severity?.high ?? 0);
+        document.getElementById('dash-high-critical').textContent = hiCrit;
+        document.getElementById('dash-top-profile').textContent  = data.most_used_profile ?? '—';
+
+        // --- Gráfica de severidad ---
+        const sevEl = document.getElementById('dash-severity-chart');
+        const sevData = data.by_severity ?? {};
+        const sevOrder = [
+            { key: 'critical', label: 'Crítica',  cls: 'critical' },
+            { key: 'high',     label: 'Alta',     cls: 'high'     },
+            { key: 'medium',   label: 'Media',    cls: 'medium'   },
+            { key: 'low',      label: 'Baja',     cls: 'low'      },
+            { key: 'info',     label: 'Info',     cls: 'info'     },
+        ];
+        const sevMax = Math.max(1, ...sevOrder.map(s => sevData[s.key] ?? 0));
+        if (Object.values(sevData).every(v => v === 0)) {
+            sevEl.innerHTML = '<div class="dash-empty">Sin datos de severidad</div>';
+        } else {
+            sevEl.innerHTML = sevOrder.map(s => {
+                const cnt = sevData[s.key] ?? 0;
+                const pct = Math.round((cnt / sevMax) * 100);
+                return `<div class="dash-bar-row">
+                    <div class="dash-bar-label">${s.label}</div>
+                    <div class="dash-bar-track">
+                        <div class="dash-bar-fill ${s.cls}" style="width:${pct}%"></div>
+                    </div>
+                    <div class="dash-bar-count">${cnt}</div>
+                </div>`;
+            }).join('');
+        }
+
+        // --- Gráfica de perfiles ---
+        const profEl = document.getElementById('dash-profile-chart');
+        const profData = data.by_profile ?? {};
+        const profEntries = Object.entries(profData).sort((a, b) => b[1] - a[1]).slice(0, 8);
+        const profMax = Math.max(1, ...profEntries.map(([, v]) => v));
+        if (!profEntries.length) {
+            profEl.innerHTML = '<div class="dash-empty">Sin datos de perfiles</div>';
+        } else {
+            profEl.innerHTML = profEntries.map(([name, cnt]) => {
+                const pct = Math.round((cnt / profMax) * 100);
+                return `<div class="dash-bar-row">
+                    <div class="dash-bar-label" style="text-align:right; font-size:0.78rem;">${name}</div>
+                    <div class="dash-bar-track">
+                        <div class="dash-bar-fill profile" style="width:${pct}%"></div>
+                    </div>
+                    <div class="dash-bar-count">${cnt}</div>
+                </div>`;
+            }).join('');
+        }
+
+        // --- Top vulnerabilidades ---
+        const topEl = document.getElementById('dash-top-vulns-container');
+        const topVulns = data.top_vulnerabilities ?? [];
+        if (!topVulns.length) {
+            topEl.innerHTML = '<div class="dash-empty">No hay escaneos completados aún</div>';
+        } else {
+            topEl.innerHTML = `<table class="dash-table">
+                <thead><tr><th>#</th><th>Vulnerabilidad</th><th style="text-align:right;">Ocurrencias</th></tr></thead>
+                <tbody>
+                ${topVulns.map((v, i) => `
+                    <tr>
+                        <td style="color:#64748b; width:28px;">${i + 1}</td>
+                        <td><div class="dash-vuln-name" title="${v.name}">${v.name}</div></td>
+                        <td style="text-align:right;"><span class="dash-count-badge">${v.count}</span></td>
+                    </tr>`).join('')}
+                </tbody>
+            </table>`;
+        }
+
+        // --- Actividad reciente ---
+        const recentEl = document.getElementById('dash-recent-container');
+        const recent = data.recent_scans ?? [];
+        if (!recent.length) {
+            recentEl.innerHTML = '<div class="dash-empty">Sin actividad reciente</div>';
+        } else {
+            recentEl.innerHTML = `<table class="dash-table">
+                <thead><tr><th>ID</th><th>Objetivo</th><th>Perfil</th><th style="text-align:right;">Hallazgos</th></tr></thead>
+                <tbody>
+                ${recent.map(s => `
+                    <tr>
+                        <td><code style="font-size:0.8rem;">${s.scan_id}</code></td>
+                        <td style="max-width:120px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${s.target}</td>
+                        <td><span class="profile-badge ${s.profile}" style="font-size:0.72rem;">${s.profile}</span></td>
+                        <td style="text-align:right; font-weight:600; color:${s.vuln_count > 0 ? '#f97316' : '#10b981'};">${s.vuln_count}</td>
+                    </tr>`).join('')}
+                </tbody>
+            </table>`;
+        }
+
+        _dashboardLoaded = true;
+
+    } catch (err) {
+        console.error('Error cargando dashboard:', err);
+        ['dash-severity-chart','dash-profile-chart','dash-top-vulns-container','dash-recent-container'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.innerHTML = `<div class="dash-empty" style="color:#ef4444;">Error cargando datos</div>`;
+        });
+    }
+}
+
+// ============================================
+// Fase 13 — Re-escanear desde historial
+// ============================================
+
+function reScanFrom(target, profile) {
+    // 1. Cambiar a la página Scanner
+    showPage('scanner');
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    const scannerBtn = document.querySelector('[data-page="scanner"]');
+    if (scannerBtn) scannerBtn.classList.add('active');
+
+    // 2. Seleccionar la tarjeta del perfil
+    const card = document.querySelector(`.profile-card[data-profile="${profile}"]`);
+    if (card) {
+        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        selectProfile(profile, card);
+    }
+
+    // 3. Rellenar el target
+    const targetInput = document.getElementById('target');
+    if (targetInput) {
+        targetInput.value = target;
+        targetInput.dispatchEvent(new Event('input')); // trigger validation
+    }
+
+    // 4. Mostrar el formulario y hacer scroll
+    const configSection = document.getElementById('scan-config-section');
+    if (configSection) {
+        configSection.style.display = 'block';
+        setTimeout(() => configSection.scrollIntoView({ behavior: 'smooth', block: 'start' }), 250);
+    }
+
+    showToast(`Re-escaneo listo: ${target} con perfil "${profile}"`, 'success');
 }
 
 // ── Integración con el envío del formulario ───────────────────────────────
