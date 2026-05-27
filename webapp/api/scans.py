@@ -296,16 +296,22 @@ async def execute_scan(scan_id: str, request: ScanRequest):
         profile_obj = VulnerabilityScanner.PROFILES.get(request.profile)
         total_steps = len(profile_obj.commands) if profile_obj else 6
 
-        def step_callback(step: int, total: int, tool: str, ok: bool):
+        def step_callback(step: int, total: int, tool: str, ok, retry_msg: str = None):
             # No actualizar si el escaneo ya fue cancelado
             if active_scans[scan_id].get("status") == "cancelled":
                 return
             pct = int(10 + (step / total) * 55)
             active_scans[scan_id]["progress"] = pct
-            estado = "completado" if ok else "falló"
-            active_scans[scan_id]["message"] = (
-                f"Paso {step}/{total} — {tool} {estado}"
-            )
+            if retry_msg:
+                # Fix B-02: mensaje intermedio durante reintento (ok=None en este caso)
+                active_scans[scan_id]["message"] = (
+                    f"Paso {step}/{total} — {tool} {retry_msg}"
+                )
+            else:
+                estado = "completado" if ok else "falló"
+                active_scans[scan_id]["message"] = (
+                    f"Paso {step}/{total} — {tool} {estado}"
+                )
 
         active_scans[scan_id]["progress"] = 10
         active_scans[scan_id]["message"] = f"Escaneando {request.target}..."

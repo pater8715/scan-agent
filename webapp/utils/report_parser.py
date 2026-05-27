@@ -517,6 +517,25 @@ class ScanResultParser:
         "email", "html5", "redirect-location", "http-server", "server",
     })
 
+    # Fix B-01: WhatWeb usa su propia capitalización (JQuery, Angularjs…).
+    # Normalizar el campo `name` al estándar de la industria antes de guardarlo en JSON,
+    # de forma que whatweb_findings y vulnerabilities sean consistentes.
+    _TECH_DISPLAY_NAMES = {
+        "jquery": "jQuery",
+        "angularjs": "AngularJS",
+        "bootstrap": "Bootstrap",
+        "lodash": "Lodash",
+        "react": "React",
+        "vuejs": "Vue.js",
+        "vue.js": "Vue.js",
+        "moment.js": "Moment.js",
+        "momentjs": "Moment.js",
+        "d3.js": "D3.js",
+        "underscore.js": "Underscore.js",
+        "backbone.js": "Backbone.js",
+        "handlebars.js": "Handlebars.js",
+    }
+
     def parse_whatweb_output(self, content: str):
         """Parsea salida de whatweb — extrae tecnologías detectadas.
         Limpia los códigos de color ANSI que whatweb embebe entre nombre y versión
@@ -538,8 +557,12 @@ class ScanResultParser:
                 "raw": self._ANSI_ESCAPE.sub('', raw_line[:300]),
                 "http_status": status,
                 # Fix 11.5: filtrar atributos que no son tecnologías reales (Country, IP, Title…)
+                # Fix B-01: normalizar capitalización del nombre (JQuery → jQuery)
                 "technologies": [
-                    {"name": t[0], "version": t[1]}
+                    {
+                        "name": self._TECH_DISPLAY_NAMES.get(t[0].lower(), t[0]),
+                        "version": t[1]
+                    }
                     for t in techs
                     if t[0].lower() not in self._WHATWEB_NOISE
                     and t[0].lower() not in ("http", "https")

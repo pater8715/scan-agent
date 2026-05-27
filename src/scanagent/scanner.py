@@ -768,8 +768,16 @@ class VulnerabilityScanner:
         
         return tools
     
-    def execute_command(self, command: Dict, target: str) -> bool:
-        """Ejecuta un comando individual del escaneo"""
+    def execute_command(self, command: Dict, target: str, on_retry=None) -> bool:
+        """Ejecuta un comando individual del escaneo.
+
+        Args:
+            command:  Diccionario con tool, args, timeout, etc.
+            target:   IP o dominio objetivo.
+            on_retry: Callable opcional ``(attempt: int, max_retries: int, tool: str)``
+                      invocado ANTES de cada reintento. Permite actualizar el mensaje
+                      de progreso en la UI (ej: "gobuster reintentando 1/2").
+        """
         tool = command['tool']
 
         # Separar hostname y puerto para sustituir correctamente en las plantillas
@@ -869,6 +877,12 @@ class VulnerabilityScanner:
                     attempt += 1
                     if self.verbose:
                         print(f"   ⚠️  {tool} recibió 'connection refused' — reintento {attempt}/{_MAX_RETRIES} en {_RETRY_DELAY}s")
+                    # Fix B-02: notificar a la UI que se está reintentando (no falló definitivamente)
+                    if on_retry:
+                        try:
+                            on_retry(attempt, _MAX_RETRIES, tool)
+                        except Exception:
+                            pass
                     import time as _time
                     _time.sleep(_RETRY_DELAY)
                     continue  # reintentar el bucle
@@ -918,7 +932,7 @@ class VulnerabilityScanner:
             return False
     
     def run_scan(self, target: str, profile_name: str, output_dir: str = "./outputs",
-                 step_callback=None, steps_filter=None) -> tuple:
+                 step_callback=None, steps_filter=None, retry_callback=None) -> tuple:
         """Ejecuta un perfil de escaneo completo
 
         Args:
@@ -1040,7 +1054,20 @@ class VulnerabilityScanner:
             if self.verbose:
                 print(f"\n[{i}/{total_commands}] Ejecutando {tool}...")
 
-            success = self.execute_command(command, target)
+            # Fix B-02: construir on_retry para que la UI muestre "reintentando" en lugar
+            # de mantener el mensaje del paso anterior mientras gobuster espera y reintenta.
+            def _make_retry_cb(step_idx, total, cb):
+                def _on_retry(attempt, max_retries, t):
+                    if cb:
+                        try:
+                            cb(step_idx, total, t, None,
+                               f"reintentando {attempt}/{max_retries}…")
+                        except Exception:
+                            pass
+                return _on_retry
+
+            _on_retry_cb = _make_retry_cb(i, total_commands, step_callback) if step_callback else None
+            success = self.execute_command(command, target, on_retry=_on_retry_cb)
 
             if step_callback:
                 try:
