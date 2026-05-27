@@ -566,8 +566,8 @@ if self.results.get("directories"):
 
 ---
 
-### FASE 12 — Limpieza de Código (Clean Code)
-**Prioridad:** MEDIA | **Estimado:** ~5h | **Estado:** ✅ Completada (2026-05-27)
+### FASE 12 — Limpieza de Código (Clean Code) + Bugs de Usabilidad
+**Prioridad:** MEDIA | **Estimado:** ~6h | **Estado:** ✅ Completada (2026-05-27)
 
 Revisión aplicando principios de Clean Code (SRP, DRY, organización de archivos). Se identificaron archivos obsoletos, código fuera de lugar y una violación al principio de Responsabilidad Única en `scans.py`.
 
@@ -647,6 +647,39 @@ Revisión aplicando principios de Clean Code (SRP, DRY, organización de archivo
 
 ---
 
+#### 12.6 — Bug B-01: normalización de nombres de tecnologías en datos raw
+**Severidad:** Minor | **Detectado en:** Test de usabilidad post-Fase 12
+
+**Problema:** La normalización de capitalización (`JQuery` → `jQuery`) introducida en Fase 11 (Fix 11.6) sólo se aplicaba en `VulnerabilityAnalyzer._analyze_whatweb_findings()` al construir el título de la vulnerabilidad. El campo `whatweb_findings[].technologies[].name` del JSON raw conservaba la capitalización original de WhatWeb, produciendo inconsistencias entre los datos crudos y las vulnerabilidades procesadas.
+
+**Causa raíz:** `ScanResultParser.parse_whatweb_output()` no tenía acceso a `_LIB_DISPLAY_NAMES` de `VulnerabilityAnalyzer` y construía la lista de tecnologías directamente desde el output de WhatWeb sin normalizar.
+
+| # | Tarea | Estado |
+|---|-------|--------|
+| 12.6.1 | Agregar `_TECH_DISPLAY_NAMES` como variable de clase en `ScanResultParser` con las mismas entradas que `VulnerabilityAnalyzer._LIB_DISPLAY_NAMES` | ✅ |
+| 12.6.2 | Actualizar `parse_whatweb_output()` para aplicar `_TECH_DISPLAY_NAMES.get(t[0].lower(), t[0])` al construir la lista de tecnologías | ✅ |
+
+**Archivo afectado:** `webapp/utils/report_parser.py`
+
+---
+
+#### 12.7 — Bug B-02: mensaje de progreso no refleja estado de reintento
+**Severidad:** Info | **Detectado en:** Test de usabilidad post-Fase 12
+
+**Problema:** Cuando una herramienta fallaba y `execute_command()` entraba en el ciclo de reintentos (Fase 11 — gobuster retry), el mensaje de progreso en la UI Web mostraba únicamente `"falló"` sin indicar que se estaba reintentando. El usuario no tenía visibilidad del estado real del escaneo durante los ~5 s de pausa entre reintentos.
+
+**Causa raíz:** `execute_command()` no exponía ningún mecanismo de callback durante el ciclo de retry; y `step_callback` en `scans.py` no recibía información para distinguir un fallo transitorio de un fallo definitivo.
+
+| # | Tarea | Estado |
+|---|-------|--------|
+| 12.7.1 | Agregar parámetro `on_retry=None` a `execute_command()` en `scanner.py`; invocarlo antes de cada pausa de reintento | ✅ |
+| 12.7.2 | Agregar `retry_callback=None` a la firma de `run_scan()`; crear closure `_make_retry_cb` que genera el `on_retry` adecuado para cada paso | ✅ |
+| 12.7.3 | Actualizar `step_callback` en `scans.py` para aceptar `retry_msg: str = None`; cuando está presente emitir `"reintentando N/M…"` en lugar del estado binario | ✅ |
+
+**Archivos afectados:** `src/scanagent/scanner.py`, `webapp/api/scans.py`
+
+---
+
 ## Resumen de Prioridades
 
 | Fase | Descripción | Prioridad | Esfuerzo | Estado |
@@ -662,7 +695,7 @@ Revisión aplicando principios de Clean Code (SRP, DRY, organización de archivo
 | 9 | Reportes dinámicos con actualización automática | ALTA | ~22h | ✅ |
 | 10 | Selección manual de fases por escaneo | MEDIA | ~20h | ✅ |
 | 11 | Correcciones al parser de reportes — calidad de datos | ALTA–BAJA | ~6h | ✅ |
-| 12 | Limpieza de código (Clean Code) | MEDIA | ~5h | ✅ |
+| 12 | Limpieza de código (Clean Code) + Bugs de usabilidad | MEDIA | ~6h | ✅ |
 | | **TOTAL** | | **~248h** | |
 
 ---
@@ -681,7 +714,7 @@ SEMANA 16:   Fase 8 — Correcciones de perfiles (calidad de datos del escaneo) 
 SEMANA 17-18: Fase 9 — Reportes dinámicos (actualización automática de catálogo)         ✅
 SEMANA 19-20: Fase 10 — Selección manual de fases (configuración personalizada por sesión) ✅
 SEMANA 21:   Fase 11 — Correcciones al parser (NSE -sV, gobuster retry, port real, limpieza JSON) ✅
-SEMANA 22:   Fase 12 — Limpieza de código (eliminar obsoletos, extraer report_builder, .gitignore, pipeline docs)
+SEMANA 22:   Fase 12 — Limpieza de código (eliminar obsoletos, extraer report_builder, .gitignore, pipeline docs) + Bugs B-01/B-02
 ```
 
 **Justificación del orden Fase 8 → 9 → 10:**
@@ -719,6 +752,9 @@ SEMANA 22:   Fase 12 — Limpieza de código (eliminar obsoletos, extraer report
 | 2026-05-27 | Revisión Clean Code completa del repositorio — identificados 8 elementos a eliminar (~206 KB), violación SRP en scans.py (1.125 líneas de generadores de reporte), .gitignore incorrecto para data/storage/, IMAGE_TAG desactualizado en build.sh, pipeline legacy sin documentar | — |
 | 2026-05-27 | Adición de Fase 12: limpieza de código — 5 subtareas: eliminar obsoletos, corregir .gitignore, extraer report_builder.py, actualizar IMAGE_TAG, documentar pipelines | 12 |
 | 2026-05-27 | Implementación completa Fase 12 — eliminados 21 archivos obsoletos (~206 KB), .gitignore data/storage/ corregido, scans.py 1605→490 líneas (report_builder.py extraído, SRP), IMAGE_TAG 2.1.0→3.3.0, comentarios de pipeline legacy en 4 módulos CLI | 12 |
+| 2026-05-27 | Test de usabilidad post-Fase 12 — 6 bloques ejecutados contra entorno Docker live; 7 fixes de Fase 11 verificados; 2 bugs encontrados (B-01: capitalización de tecnologías en JSON raw, B-02: mensaje "falló" sin indicar reintento en progreso) | — |
+| 2026-05-27 | Corrección B-01 — `_TECH_DISPLAY_NAMES` en `ScanResultParser.parse_whatweb_output()`: `whatweb_findings[].technologies[].name` ahora usa la misma normalización que `VulnerabilityAnalyzer` | 12 |
+| 2026-05-27 | Corrección B-02 — `on_retry` callback en `execute_command()`, closure `_make_retry_cb` en `run_scan()`, `retry_msg` en `step_callback`: mensaje "reintentando N/M…" visible en UI durante pausa entre reintentos | 12 |
 
 ---
 
