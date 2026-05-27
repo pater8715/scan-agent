@@ -48,11 +48,11 @@ data/*.db
 !data/.gitkeep
 
 # Storage - NO incluir en Git
-storage/metadata/*.json
-storage/active/
-storage/archived/
-storage/temp/
-!storage/metadata/.gitkeep
+data/storage/metadata/*.json
+data/storage/active/
+data/storage/archived/
+data/storage/temp/
+!data/storage/metadata/.gitkeep
 
 # Archivos de ejemplo antiguos
 informe_tecnico.*

@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# PIPELINE CLI (legacy) — Este módulo es parte exclusiva del flujo de línea de comandos:
+#   agent.run() → ScanParser → VulnerabilityInterpreter → ReportGenerator → DashboardGenerator
+# NO es usado por la webapp. El pipeline web usa: webapp/utils/report_parser.py + report_builder.py
 """
 Interpreter Module - Scan Agent
 ================================

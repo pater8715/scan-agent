@@ -11,7 +11,7 @@ RED='\033[0;31m'
 NC='\033[0m'
 
 echo -e "${GREEN}╔════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}║  Scan Agent v2.1 - Docker Build       ║${NC}"
+echo -e "${GREEN}║  Scan Agent v2.1 - Docker Build        ║${NC}"
 echo -e "${GREEN}╚════════════════════════════════════════╝${NC}"
 echo ""
 
@@ -27,7 +27,7 @@ echo ""
 
 # Opciones
 IMAGE_NAME="scan-agent"
-IMAGE_TAG="2.1.0"
+IMAGE_TAG="3.3.0"
 NO_CACHE=${1:-false}
 
 # Construir
