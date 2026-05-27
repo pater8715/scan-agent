@@ -567,7 +567,7 @@ if self.results.get("directories"):
 ---
 
 ### FASE 12 — Limpieza de Código (Clean Code)
-**Prioridad:** MEDIA | **Estimado:** ~5h | **Estado:** ⬜ Pendiente
+**Prioridad:** MEDIA | **Estimado:** ~5h | **Estado:** ✅ Completada (2026-05-27)
 
 Revisión aplicando principios de Clean Code (SRP, DRY, organización de archivos). Se identificaron archivos obsoletos, código fuera de lugar y una violación al principio de Responsabilidad Única en `scans.py`.
 
@@ -580,14 +580,14 @@ Revisión aplicando principios de Clean Code (SRP, DRY, organización de archivo
 
 | # | Elemento | Motivo | Estado |
 |---|----------|--------|--------|
-| 12.1.1 | `docker/Dockerfile.backup-local` | Backup explícito; producción usa `docker/Dockerfile` | ⬜ |
-| 12.1.2 | `scripts/EJEMPLOS.sh` | v1.0 — rutas incorrectas (`python3 agent.py`), obsoleto | ⬜ |
-| 12.1.3 | `scripts/EJEMPLOS_v2.sh` | v2.0 — misma ruta incorrecta; obsoleto | ⬜ |
-| 12.1.4 | `docs/INDEX_v3.0.md` | Supersedido por `docs/INDEX.md` (activo, 21 KB) | ⬜ |
-| 12.1.5 | `docs/ROADMAP.md` | 25 líneas de meta-referencias a archivos archivados | ⬜ |
-| 12.1.6 | `docs/archived/` (8 archivos, ~117 KB) | Logs de implementación, README antiguo, contextos viejos | ⬜ |
-| 12.1.7 | `examples/` (6 archivos, ~72 KB) | Estructura v1.0 con campos en español; no usados por tests ni webapp | ⬜ |
-| 12.1.8 | `webapp/context_proyect.md` | Notas internas en Markdown dentro de un paquete Python | ⬜ |
+| 12.1.1 | `docker/Dockerfile.backup-local` | Backup explícito; producción usa `docker/Dockerfile` | ✅ |
+| 12.1.2 | `scripts/EJEMPLOS.sh` | v1.0 — rutas incorrectas (`python3 agent.py`), obsoleto | ✅ |
+| 12.1.3 | `scripts/EJEMPLOS_v2.sh` | v2.0 — misma ruta incorrecta; obsoleto | ✅ |
+| 12.1.4 | `docs/INDEX_v3.0.md` | Supersedido por `docs/INDEX.md` (activo, 21 KB) | ✅ |
+| 12.1.5 | `docs/ROADMAP.md` | 25 líneas de meta-referencias a archivos archivados | ✅ |
+| 12.1.6 | `docs/archived/` (8 archivos, ~117 KB) | Logs de implementación, README antiguo, contextos viejos | ✅ |
+| 12.1.7 | `examples/` (6 archivos, ~72 KB) | Estructura v1.0 con campos en español; no usados por tests ni webapp | ✅ |
+| 12.1.8 | `webapp/context_proyect.md` | Notas internas en Markdown dentro de un paquete Python | ✅ |
 
 ---
 
@@ -596,7 +596,7 @@ Revisión aplicando principios de Clean Code (SRP, DRY, organización de archivo
 
 | # | Tarea | Estado |
 |---|-------|--------|
-| 12.2.1 | Agregar `data/storage/` a `.gitignore`: reemplazar las rutas `storage/metadata/*.json` / `storage/active/` / ... (relativas a raíz, incorrectas) por `data/storage/metadata/*.json` / `data/storage/active/` / `data/storage/archived/` / `data/storage/temp/` / `!data/storage/metadata/.gitkeep` | ⬜ |
+| 12.2.1 | Agregar `data/storage/` a `.gitignore`: reemplazar las rutas `storage/metadata/*.json` / `storage/active/` / ... (relativas a raíz, incorrectas) por `data/storage/metadata/*.json` / `data/storage/active/` / `data/storage/archived/` / `data/storage/temp/` / `!data/storage/metadata/.gitkeep` | ✅ |
 
 **Contexto:** `data/storage/` aparece como untracked en `git status` porque las reglas actuales usan `storage/` sin el prefijo `data/`, lo que no coincide con la estructura real del proyecto.
 
@@ -609,9 +609,9 @@ Revisión aplicando principios de Clean Code (SRP, DRY, organización de archivo
 
 | # | Tarea | Estado |
 |---|-------|--------|
-| 12.3.1 | Crear `webapp/utils/report_builder.py` con las siguientes funciones extraídas de `scans.py` (L481–L1605): `generate_basic_reports`, `_html_severity_badge`, `_generate_headers_table_html`, `_generate_directories_html`, `_generate_owasp_api_table_html`, `_generate_nikto_html`, `_generate_profile_html_sections`, `_profile_label`, `generate_professional_html_report`, `generate_professional_txt_report`, `generate_professional_md_report` | ⬜ |
-| 12.3.2 | En `scans.py`, reemplazar las funciones eliminadas con: `from webapp.utils.report_builder import generate_basic_reports` | ⬜ |
-| 12.3.3 | Verificar que `webapp/utils/__init__.py` no requiere modificación (el import es directo del módulo) | ⬜ |
+| 12.3.1 | Crear `webapp/utils/report_builder.py` con las siguientes funciones extraídas de `scans.py` (L481–L1605): `generate_basic_reports`, `_html_severity_badge`, `_generate_headers_table_html`, `_generate_directories_html`, `_generate_owasp_api_table_html`, `_generate_nikto_html`, `_generate_profile_html_sections`, `_profile_label`, `generate_professional_html_report`, `generate_professional_txt_report`, `generate_professional_md_report` | ✅ |
+| 12.3.2 | En `scans.py`, reemplazar las funciones eliminadas con: `from webapp.utils.report_builder import generate_basic_reports` | ✅ |
+| 12.3.3 | Verificar que `webapp/utils/__init__.py` no requiere modificación (el import es directo del módulo) | ✅ |
 
 **Imports requeridos en `report_builder.py`:** `datetime`, `json`, `pathlib.Path`, `typing.List`, `webapp.utils.report_parser.{ScanResultParser, VulnerabilityAnalyzer}`, `webapp.utils.catalog_loader.catalog_loader`
 
@@ -622,7 +622,7 @@ Revisión aplicando principios de Clean Code (SRP, DRY, organización de archivo
 
 | # | Tarea | Estado |
 |---|-------|--------|
-| 12.4.1 | En `scripts/build.sh:30`, cambiar `IMAGE_TAG="2.1.0"` → `IMAGE_TAG="3.3.0"` | ⬜ |
+| 12.4.1 | En `scripts/build.sh:30`, cambiar `IMAGE_TAG="2.1.0"` → `IMAGE_TAG="3.3.0"` | ✅ |
 
 ---
 
@@ -633,10 +633,10 @@ Revisión aplicando principios de Clean Code (SRP, DRY, organización de archivo
 
 | # | Tarea | Estado |
 |---|-------|--------|
-| 12.5.1 | Agregar comentario de bloque en `src/scanagent/parser.py` (línea 1) indicando que pertenece al pipeline CLI | ⬜ |
-| 12.5.2 | Agregar comentario de bloque en `src/scanagent/interpreter.py` (línea 1) | ⬜ |
-| 12.5.3 | Agregar comentario de bloque en `src/scanagent/report_generator.py` (línea 1) | ⬜ |
-| 12.5.4 | Agregar comentario de bloque en `src/scanagent/dashboard_generator.py` (línea 1) | ⬜ |
+| 12.5.1 | Agregar comentario de bloque en `src/scanagent/parser.py` (línea 1) indicando que pertenece al pipeline CLI | ✅ |
+| 12.5.2 | Agregar comentario de bloque en `src/scanagent/interpreter.py` (línea 1) | ✅ |
+| 12.5.3 | Agregar comentario de bloque en `src/scanagent/report_generator.py` (línea 1) | ✅ |
+| 12.5.4 | Agregar comentario de bloque en `src/scanagent/dashboard_generator.py` (línea 1) | ✅ |
 
 **Formato del comentario:**
 ```python
@@ -662,7 +662,7 @@ Revisión aplicando principios de Clean Code (SRP, DRY, organización de archivo
 | 9 | Reportes dinámicos con actualización automática | ALTA | ~22h | ✅ |
 | 10 | Selección manual de fases por escaneo | MEDIA | ~20h | ✅ |
 | 11 | Correcciones al parser de reportes — calidad de datos | ALTA–BAJA | ~6h | ✅ |
-| 12 | Limpieza de código (Clean Code) | MEDIA | ~5h | ⬜ |
+| 12 | Limpieza de código (Clean Code) | MEDIA | ~5h | ✅ |
 | | **TOTAL** | | **~248h** | |
 
 ---
@@ -718,6 +718,7 @@ SEMANA 22:   Fase 12 — Limpieza de código (eliminar obsoletos, extraer report
 | 2026-05-27 | Implementación completa Fase 11 — NSE -sV en web+api-owasp, gobuster reorden+retry, _target_port/_target_service en todos los findings (web-headers, web-nikto, api-owasp, nse-scripts, web-outdated-lib, web-directories), ANSI cleanup en waf_info.raw y whatweb raw, _WHATWEB_NOISE filter, _LIB_DISPLAY_NAMES (jQuery), recomendación directorios condicional vía catálogo | 11 |
 | 2026-05-27 | Revisión Clean Code completa del repositorio — identificados 8 elementos a eliminar (~206 KB), violación SRP en scans.py (1.125 líneas de generadores de reporte), .gitignore incorrecto para data/storage/, IMAGE_TAG desactualizado en build.sh, pipeline legacy sin documentar | — |
 | 2026-05-27 | Adición de Fase 12: limpieza de código — 5 subtareas: eliminar obsoletos, corregir .gitignore, extraer report_builder.py, actualizar IMAGE_TAG, documentar pipelines | 12 |
+| 2026-05-27 | Implementación completa Fase 12 — eliminados 21 archivos obsoletos (~206 KB), .gitignore data/storage/ corregido, scans.py 1605→490 líneas (report_builder.py extraído, SRP), IMAGE_TAG 2.1.0→3.3.0, comentarios de pipeline legacy en 4 módulos CLI | 12 |
 
 ---
 
