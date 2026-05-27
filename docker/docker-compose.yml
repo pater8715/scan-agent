@@ -198,9 +198,9 @@ services:
           cpus: '0.25'
           memory: 128M
     
-    # Reinicio en caso de fallo
-    restart: unless-stopped
-    
+    # Job batch: no reiniciar automaticamente (termina cuando acaba el analisis)
+    restart: "no"
+
     # Solo disponible en perfil analyzer o web
     profiles: ["analyzer", "web", "all"]
 

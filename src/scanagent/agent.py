@@ -336,14 +336,30 @@ class ScanAgent:
             if not self.parser:
                 self.parser = ScanParser(outputs_dir)
             
-            # Detectar archivos disponibles
+            # Detectar archivos disponibles (incluyendo subcarpetas de escaneo)
             outputs_path = Path(outputs_dir)
             txt_files = list(outputs_path.glob("*.txt"))
-            
+
             if not txt_files:
-                print(f"[WARN] No se encontraron archivos .txt en {outputs_dir}")
+                # Buscar en subdirectorios tipo outputs/scan_XXXX/*.txt
+                txt_files = list(outputs_path.rglob("*.txt"))
+                if txt_files:
+                    # Usar el directorio de escaneo mas reciente
+                    scan_dirs = sorted(
+                        set(f.parent for f in txt_files),
+                        key=lambda d: d.stat().st_mtime,
+                        reverse=True
+                    )
+                    outputs_dir = str(scan_dirs[0])
+                    outputs_path = scan_dirs[0]
+                    print(f"[*] Usando directorio de escaneo: {outputs_path.name}")
+                    # Re-inicializar parser apuntando al subdirectorio correcto
+                    self.parser = ScanParser(outputs_dir)
+
+            if not txt_files:
+                print(f"[WARN] No se encontraron archivos .txt en {outputs_dir} ni en subcarpetas")
                 return None
-            
+
             print(f"[*] Archivos encontrados: {len(txt_files)}")
             
             # Parsear todos los archivos

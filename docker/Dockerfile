@@ -24,42 +24,41 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 
-# Actualizar sistema e instalar herramientas de pentesting + dependencias web
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-    # Python y herramientas básicas
+# -- Paquetes esenciales del escaner (sin git/vim/nano que arrastran libexpat1) -
+RUN apt update && \
+    apt install -y --no-install-recommends \
     python3 \
     python3-pip \
     python3-venv \
-    # Herramientas de seguridad
     nmap \
-    nikto \
-    gobuster \
-    dirb \
-    whatweb \
-    wafw00f \
-    sslscan \
-    enum4linux \
-    snmp-check \
-    # Utilidades de red
     curl \
     wget \
-    netcat-traditional \
-    dnsutils \
-    # Herramientas del sistema
-    git \
-    vim \
-    nano \
     sqlite3 \
     jq \
-    # Limpieza
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \
-    # Wordlist de API endpoints de SecLists
-    && mkdir -p /usr/share/wordlists \
-    && wget -q "https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/Web-Content/common-api-endpoints-mazen160.txt" \
-       -O /usr/share/wordlists/api-endpoints.txt \
-    || echo "⚠️  No se pudo descargar api-endpoints.txt — usar dirb/common.txt como fallback"
+    netcat-traditional \
+    dnsutils \
+    && apt clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# -- Herramientas de seguridad opcionales ---------------------
+# Cada una se instala de forma independiente; si falla, se ignora.
+RUN apt update && \
+    for pkg in nikto gobuster dirb sslscan enum4linux snmp-check whatweb wafw00f; do \
+        apt install -y --no-install-recommends $pkg 2>/dev/null || echo "SKIP: $pkg no disponible"; \
+    done && \
+    apt clean && rm -rf /var/lib/apt/lists/*
+
+# -- Garantizar /usr/bin/python3 (Kali 2026+ usa python3.X) --
+RUN ls /usr/bin/python3 2>/dev/null \
+    || (ls /usr/bin/python3.* 2>/dev/null | sort -V | tail -1 \
+        | xargs -I{} sh -c 'ln -sf {} /usr/bin/python3 && echo "Symlink: python3 -> {}"') \
+    && python3 --version
+
+# -- Wordlist de endpoints (opcional) -------------------------
+RUN mkdir -p /usr/share/wordlists && \
+    wget -q "https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/Web-Content/common-api-endpoints-mazen160.txt" \
+         -O /usr/share/wordlists/api-endpoints.txt \
+    || echo "api-endpoints.txt no descargado, se usara dirb/common.txt"
 
 # ============================================================================
 # STAGE 2: Python dependencies
@@ -73,17 +72,22 @@ WORKDIR /scan-agent
 COPY requirements.txt ./
 COPY webapp/requirements.txt ./webapp-requirements.txt
 
-# Instalar dependencias Python (manejando entorno gestionado externamente)
-RUN pip3 install --break-system-packages --no-cache-dir \
+# Instalar dependencias Python
+# --break-system-packages : permite instalar sobre el entorno del sistema
+# --ignore-installed      : no intenta desinstalar versiones del sistema (evita
+#                           "uninstall-no-record-file" con paquetes apt como jinja2)
+RUN python3 -m pip install \
+    --break-system-packages \
+    --ignore-installed \
+    --no-cache-dir \
     fastapi==0.115.0 \
-    uvicorn[standard]==0.31.0 \
+    "uvicorn[standard]==0.31.0" \
     jinja2==3.1.4 \
     python-multipart==0.0.9 \
     pydantic==2.9.0 \
     websockets==13.1 \
     markdown==3.7 && \
-    # Limpiar cache de pip
-    pip3 cache purge || true
+    python3 -m pip cache purge 2>/dev/null || true
 
 # ============================================================================
 # STAGE 3: Application files
