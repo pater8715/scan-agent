@@ -18,7 +18,7 @@ VERSION="3.0.0"
 TEST_TARGET="scanme.nmap.org"
 
 echo -e "${BLUE}╔══════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║              Scan Agent v3.0 - Docker Tests             ║${NC}"
+echo -e "${BLUE}║              Scan Agent v3.3 - Docker Tests             ║${NC}"
 echo -e "${BLUE}╚══════════════════════════════════════════════════════════╝${NC}"
 echo ""
 

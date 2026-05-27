@@ -8,7 +8,7 @@ RED='\033[0;31m'
 NC='\033[0m' # No Color
 
 echo -e "${BLUE}================================${NC}"
-echo -e "${BLUE}  Scan Agent - Web Interface${NC}"
+echo -e "${BLUE}  Scan Agent - Web Interface    ${NC}"
 echo -e "${BLUE}================================${NC}\n"
 
 # Verificar Python

@@ -18259,6 +18259,39 @@
       "due_date": "2022-05-03",
       "ransomware": "Unknown",
       "source": "cisa_kev"
+    },
+    "CVE-2026-48027": {
+      "vendor": "Nx",
+      "product": "Nx Console",
+      "name": "Nx Console Embedded Malicious Code Vulnerability",
+      "date_added": "2026-05-27",
+      "description": "Nx Console contains an embedded malicious code vulnerability that allowed a malicious version of Nx Console to be published. The compromised extension fetched an obfuscated payload that could harvested credentials from multiple sources on disk and in memory.",
+      "action": "Apply mitigations per vendor instructions, follow applicable BOD 22-01 guidance for cloud services, or discontinue use of the product if mitigations are unavailable.",
+      "due_date": "2026-06-10",
+      "ransomware": "Unknown",
+      "source": "cisa_kev"
+    },
+    "CVE-2026-45321": {
+      "vendor": "TanStack",
+      "product": "TanStack",
+      "name": "TanStack Unspecified Vulnerability",
+      "date_added": "2026-05-27",
+      "description": "TanStack contains an unspecified vulnerability that allowed malicious versions of the product to be published to the npm registry to publish credential-stealing malware under a trusted identity.",
+      "action": "Apply mitigations per vendor instructions, follow applicable BOD 22-01 guidance for cloud services, or discontinue use of the product if mitigations are unavailable.",
+      "due_date": "2026-06-10",
+      "ransomware": "Unknown",
+      "source": "cisa_kev"
+    },
+    "CVE-2026-8398": {
+      "vendor": "Daemon",
+      "product": "Daemon Tools Lite",
+      "name": "Daemon Tools Lite Embedded Malicious Code Vulnerability",
+      "date_added": "2026-05-27",
+      "description": "Daemon Tools contains an unspecified vulnerability that has a high impact on confidentiality, integrity, and availability.",
+      "action": "Apply mitigations per vendor instructions, follow applicable BOD 22-01 guidance for cloud services, or discontinue use of the product if mitigations are unavailable.",
+      "due_date": "2026-05-30",
+      "ransomware": "Unknown",
+      "source": "cisa_kev"
     }
   }
 }

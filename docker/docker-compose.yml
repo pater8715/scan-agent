@@ -16,7 +16,7 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
       target: production
-    image: scan-agent:3.0.0
+    image: scan-agent:3.3.0
     container_name: scan-agent-cli
     hostname: scan-agent-cli
     
@@ -73,7 +73,7 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
       target: production
-    image: scan-agent:3.0.0
+    image: scan-agent:3.3.0
     container_name: scan-agent-web
     hostname: scan-agent-web
     
@@ -159,7 +159,7 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
       target: production
-    image: scan-agent:3.0.0
+    image: scan-agent:3.3.0
     container_name: scan-agent-analyzer
     hostname: scan-agent-analyzer
     
@@ -334,7 +334,7 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
       target: app  # Sin optimizaciones de seguridad para desarrollo
-    image: scan-agent:3.0.0-dev
+    image: scan-agent:3.3.0-dev
     container_name: scan-agent-dev
     hostname: scan-agent-dev
     
