@@ -818,6 +818,30 @@ SEMANA 23:   Fase 13 — Dashboard de análisis + mejoras de historial (stats en
 | 2026-05-27 | Corrección B-02 — `on_retry` callback en `execute_command()`, closure `_make_retry_cb` en `run_scan()`, `retry_msg` en `step_callback`: mensaje "reintentando N/M…" visible en UI durante pausa entre reintentos | 12 |
 | 2026-05-27 | Adición de Fase 13: Dashboard de Análisis + Mejoras de Historial — 5 subtareas: stats endpoint, vuln count en list, página Dashboard CSS, columna Hallazgos + Re-escanear, versión 3.3.0 | 13 |
 | 2026-05-27 | Implementación completa Fase 13 — GET /api/scans/stats (agregación de JSON reports), vulnerabilities_count en ScanStatus + list endpoint, página Dashboard (4 cards, 2 gráficas barras CSS, top vulns, actividad reciente), columna Hallazgos + botón Re-escanear en historial, versión 3.3.0 en main.py/index.html | 13 |
+| 2026-05-28 | Adición de Fase 14: fixes de UX y estabilidad post-sesión de pruebas — 5 subtareas, commits b848534→6eb986a | 14 |
+| 2026-05-28 | Implementación parcial Fase 14 — indicador de etapas (steps) en progreso del escaneo (b848534), fix historial disk-based (d543635), etapas visibles post-scan + estado `aborted` (7925285), fix rate limiting en polling (6eb986a) | 14 |
+
+---
+
+## Fase 14 — Fixes UX y Estabilidad (2026-05-28)
+
+### Estado general: 🔄 En progreso
+
+| ID | Descripción | Archivos | Estado |
+|----|-------------|----------|--------|
+| 14.1 | Indicador de etapas en tiempo real durante escaneo (steps pending→running→completed/failed) | `scans.py`, `app.js`, `styles.css`, `index.html` | ✅ Completado |
+| 14.2 | Fix historial: cargar scans completados desde metadata en disco (file_manager) en vez de IDs numéricos DB | `scans.py` | ✅ Completado |
+| 14.3 | Etapas visibles post-scan: no ocultar sección de progreso al completar; estado `aborted` para pasos no ejecutados | `scans.py`, `app.js`, `styles.css` | ✅ Completado |
+| 14.4 | Fix rate limiting: mover límite de /api/scans/* a solo POST /scans/start; endpoints de lectura sin límite | `main.py`, `scans.py`, `utils/rate_limit.py` | ✅ Completado |
+| 14.5 | Perfil VoIP/Asterisk: puertos SIP/5060 UDP, IAX2/4569 UDP, STUN-TURN/3478; SSH profundo en perfil full | `scanner.py`, `profiles.py` | ✅ Completado |
+| 14.6 | Fix gobuster en SPAs (juice-shop): wildcard 200 → decidido NO implementar (comportamiento esperado) | — | ❌ Descartado |
+| 14.7 | Fix nikto muestra estado `▶ running` al finalizar el scan (step_callback post-nikto no refleja estado final) | `scans.py` / `scanner.py` | ⬜ Pendiente |
+
+### Notas técnicas Fase 14
+
+- **14.3**: Cuando un paso `required=True` falla, el scanner aborta el resto del perfil. Los pasos no ejecutados quedan como `aborted` (⊘) en vez de `pending` (○), diferenciando "nunca ejecutado" de "aún no llega".
+- **14.4**: El rate limiter previo (30 req/60s global) bloqueaba el polling de estado (2s) + barra de activos (3s) ≈ 50 req/min durante nikto. Ahora el límite es 10 inicios/min por IP, sin restricción en endpoints de lectura.
+- **14.7 pendiente**: En la UI el paso nikto aparece como `▶ running` aunque el scan ya completó. Causa probable: la señal post-step de nikto y los pre/post steps de curl ocurren durante la ventana de error 429 (antes del fix 14.4). Con 14.4 aplicado debería resolverse, pero requiere validación con un nuevo scan completo.
 
 ---
 
