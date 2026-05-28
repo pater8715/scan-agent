@@ -4,7 +4,7 @@ Scans API Router
 Endpoints para gestionar escaneos de vulnerabilidades.
 """
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
@@ -14,6 +14,8 @@ import sys
 import json
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+
+from webapp.utils.rate_limit import check_scan_start_rate_limit
 
 # Importar módulos de scanagent
 src_path = Path(__file__).parent.parent.parent / "src"
@@ -87,7 +89,7 @@ class ScanResult(BaseModel):
     duration_seconds: float
 
 
-@router.post("/start", response_model=ScanStatus)
+@router.post("/start", response_model=ScanStatus, dependencies=[Depends(check_scan_start_rate_limit)])
 async def start_scan(request: ScanRequest, background_tasks: BackgroundTasks):
     """
     Inicia un nuevo escaneo de vulnerabilidades.

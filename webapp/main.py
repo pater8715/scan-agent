@@ -19,8 +19,7 @@ import sys
 import os
 import logging
 import json
-from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, HTTPException, Security, Depends
 from fastapi.security.api_key import APIKeyHeader
@@ -75,36 +74,8 @@ async def verify_api_key(api_key: str = Security(API_KEY_HEADER)):
         raise HTTPException(status_code=403, detail="API key inválida o ausente")
 
 
-# ---------------------------------------------------------------------------
-# Rate limiter en memoria (sin dependencias externas)
-# 30 peticiones / 60 s por IP para endpoints de escaneo
-# ---------------------------------------------------------------------------
-class _InMemoryRateLimiter:
-    def __init__(self, max_requests: int = 30, window_seconds: int = 60):
-        self.max_requests = max_requests
-        self.window = timedelta(seconds=window_seconds)
-        self._log: dict[str, list[datetime]] = defaultdict(list)
-
-    def is_allowed(self, client_ip: str) -> bool:
-        now = datetime.now()
-        cutoff = now - self.window
-        bucket = self._log[client_ip]
-        # eliminar entradas viejas
-        self._log[client_ip] = [t for t in bucket if t > cutoff]
-        if len(self._log[client_ip]) >= self.max_requests:
-            return False
-        self._log[client_ip].append(now)
-        return True
-
-
-_rate_limiter = _InMemoryRateLimiter()
-
-
-async def check_rate_limit(request: Request):
-    client_ip = request.client.host if request.client else "unknown"
-    if not _rate_limiter.is_allowed(client_ip):
-        logger.warning("Rate limit excedido para IP %s", client_ip)
-        raise HTTPException(status_code=429, detail="Demasiadas peticiones. Espera un momento.")
+# Rate limiting movido a webapp/utils/rate_limit.py
+# Solo se aplica al endpoint POST /scans/start, no a los de lectura (status, list)
 
 
 # Crear aplicación FastAPI
@@ -131,9 +102,8 @@ app.mount("/static", StaticFiles(directory=str(webapp_path / "static")), name="s
 templates = Jinja2Templates(directory=str(webapp_path / "templates"))
 
 # Incluir routers de la API
-# Los endpoints de escaneo llevan autenticación + rate limit
-# Los de perfiles y reportes solo autenticación
-_scan_deps = [Depends(verify_api_key), Depends(check_rate_limit)]
+# Todos los routers autenticados; rate limit solo en POST /scans/start (ver scans.py)
+_scan_deps = [Depends(verify_api_key)]
 _auth_deps = [Depends(verify_api_key)]
 
 app.include_router(scans_router, prefix="/api/scans", tags=["Scans"], dependencies=_scan_deps)
