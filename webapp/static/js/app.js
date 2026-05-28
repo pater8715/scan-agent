@@ -379,7 +379,11 @@ function resetAll() {
 function showProgressSection(scanStatus) {
     // Ocultar formulario
     document.getElementById('scan-config-section').style.display = 'none';
-    
+
+    // Restaurar botón cancelar (pudo haber quedado oculto del scan anterior)
+    const cancelBtn = document.getElementById('cancel-scan-btn');
+    if (cancelBtn) { cancelBtn.style.display = ''; cancelBtn.disabled = false; cancelBtn.innerHTML = '<span class="icon">⛔</span> Cancelar Escaneo'; }
+
     // Mostrar progreso
     const section = document.getElementById('scan-progress-section');
     section.style.display = 'block';
@@ -416,6 +420,7 @@ const _STEP_ICONS = {
     completed: '✓',
     failed:    '✗',
     skipped:   '—',
+    aborted:   '⊘',
 };
 const _STEP_LABELS = {
     pending:   'pendiente',
@@ -424,6 +429,7 @@ const _STEP_LABELS = {
     completed: 'completado',
     failed:    'falló',
     skipped:   'omitida',
+    aborted:   'no ejecutada',
 };
 
 function renderSteps(steps) {
@@ -483,9 +489,11 @@ function startProgressPolling(scanId) {
 }
 
 async function showResults(scanId) {
-    // Ocultar progreso
-    document.getElementById('scan-progress-section').style.display = 'none';
-    
+    // Mantener la sección de progreso visible (con las etapas en estado final)
+    // Solo ocultar el botón de cancelar (ya no aplica)
+    const cancelBtn = document.getElementById('cancel-scan-btn');
+    if (cancelBtn) cancelBtn.style.display = 'none';
+
     // Mostrar resultados
     const section = document.getElementById('scan-results-section');
     const content = document.getElementById('scan-results-content');

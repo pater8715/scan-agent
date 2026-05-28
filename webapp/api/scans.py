@@ -478,6 +478,12 @@ async def execute_scan(scan_id: str, request: ScanRequest):
             except Exception:
                 pass
 
+        # Marcar pasos que nunca llegaron a ejecutarse (quedaron en "pending")
+        # Ocurre cuando un paso required=True falla y el scanner aborta el resto
+        for s in active_scans[scan_id].get("steps", []):
+            if s.get("status") == "pending":
+                s["status"] = "aborted"
+
         active_scans[scan_id]["status"] = "completed"
         active_scans[scan_id]["progress"] = 100
         active_scans[scan_id]["message"] = (
@@ -548,6 +554,9 @@ async def execute_scan(scan_id: str, request: ScanRequest):
         print(f"❌ Error en execute_scan ({scan_id}):\n{traceback.format_exc()}")
         # No sobreescribir si ya fue cancelado por el usuario
         if active_scans[scan_id].get("status") != "cancelled":
+            for s in active_scans[scan_id].get("steps", []):
+                if s.get("status") == "pending":
+                    s["status"] = "aborted"
             active_scans[scan_id]["status"] = "failed"
             active_scans[scan_id]["progress"] = 0
             active_scans[scan_id]["message"] = f"Error: {str(e)}"
