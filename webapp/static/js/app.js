@@ -359,6 +359,9 @@ function resetAll() {
     document.getElementById('scan-results-section').style.display = 'none';
     const discoveredSection = document.getElementById('discovered-hosts-section');
     if (discoveredSection) discoveredSection.style.display = 'none';
+    // Limpiar lista de etapas
+    const stepsList = document.getElementById('scan-steps-list');
+    if (stepsList) { stepsList.innerHTML = ''; stepsList.style.display = 'none'; }
     
     // Re-habilitar botón
     const submitBtn = document.getElementById('start-scan-btn');
@@ -396,10 +399,48 @@ function updateProgress(scanStatus) {
     const progressFill = document.getElementById('progress-fill');
     const statusText = document.getElementById('scan-status-text');
     const percentage = document.getElementById('scan-percentage');
-    
+
     progressFill.style.width = `${scanStatus.progress}%`;
     statusText.textContent = scanStatus.message;
     percentage.textContent = `${scanStatus.progress}%`;
+
+    if (scanStatus.steps && scanStatus.steps.length > 0) {
+        renderSteps(scanStatus.steps);
+    }
+}
+
+const _STEP_ICONS = {
+    pending:   '○',
+    running:   '▶',
+    retrying:  '↻',
+    completed: '✓',
+    failed:    '✗',
+    skipped:   '—',
+};
+const _STEP_LABELS = {
+    pending:   'pendiente',
+    running:   'ejecutando...',
+    retrying:  'reintentando...',
+    completed: 'completado',
+    failed:    'falló',
+    skipped:   'omitida',
+};
+
+function renderSteps(steps) {
+    const container = document.getElementById('scan-steps-list');
+    if (!container) return;
+    container.style.display = 'flex';
+
+    container.innerHTML = steps.map(s => {
+        const icon  = _STEP_ICONS[s.status]  || '?';
+        const label = _STEP_LABELS[s.status] || s.status;
+        const num   = s.orig_index + 1;
+        return `<div class="scan-step ${s.status}">
+            <span class="step-icon">${icon}</span>
+            <span class="step-label">Paso ${num}: <strong>${s.tool}</strong></span>
+            <span class="step-badge">${label}</span>
+        </div>`;
+    }).join('');
 }
 
 function startProgressPolling(scanId) {

@@ -116,7 +116,7 @@ class VulnerabilityScanner:
 
         'full': ScanProfile(
             name='Full Scan',
-            description='Escaneo exhaustivo con todas las herramientas (30-60 min aprox)',
+            description='Escaneo exhaustivo con todas las herramientas + auditoría profunda SSH (30-60 min aprox)',
             commands=[
                 {
                     'tool': 'nmap',
@@ -131,6 +131,15 @@ class VulnerabilityScanner:
                     'output': 'nmap_nse_{target}.txt',
                     'timeout': 1200,
                     'required': True
+                },
+                {
+                    # Auditoría SSH profunda: algoritmos débiles, versión del protocolo,
+                    # métodos de autenticación y fingerprint de clave del host.
+                    'tool': 'nmap',
+                    'args': '--script=ssh2-enum-algos,ssh-hostkey,ssh-auth-methods,sshv1 -p22 {target}',
+                    'output': 'nmap_ssh_{target}.txt',
+                    'timeout': 60,
+                    'required': False
                 },
                 {
                     'tool': 'whatweb',
@@ -530,6 +539,63 @@ class VulnerabilityScanner:
             ]
         ),
 
+        'voip': ScanProfile(
+            name='VoIP / Asterisk Scan',
+            description='Escaneo de infraestructura VoIP/PBX con detección de SIP (UDP/TCP 5060), IAX2 (UDP 4569), AMI (5038) y ARI (8088). Incluye scripts NSE de SIP (15-25 min aprox, requiere root)',
+            commands=[
+                {
+                    # TCP: SIP TLS, AMI, ARI, STUN/TURN, panel HTTP
+                    'tool': 'nmap',
+                    'args': '-sV -p5060,5061,5038,8088,8089,3478,3479,8080,443,80 {target}',
+                    'output': 'nmap_service_{target}.txt',
+                    'timeout': 120,
+                    'required': True,
+                },
+                {
+                    # UDP: SIP (5060), IAX2 (4569), STUN/TURN (3478) — puertos clave VoIP moderno
+                    'tool': 'nmap',
+                    'args': '-sU -sV -p5060,4569,3478 --version-intensity 5 {target}',
+                    'output': 'nmap_udp_{target}.txt',
+                    'timeout': 300,
+                    'required': False,
+                    'sudo': True,
+                },
+                {
+                    # NSE: enumerar usuarios SIP y métodos soportados
+                    'tool': 'nmap',
+                    'args': '-sU --script=sip-enum-users,sip-methods -p5060 {target}',
+                    'output': 'nmap_nse_{target}.txt',
+                    'timeout': 300,
+                    'required': False,
+                    'sudo': True,
+                },
+                {
+                    # Banner de Asterisk Manager Interface (AMI) — credenciales por defecto
+                    'tool': 'nmap',
+                    'args': '--script=banner -p5038 {target}',
+                    'output': 'nmap_ami_{target}.txt',
+                    'timeout': 30,
+                    'required': False,
+                },
+                {
+                    # ARI (Asterisk REST Interface) — expuesto sin auth es vector grave
+                    'tool': 'curl',
+                    'args': '-s --connect-timeout 5 http://{target}:8088/ari/api-docs/resources.json',
+                    'output': 'curl_ari_{target}.txt',
+                    'timeout': 15,
+                    'required': False,
+                },
+                {
+                    # Panel HTTP de administración (FreePBX/Asterisk GUI)
+                    'tool': 'curl',
+                    'args': '-I http://{target}',
+                    'output': 'headers_{target}.txt',
+                    'timeout': 15,
+                    'required': False,
+                },
+            ]
+        ),
+
         'lab': ScanProfile(
             name='Lab Environment Scan',
             description='Escaneo para entornos de práctica (Juice Shop en :3000, DVWA en :8081) - ideal para clases (10-15 min aprox)',
@@ -614,6 +680,27 @@ class VulnerabilityScanner:
             'outputs_generated': []
         }
     
+    # Rutas de wordlists para gobuster/dirb — se prueban en orden hasta encontrar una que exista
+    _WORDLIST_FALLBACKS = [
+        "/usr/share/dirb/wordlists/common.txt",
+        "/usr/share/wordlists/dirb/common.txt",
+        "/usr/share/dirb/wordlists/small.txt",
+        "/usr/share/wordlists/dirbuster/directory-list-2.3-small.txt",
+        "/usr/share/wordlists/wfuzz/general/common.txt",
+    ]
+
+    @staticmethod
+    def _resolve_wordlist(path: str) -> str:
+        """Devuelve `path` si existe; si no, el primer fallback disponible."""
+        if os.path.isfile(path):
+            return path
+        for fb in VulnerabilityScanner._WORDLIST_FALLBACKS:
+            if os.path.isfile(fb):
+                logger.warning("Wordlist '%s' no encontrada — usando fallback: %s", path, fb)
+                return fb
+        logger.error("No se encontró ninguna wordlist válida para: %s", path)
+        return path
+
     # Rangos privados permitidos por defecto
     _PRIVATE_NETS = [
         ipaddress.ip_network("10.0.0.0/8"),
@@ -807,6 +894,14 @@ class VulnerabilityScanner:
                     args = _PORT_RE.sub(_inject_port, args, count=1)
                 else:
                     args += f' -p{port}'
+
+        # Resolver ruta de wordlist para gobuster/dirb antes de ejecutar
+        if tool in {"gobuster", "dirb"}:
+            args = re.sub(
+                r'-w\s+(\S+)',
+                lambda m: f"-w {self._resolve_wordlist(m.group(1))}",
+                args,
+            )
 
         # Nombre de archivo seguro: sin "://" ni barras (CIDR usa "/")
         safe_target = hostname.replace("/", "_") + (f"_{port}" if port else "")
@@ -1048,11 +1143,23 @@ class VulnerabilityScanner:
             if not tools_status.get(tool, False):
                 if self.verbose:
                     print(f"\n[{i}/{total_commands}] Saltando '{tool}' (no disponible)")
+                if step_callback:
+                    try:
+                        step_callback(i, total_commands, tool, False)
+                    except Exception:
+                        pass
                 failed += 1
                 continue
 
             if self.verbose:
                 print(f"\n[{i}/{total_commands}] Ejecutando {tool}...")
+
+            # Señal pre-step: notificar a la UI que la etapa está iniciando
+            if step_callback:
+                try:
+                    step_callback(i, total_commands, tool, None, "running")
+                except Exception:
+                    pass
 
             # Fix B-02: construir on_retry para que la UI muestre "reintentando" en lugar
             # de mantener el mensaje del paso anterior mientras gobuster espera y reintenta.

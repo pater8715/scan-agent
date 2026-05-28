@@ -71,6 +71,7 @@ class ScanStatus(BaseModel):
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
     vulnerabilities_count: Optional[int] = None  # Fase 13: incluido en list
+    steps: Optional[list] = None  # Lista de etapas con su estado
 
 
 class ScanResult(BaseModel):
@@ -129,6 +130,27 @@ async def start_scan(request: ScanRequest, background_tasks: BackgroundTasks):
     # Generar ID único para el escaneo
     scan_id = str(uuid.uuid4())[:8]
     
+    # Construir lista de etapas para seguimiento visual
+    profile_obj_for_steps = VulnerabilityScanner.PROFILES.get(request.profile)
+    steps_list = []
+    if profile_obj_for_steps:
+        filtered_set = (
+            set(request.selected_steps)
+            if request.selected_steps is not None
+            else None
+        )
+        run_order = 0
+        for idx, cmd in enumerate(profile_obj_for_steps.commands):
+            is_selected = filtered_set is None or idx in filtered_set
+            if is_selected:
+                run_order += 1
+            steps_list.append({
+                "run_index": run_order if is_selected else None,
+                "orig_index": idx,
+                "tool": cmd["tool"],
+                "status": "pending" if is_selected else "skipped",
+            })
+
     # Crear estado inicial
     scan_status = {
         "scan_id": scan_id,
@@ -143,6 +165,7 @@ async def start_scan(request: ScanRequest, background_tasks: BackgroundTasks):
         "output_formats": request.output_formats,
         "save_to_db": request.save_to_db,
         "selected_steps": request.selected_steps,
+        "steps": steps_list,
     }
     
     active_scans[scan_id] = scan_status
@@ -317,9 +340,33 @@ async def execute_scan(scan_id: str, request: ScanRequest):
             # No actualizar si el escaneo ya fue cancelado
             if active_scans[scan_id].get("status") == "cancelled":
                 return
-            pct = int(10 + (step / total) * 55)
+
+            # Actualizar estado de la etapa en la lista de steps
+            steps = active_scans[scan_id].get("steps", [])
+            for s in steps:
+                if s.get("run_index") == step:
+                    if retry_msg == "running":
+                        s["status"] = "running"
+                    elif retry_msg:          # "reintentando X/Y…"
+                        s["status"] = "retrying"
+                    else:
+                        s["status"] = "completed" if ok else "failed"
+
+            # Calcular porcentaje:
+            # - pre-step (running): mostrar progreso del paso anterior
+            # - post-step: mostrar progreso del paso completado
+            if retry_msg == "running":
+                pct = int(10 + ((step - 1) / total) * 55)
+            else:
+                pct = int(10 + (step / total) * 55)
+
             active_scans[scan_id]["progress"] = pct
-            if retry_msg:
+
+            if retry_msg == "running":
+                active_scans[scan_id]["message"] = (
+                    f"Paso {step}/{total} — ejecutando {tool}..."
+                )
+            elif retry_msg:
                 # Fix B-02: mensaje intermedio durante reintento (ok=None en este caso)
                 active_scans[scan_id]["message"] = (
                     f"Paso {step}/{total} — {tool} {retry_msg}"

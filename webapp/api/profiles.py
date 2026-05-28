@@ -57,6 +57,7 @@ _TIME_ESTIMATES: Dict[str, str] = {
     'api-owasp':   '20-30 minutos',
     'zap-passive': '10-15 minutos',
     'zap-active':  '30-60 minutos',
+    'voip':        '15-25 minutos',
     'lab':         '10-15 minutos',
 }
 
@@ -94,10 +95,14 @@ PROFILE_EDUCATION: Dict[str, Dict[str, Any]] = {
         "learning_objectives": [
             "Realizar el reconocimiento más completo posible sobre el objetivo",
             "Combinar detección de versiones, OS fingerprinting y scripts de vulnerabilidad",
+            "Auditar la configuración SSH a nivel criptográfico: algoritmos KEX débiles, cifrados obsoletos, SSHv1 y métodos de autenticación",
             "Entender la diferencia entre escaneo pasivo (lectura de banners) y activo (scripts vuln/exploit)",
         ],
         "when_to_use": "Auditorías exhaustivas en entornos de laboratorio donde el tiempo no es una restricción.",
-        "limitations": "Muy ruidoso y fácilmente detectable. La categoría 'exploit' puede modificar el estado del objetivo — solo para entornos autorizados.",
+        "limitations": (
+            "Muy ruidoso y fácilmente detectable. La categoría 'exploit' puede modificar el estado del objetivo — solo para entornos autorizados. "
+            "La auditoría SSH solo cubre el puerto 22 por defecto; si SSH corre en un puerto no estándar, ajustar con selected_steps."
+        ),
     },
     'web': {
         "learning_objectives": [
@@ -170,6 +175,21 @@ PROFILE_EDUCATION: Dict[str, Dict[str, Any]] = {
         ],
         "when_to_use": "Pruebas de penetración completas en entornos de laboratorio (Juice Shop, DVWA). Nunca en producción sin autorización explícita.",
         "limitations": "Puede modificar datos en la aplicación. Genera tráfico muy ruidoso. Requiere contenedor ZAP activo.",
+    },
+    'voip': {
+        "learning_objectives": [
+            "Comprender por qué SIP usa UDP y cómo esto lo hace invisible a escaneos TCP estándar",
+            "Identificar los puertos críticos de Asterisk: SIP (5060), IAX2 (4569), AMI (5038), ARI (8088), STUN/TURN (3478)",
+            "Evaluar los riesgos de exponer AMI sin autenticación o ARI sin TLS",
+            "Usar scripts NSE especializados para enumerar usuarios y métodos SIP",
+        ],
+        "when_to_use": "Auditorías de servidores VoIP, PBX con Asterisk/FreePBX o cualquier infraestructura de comunicaciones unificadas.",
+        "limitations": (
+            "El escaneo UDP (-sU) es significativamente más lento que TCP y puede producir falsos negativos "
+            "si el firewall filtra ICMP unreachable (nmap asume el puerto 'open|filtered'). "
+            "Los scripts sip-enum-users pueden ser bloqueados por fail2ban. "
+            "Los puertos RTP (10000-20000 UDP) no se escanean por su amplitud."
+        ),
     },
     'lab': {
         "learning_objectives": [
@@ -415,6 +435,82 @@ def _get_command_education(tool: str, args: str) -> Dict[str, Any]:
                 ],
                 "owasp_ref": "A05: Security Misconfiguration — exposición de servicios de red internos",
                 "difficulty": "intermedio",
+            }
+
+        # Auditoría SSH profunda
+        if 'ssh2-enum-algos' in args or 'sshv1' in args:
+            return {
+                "purpose": "Auditoría profunda de SSH: algoritmos criptográficos, versión del protocolo y métodos de autenticación",
+                "explanation": (
+                    "ssh2-enum-algos negocia la sesión SSH sin autenticarse y extrae las listas completas de "
+                    "algoritmos soportados en cuatro categorías: intercambio de claves (KEX), cifrado simétrico, "
+                    "códigos de autenticación de mensaje (MAC) y compresión. Algoritmos débiles comunes: "
+                    "diffie-hellman-group1-sha1 (512 bits, vulnerable a Logjam), arcfour (RC4, prohibido por RFC 8758), "
+                    "3des-cbc (DES triple, cuello de botella), hmac-md5 (colisiones MD5). "
+                    "sshv1 detecta si el servidor acepta el protocolo SSH-1 (1995), que tiene vulnerabilidades "
+                    "criptográficas fundamentales que permiten MITM sin que el cliente lo detecte. "
+                    "ssh-auth-methods revela si se acepta autenticación por contraseña (vector de fuerza bruta) "
+                    "o solo por clave pública. ssh-hostkey extrae el tipo de clave del host (RSA/ECDSA/Ed25519) "
+                    "y su tamaño en bits — RSA menor a 2048 bits es inseguro según NIST SP 800-131A."
+                ),
+                "what_it_finds": [
+                    "Algoritmos KEX débiles: diffie-hellman-group1-sha1 (Logjam), group14-sha1",
+                    "Cifrados obsoletos: 3des-cbc, arcfour, blowfish-cbc, cast128-cbc",
+                    "MACs inseguros: hmac-md5, hmac-sha1-96, umac-64",
+                    "SSH protocolo versión 1 habilitado (permite MITM activo)",
+                    "Autenticación por contraseña activa (brute-force posible)",
+                    "Claves RSA del host menores a 2048 bits",
+                ],
+                "owasp_ref": "A02: Cryptographic Failures — algoritmos criptográficos débiles o deprecados",
+                "difficulty": "intermedio",
+            }
+
+        # UDP VoIP: SIP + IAX2 + STUN/TURN
+        if '-sU' in args and 'sip-enum' not in args:
+            return {
+                "purpose": "Escaneo UDP de puertos VoIP: SIP (5060), IAX2 (4569), STUN/TURN (3478)",
+                "explanation": (
+                    "SIP (Session Initiation Protocol) es el protocolo estándar para VoIP y usa UDP/5060 "
+                    "por defecto. Los escaneos TCP convencionales no lo detectan jamás. "
+                    "-sU envía una sonda UDP a cada puerto; si el objetivo responde con un paquete ICMP "
+                    "Port Unreachable el puerto está cerrado; si no hay respuesta se marca open|filtered. "
+                    "IAX2 (Inter-Asterisk eXchange v2) es el protocolo nativo de Asterisk en UDP/4569. "
+                    "STUN/TURN en UDP/3478 permite a los clientes VoIP detrás de NAT descubrir su IP pública "
+                    "y establecer canales de media (RTP). Expuesto sin controles, un servidor STUN puede ser "
+                    "usado para ataques de amplificación UDP."
+                ),
+                "what_it_finds": [
+                    "Servidor SIP activo en UDP/5060 (invisible a escaneos TCP)",
+                    "Protocolo IAX2 de Asterisk en UDP/4569",
+                    "Servicio STUN/TURN en UDP/3478 — amplificación UDP si es open relay",
+                    "Versión del servidor SIP/Asterisk mediante fingerprinting de respuesta",
+                ],
+                "owasp_ref": "A05: Security Misconfiguration — servicios VoIP expuestos sin restricción",
+                "difficulty": "intermedio",
+            }
+
+        # NSE SIP: sip-enum-users + sip-methods
+        if 'sip-enum-users' in args or 'sip-methods' in args:
+            return {
+                "purpose": "Enumeración de usuarios SIP y métodos soportados por el servidor",
+                "explanation": (
+                    "sip-enum-users envía peticiones REGISTER/OPTIONS al servidor Asterisk con "
+                    "nombres de usuario comunes (admin, asterisk, 1000, 1001…) y analiza las respuestas: "
+                    "un '401 Unauthorized' confirma que el usuario existe, mientras '403 Forbidden' "
+                    "o '404 Not Found' indica que no. Este comportamiento diferencial permite enumerar "
+                    "extensiones válidas sin conocer contraseñas — información necesaria para ataques "
+                    "de fuerza bruta sobre cuentas SIP. "
+                    "sip-methods lista los verbos SIP aceptados (INVITE, REGISTER, OPTIONS, BYE, CANCEL): "
+                    "un servidor que acepta INVITE sin autenticación permite originar llamadas arbitrarias."
+                ),
+                "what_it_finds": [
+                    "Extensiones SIP válidas (útiles para ataques de fuerza bruta posterior)",
+                    "Métodos SIP habilitados sin autenticación (INVITE peligroso)",
+                    "Versión y software del servidor SIP (Asterisk, FreeSWITCH, etc.)",
+                    "Política de autenticación: ¿exige credenciales en REGISTER?",
+                ],
+                "owasp_ref": "A07: Identification and Authentication Failures — enumeración de cuentas SIP",
+                "difficulty": "avanzado",
             }
 
         # Detección de versión en puertos específicos (sin scripts)

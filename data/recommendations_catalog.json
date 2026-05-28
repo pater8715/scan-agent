@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "last_updated": "2026-05-27",
+  "last_updated": "2026-05-28",
   "ports": {
     "21": {
       "risk_level": "HIGH",
