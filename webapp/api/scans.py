@@ -207,59 +207,67 @@ async def get_scan_status(scan_id: str):
 async def list_scans(limit: int = 20, status: Optional[str] = None):
     """
     Lista todos los escaneos recientes.
-    
+
     Parámetros:
     - limit: Número máximo de resultados (default: 20)
     - status: Filtrar por estado (pending, running, completed, failed)
     """
-    # Obtener escaneos activos
-    scans = list(active_scans.values())
-    
-    # Obtener escaneos completados de la BD
+    scans: list = []
+    seen_ids: set = set()
+
+    # 1. Escaneos activos en memoria (running / pending / recién completados)
+    for scan in active_scans.values():
+        scans.append(dict(scan))
+        seen_ids.add(scan["scan_id"])
+
+    # 2. Escaneos completados desde archivos de metadata en disco.
+    #    Persisten entre reinicios del contenedor y sus IDs coinciden
+    #    exactamente con los reportes JSON/HTML generados.
     try:
-        db_scans = db.get_all_scans(limit=limit)
-        for db_scan in db_scans:
-            sid = str(db_scan['id'])
-            if sid not in active_scans:
-                # Fase 13: obtener vulnerabilities_count desde metadata o JSON report
-                vuln_count = None
-                meta = file_manager.load_scan_metadata(sid)
-                if meta:
-                    vuln_count = meta.get('vulnerabilities_count')
-                if vuln_count is None:
-                    json_report = Path("./reports") / f"scan_{sid}.json"
-                    if json_report.exists():
-                        try:
-                            with open(json_report, "r", encoding="utf-8") as _f:
-                                _jdata = json.load(_f)
-                            vuln_count = len(_jdata.get("vulnerabilities", []))
-                        except Exception:
-                            pass
-                scans.append({
-                    "scan_id": sid,
-                    "target": db_scan.get('target', 'Unknown'),
-                    "profile": db_scan.get('profile', 'Unknown'),
-                    "status": "completed",
-                    "progress": 100,
-                    "message": "Completado",
-                    "started_at": db_scan.get('start_time'),
-                    "completed_at": db_scan.get('end_time'),
-                    "vulnerabilities_count": vuln_count,
-                })
-    except Exception:
-        pass
-    
+        for meta in file_manager.get_all_metadata():
+            sid = meta.get("scan_id")
+            if not sid or sid in seen_ids:
+                continue
+            seen_ids.add(sid)
+            vuln_count = meta.get("vulnerabilities_count")
+            scans.append({
+                "scan_id": sid,
+                "target": meta.get("target", "unknown"),
+                "profile": meta.get("profile", "unknown"),
+                "description": None,
+                "status": "completed",
+                "progress": 100,
+                "message": (
+                    f"Completado — {vuln_count} hallazgos"
+                    if vuln_count is not None else "Completado"
+                ),
+                "started_at": meta.get("created_at"),
+                "completed_at": meta.get("completed_at"),
+                "vulnerabilities_count": vuln_count,
+                "steps": None,
+            })
+    except Exception as e:
+        print(f"⚠️ Error leyendo metadata de escaneos: {e}")
+
     # Filtrar por estado si se especifica
     if status:
         scans = [s for s in scans if s.get("status") == status]
-    
-    # Ordenar por fecha de inicio (más recientes primero)
-    # Manejar None values en started_at
-    scans.sort(
-        key=lambda x: x.get("started_at") or datetime.min, 
-        reverse=True
-    )
-    
+
+    # Ordenar por fecha de inicio (más recientes primero).
+    # Soporta tanto objetos datetime como strings ISO 8601.
+    def _sort_key(s):
+        val = s.get("started_at")
+        if val is None:
+            return datetime.min
+        if isinstance(val, str):
+            try:
+                return datetime.fromisoformat(val)
+            except Exception:
+                return datetime.min
+        return val
+
+    scans.sort(key=_sort_key, reverse=True)
+
     return [ScanStatus(**s) for s in scans[:limit]]
 
 
