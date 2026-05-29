@@ -593,10 +593,61 @@ def generate_professional_html_report(scan_data: dict) -> str:
             text-align: center;
             font-size: 0.9em;
         }}
+        .filter-chip {{
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 14px;
+            border-radius: 20px;
+            border: 2px solid;
+            background: transparent;
+            font-size: 0.82em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s, color 0.15s;
+        }}
+        .chip-badge {{
+            display: inline-block;
+            background: rgba(0,0,0,0.12);
+            border-radius: 10px;
+            padding: 1px 7px;
+            font-size: 0.85em;
+        }}
+        #findings-filter-bar {{
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 18px;
+            padding: 14px 16px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }}
+        #cat-filter {{
+            padding: 6px 12px;
+            border: 1px solid #cbd5e0;
+            border-radius: 6px;
+            background: #fff;
+            font-size: 0.88em;
+            color: #2d3748;
+            cursor: pointer;
+            margin-left: auto;
+        }}
+        #no-findings-msg {{
+            display: none;
+            padding: 24px;
+            text-align: center;
+            color: #94a3b8;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px dashed #cbd5e0;
+        }}
         @media print {{
             body {{ background: white; padding: 0; }}
             .container {{ box-shadow: none; }}
             .collapsible-content {{ display: block !important; }}
+            #findings-filter-bar {{ display: none; }}
         }}
     </style>
 </head>
@@ -739,22 +790,87 @@ def generate_professional_html_report(scan_data: dict) -> str:
     # Hallazgos de Seguridad
     vulnerabilities = scan_data.get("vulnerabilities", [])
     if vulnerabilities:
-        html += """
+        severity_order = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"]
+        severity_colors_inline = {
+            "CRITICAL": "#d32f2f",
+            "HIGH": "#f57c00",
+            "MEDIUM": "#fbc02d",
+            "LOW": "#689f38",
+            "INFO": "#1976d2"
+        }
+        severity_labels = {
+            "CRITICAL": "Crítico",
+            "HIGH": "Alto",
+            "MEDIUM": "Medio",
+            "LOW": "Bajo",
+            "INFO": "Info"
+        }
+        category_labels = {
+            "infrastructure": "Infraestructura",
+            "web-headers": "Cabeceras HTTP",
+            "web-nikto": "Nikto",
+            "nse-scripts": "Scripts NSE",
+            "api-owasp": "API / OWASP",
+            "web-directories": "Directorios",
+            "vulnerable-software": "Software vulnerable",
+            "general": "General"
+        }
+
+        sev_counts = {s: 0 for s in severity_order}
+        cat_counts = {}
+        for v in vulnerabilities:
+            s = v.get("severity", "INFO")
+            if s in sev_counts:
+                sev_counts[s] += 1
+            c = v.get("category", "general")
+            cat_counts[c] = cat_counts.get(c, 0) + 1
+
+        total = len(vulnerabilities)
+
+        chips_html = (
+            f'<button class="filter-chip" data-sev="ALL" onclick="setSevFilter(this,\'ALL\')" '
+            f'style="border-color:#94a3b8;color:#94a3b8;">'
+            f'Todos <span class="chip-badge">{total}</span></button>\n'
+        )
+        for sev in severity_order:
+            count = sev_counts[sev]
+            if count == 0:
+                continue
+            color = severity_colors_inline[sev]
+            label = severity_labels[sev]
+            chips_html += (
+                f'<button class="filter-chip" data-sev="{sev}" onclick="setSevFilter(this,\'{sev}\')" '
+                f'style="border-color:{color};color:{color};">'
+                f'{label} <span class="chip-badge">{count}</span></button>\n'
+            )
+
+        cat_options = '<option value="ALL">Todos los tipos</option>\n'
+        for cat, count in sorted(cat_counts.items()):
+            label = category_labels.get(cat, cat)
+            cat_options += f'<option value="{cat}">{label} ({count})</option>\n'
+
+        html += f"""
             <!-- Hallazgos de Seguridad -->
-            <div class="section">
-                <h2>🚨 Hallazgos de Seguridad</h2>
+            <div class="section" id="findings-section">
+                <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
+                    <h2 style="margin:0;border-bottom:none;padding:0;">🚨 Hallazgos de Seguridad</h2>
+                    <span id="findings-counter" style="font-size:0.88em;color:#94a3b8;">Mostrando {total} de {total} hallazgos</span>
+                </div>
+                <div id="findings-filter-bar">
+                    <div style="display:flex;flex-wrap:wrap;gap:6px;">
+                        {chips_html}
+                    </div>
+                    <select id="cat-filter" onchange="applyFindingsFilter()">
+                        {cat_options}
+                    </select>
+                </div>
+                <div id="no-findings-msg">Sin hallazgos para los filtros seleccionados.</div>
 """
         for vuln in vulnerabilities:
             severity = vuln.get("severity", "INFO")
             severity_class = severity.lower()
-            severity_colors_inline = {
-                "CRITICAL": "#d32f2f",
-                "HIGH": "#f57c00",
-                "MEDIUM": "#fbc02d",
-                "LOW": "#689f38",
-                "INFO": "#1976d2"
-            }
             severity_color = severity_colors_inline.get(severity, "#757575")
+            category = vuln.get("category", "general")
 
             vuln_id = vuln.get('vuln_id', '')
             vuln_id_attr = f' data-vuln-id="{vuln_id}"' if vuln_id else ''
@@ -772,26 +888,21 @@ def generate_professional_html_report(scan_data: dict) -> str:
             recs = vuln.get('recommendations', [])
             recs_html = ""
             if recs:
-                items = "".join(
-                    f'<li style="margin:4px 0;">{r}</li>' for r in recs
-                )
+                items = "".join(f'<li style="margin:4px 0;">{r}</li>' for r in recs)
                 recs_html = f"""
                     <div class="recommendation">
                         <div class="recommendation-title">💡 Recomendaciones</div>
                         <ul style="margin:8px 0 0 16px;padding:0;">{items}</ul>
                     </div>
 """
-
             html += f"""
-                <div class="finding-card finding-{severity_class}"{vuln_id_attr}>
+                <div class="finding-card finding-{severity_class}" data-severity="{severity}" data-category="{category}"{vuln_id_attr}>
                     <div class="finding-header">
                         <div class="finding-title">{vuln.get('title', 'Hallazgo sin título')}</div>
-                        <div class="finding-severity" style="background: {severity_color};">{severity}</div>
+                        <div class="finding-severity" style="background:{severity_color};">{severity}</div>
                     </div>
                     {'<div style="font-size:0.82em;color:#888;margin-bottom:6px;">'+port_info+'</div>' if port_info else ''}
-                    <div style="color: #555; margin: 10px 0;">
-                        {vuln.get('description', 'Sin descripción disponible')}
-                    </div>
+                    <div style="color:#555;margin:10px 0;">{vuln.get('description', 'Sin descripción disponible')}</div>
                     {cves_html}
                     {recs_html}
                 </div>
@@ -845,12 +956,70 @@ def generate_professional_html_report(scan_data: dict) -> str:
     </div>
 
     <script>
-        // Auto-colapsar datos técnicos por defecto
+        var _activeSev = 'ALL';
+        var _activeCat = 'ALL';
+
+        function setSevFilter(btn, sev) {{
+            _activeSev = sev;
+            document.querySelectorAll('.filter-chip').forEach(function(b) {{
+                b.classList.remove('active');
+                b.style.background = 'transparent';
+                b.style.color = b.style.borderColor;
+            }});
+            btn.classList.add('active');
+            btn.style.background = btn.style.borderColor;
+            btn.style.color = 'white';
+            applyFindingsFilter();
+        }}
+
+        function applyFindingsFilter() {{
+            var catSel = document.getElementById('cat-filter');
+            _activeCat = catSel ? catSel.value : 'ALL';
+            var cards = document.querySelectorAll('.finding-card');
+            var visible = 0;
+            cards.forEach(function(card) {{
+                var sev = card.getAttribute('data-severity');
+                var cat = card.getAttribute('data-category');
+                var showSev = (_activeSev === 'ALL' || sev === _activeSev);
+                var showCat = (_activeCat === 'ALL' || cat === _activeCat);
+                card.style.display = (showSev && showCat) ? '' : 'none';
+                if (showSev && showCat) visible++;
+            }});
+            var counter = document.getElementById('findings-counter');
+            if (counter) counter.textContent = 'Mostrando ' + visible + ' de ' + cards.length + ' hallazgos';
+            var msg = document.getElementById('no-findings-msg');
+            if (msg) msg.style.display = visible === 0 ? 'block' : 'none';
+        }}
+
+        function applyHashFilters() {{
+            var hash = window.location.hash.slice(1);
+            if (!hash) return;
+            var params = {{}};
+            hash.split('&').forEach(function(p) {{
+                var kv = p.split('=');
+                if (kv.length === 2) params[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1]);
+            }});
+            if (params.severity) {{
+                var chip = document.querySelector('.filter-chip[data-sev="' + params.severity + '"]');
+                if (chip) setSevFilter(chip, params.severity);
+            }}
+            if (params.category) {{
+                var sel = document.getElementById('cat-filter');
+                if (sel) {{ sel.value = params.category; applyFindingsFilter(); }}
+            }}
+        }}
+
         document.addEventListener('DOMContentLoaded', function() {{
-            const collapsibles = document.getElementsByClassName('collapsible-content');
-            for (let i = 0; i < collapsibles.length; i++) {{
+            // Auto-colapsar datos técnicos
+            var collapsibles = document.getElementsByClassName('collapsible-content');
+            for (var i = 0; i < collapsibles.length; i++) {{
                 collapsibles[i].style.display = 'none';
             }}
+            // Activar chip "Todos" por defecto
+            var allChip = document.querySelector('.filter-chip[data-sev="ALL"]');
+            if (allChip) setSevFilter(allChip, 'ALL');
+            // Aplicar filtros desde hash de URL si existen
+            applyHashFilters();
         }});
     </script>
 </body>

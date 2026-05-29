@@ -4,7 +4,7 @@ Reports API Router
 Endpoints para gestionar y descargar reportes de escaneos.
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse
 from pydantic import BaseModel
 from typing import List, Optional
@@ -153,24 +153,41 @@ async def view_report_txt(scan_id: str):
 
 
 @router.get("/{scan_id}/preview")
-async def preview_report(scan_id: str):
+async def preview_report(
+    scan_id: str,
+    severity: Optional[str] = Query(default=None, description="Filtrar por severidad: CRITICAL, HIGH, MEDIUM, LOW, INFO"),
+    category: Optional[str] = Query(default=None, description="Filtrar por categoría: infrastructure, web-headers, web-nikto, nse-scripts, api-owasp, web-directories, vulnerable-software, general"),
+):
     """
     Obtiene una vista previa del reporte en formato JSON.
+    Soporta filtrado opcional por severidad y/o categoría de vulnerabilidad.
     """
     report_path = Path(f"./reports/scan_{scan_id}.json")
-    
+
     if not report_path.exists():
-        raise HTTPException(
-            status_code=404,
-            detail="Reporte no encontrado"
-        )
-    
+        raise HTTPException(status_code=404, detail="Reporte no encontrado")
+
     try:
         with open(report_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
+
+        if severity or category:
+            sev_upper = severity.upper() if severity else None
+            cat_lower = category.lower() if category else None
+            filtered = [
+                v for v in data.get("vulnerabilities", [])
+                if (sev_upper is None or v.get("severity", "").upper() == sev_upper)
+                and (cat_lower is None or v.get("category", "").lower() == cat_lower)
+            ]
+            data = dict(data)
+            data["vulnerabilities"] = filtered
+            data["_filter_applied"] = {
+                "severity": sev_upper,
+                "category": cat_lower,
+                "total_original": data.get("summary", {}).get("total_ports"),
+                "matching": len(filtered)
+            }
+
         return data
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error leyendo reporte: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error leyendo reporte: {str(e)}")

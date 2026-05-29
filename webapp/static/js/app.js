@@ -590,7 +590,15 @@ async function loadScansHistory() {
                 ? `<button class="btn btn-danger btn-sm" onclick="cancelScan('${scan.scan_id}')">⛔ Cancelar</button>`
                 : '';
             const reportBtn = scan.status === 'completed'
-                ? `<button class="btn btn-secondary btn-sm" onclick="viewScanReport('${scan.scan_id}')">📄 Reporte</button>`
+                ? `<button class="btn btn-secondary btn-sm" onclick="viewScanReport('${scan.scan_id}')">📄 Reporte</button>
+                   <select class="btn btn-secondary btn-sm" style="padding:3px 6px;font-size:0.78rem;cursor:pointer;"
+                       onchange="if(this.value){viewScanReport('${scan.scan_id}',this.value);this.value='';}">
+                       <option value="">🔽 filtrar</option>
+                       <option value="CRITICAL">🔴 Crítico</option>
+                       <option value="HIGH">🟠 Alto</option>
+                       <option value="MEDIUM">🟡 Medio</option>
+                       <option value="LOW">🟢 Bajo</option>
+                   </select>`
                 : '';
             // Fase 13: botón Re-escanear y columna Hallazgos
             const reScanBtn = `<button class="btn btn-secondary btn-sm"
@@ -647,8 +655,13 @@ function formatDate(dateString) {
     return date.toLocaleString('es-ES');
 }
 
-async function viewScanReport(scanId) {
-    window.open(`${API_BASE}/reports/${scanId}/download/html`, '_blank');
+function viewScanReport(scanId, severity = null, category = null) {
+    let url = `${API_BASE}/reports/${scanId}/download/html`;
+    const parts = [];
+    if (severity) parts.push(`severity=${encodeURIComponent(severity)}`);
+    if (category) parts.push(`category=${encodeURIComponent(category)}`);
+    if (parts.length) url += '#' + parts.join('&');
+    window.open(url, '_blank');
 }
 
 // ============================================
