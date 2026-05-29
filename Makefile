@@ -1,5 +1,5 @@
 # Scan Agent v3.0 - Docker Makefile
-# ===================================
+	# ===================================
 # Comandos para gestionar contenedores Docker
 #
 # NOTA: En Windows usar start.ps1 para el menu interactivo de perfiles:
@@ -9,7 +9,7 @@
 
 # Variables
 IMAGE_NAME  = scan-agent
-VERSION     = 3.0.0
+VERSION     = 3.3.0
 REGISTRY    = ghcr.io/pater8715
 FULL_IMAGE  = $(REGISTRY)/$(IMAGE_NAME):$(VERSION)
 LATEST_IMAGE = $(REGISTRY)/$(IMAGE_NAME):latest
@@ -55,7 +55,7 @@ help: ## Mostrar esta ayuda
 
 build: ## Construir imagen Docker (usa cache de capas)
 	@echo -e "$(BLUE)[BUILD]$(NC) Construyendo $(IMAGE_NAME):$(VERSION)..."
-	$(COMPOSE) build
+	$(COMPOSE) --profile all build
 	@echo -e "$(GREEN)[OK]$(NC) Imagen construida exitosamente"
 
 build-dev: ## Construir imagen de desarrollo
@@ -66,7 +66,7 @@ build-dev: ## Construir imagen de desarrollo
 build-no-cache: ## Construir imagen sin cache (puede fallar por mirrors de Kali rolling)
 	@echo -e "$(BLUE)[BUILD]$(NC) Construyendo sin cache — puede tardar varios minutos..."
 	@echo -e "$(YELLOW)[AVISO]$(NC) Si falla por mirrors de Kali, usar: make build"
-	$(COMPOSE) build --no-cache
+	$(COMPOSE) --profile all build --no-cache
 	@echo -e "$(GREEN)[OK]$(NC) Imagen construida sin cache"
 
 # ============================================================================
