@@ -230,10 +230,12 @@ class VulnerabilityScanner:
                     # Fix 11.2: -sV fuerza detección de protocolo antes de scripts http-*
                     # Sin -sV, nmap clasifica puertos no estándar (ej: 3000) como "ppp"
                     # y los scripts http-enum, http-headers, etc. no se activan.
-                    'args': '-sV --script=http-enum,http-headers,http-methods,http-vuln*,http-cors {target}',
+                    # http-vuln* (wildcard) eliminado: causa crash de nmap NSE en ciertos
+                    # targets (assertion LUA_YIELD en nse_nsock.cc). Scripts específicos usados.
+                    'args': '-sV --script=http-enum,http-headers,http-methods,http-cors,http-security-headers,http-auth-finder {target}',
                     'output': 'nmap_nse_{target}.txt',
                     'timeout': 600,
-                    'required': True
+                    'required': False
                 },
                 {
                     'tool': 'whatweb',
