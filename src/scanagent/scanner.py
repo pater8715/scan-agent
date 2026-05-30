@@ -106,6 +106,13 @@ class VulnerabilityScanner:
                 },
                 {
                     'tool': 'curl',
+                    'args': '-IL https://{target}',
+                    'output': 'headers_https_{target}.txt',
+                    'timeout': 30,
+                    'required': False
+                },
+                {
+                    'tool': 'curl',
                     'args': '-v http://{target}',
                     'output': 'curl_verbose_{target}.txt',
                     'timeout': 30,
@@ -185,6 +192,13 @@ class VulnerabilityScanner:
                 },
                 {
                     'tool': 'curl',
+                    'args': '-IL https://{target}',
+                    'output': 'headers_https_{target}.txt',
+                    'timeout': 30,
+                    'required': False
+                },
+                {
+                    'tool': 'curl',
                     'args': '-v http://{target}',
                     'output': 'curl_verbose_{target}.txt',
                     'timeout': 30,
@@ -249,6 +263,13 @@ class VulnerabilityScanner:
                     'tool': 'curl',
                     'args': '-IL http://{target}',
                     'output': 'headers_{target}.txt',
+                    'timeout': 30,
+                    'required': False
+                },
+                {
+                    'tool': 'curl',
+                    'args': '-IL https://{target}',
+                    'output': 'headers_https_{target}.txt',
                     'timeout': 30,
                     'required': False
                 },
@@ -395,6 +416,13 @@ class VulnerabilityScanner:
                 },
                 {
                     'tool': 'curl',
+                    'args': '-IL -H "Accept: application/json" https://{target}',
+                    'output': 'headers_https_{target}.txt',
+                    'timeout': 30,
+                    'required': False
+                },
+                {
+                    'tool': 'curl',
                     'args': '-X PUT -I -H "Accept: application/json" http://{target}/api/test',
                     'output': 'curl_put_{target}.txt',
                     'timeout': 30,
@@ -454,6 +482,13 @@ class VulnerabilityScanner:
                     'tool': 'curl',
                     'args': '-IL -H "Accept: application/json" http://{target}',
                     'output': 'headers_{target}.txt',
+                    'timeout': 30,
+                    'required': False
+                },
+                {
+                    'tool': 'curl',
+                    'args': '-IL -H "Accept: application/json" https://{target}',
+                    'output': 'headers_https_{target}.txt',
                     'timeout': 30,
                     'required': False
                 },
