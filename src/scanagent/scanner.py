@@ -50,14 +50,14 @@ class VulnerabilityScanner:
                 },
                 {
                     'tool': 'curl',
-                    'args': '-I http://{target}',
+                    'args': '-IL http://{target}',
                     'output': 'headers_{target}.txt',
                     'timeout': 30,
                     'required': False
                 },
                 {
                     'tool': 'curl',
-                    'args': '-I https://{target}',
+                    'args': '-IL https://{target}',
                     'output': 'headers_https_{target}.txt',
                     'timeout': 30,
                     'required': False
@@ -92,14 +92,14 @@ class VulnerabilityScanner:
                 },
                 {
                     'tool': 'nikto',
-                    'args': '-h http://{target} -timeout 10 -maxtime 180',
+                    'args': '-h https://{target} -timeout 10 -maxtime 180',
                     'output': 'nikto_{target}.txt',
                     'timeout': 240,
                     'required': False
                 },
                 {
                     'tool': 'curl',
-                    'args': '-I http://{target}',
+                    'args': '-IL http://{target}',
                     'output': 'headers_{target}.txt',
                     'timeout': 30,
                     'required': False
@@ -150,7 +150,7 @@ class VulnerabilityScanner:
                 },
                 {
                     'tool': 'nikto',
-                    'args': '-h http://{target}',
+                    'args': '-h https://{target}',
                     'output': 'nikto_{target}.txt',
                     'timeout': 1800,
                     'required': False
@@ -178,7 +178,7 @@ class VulnerabilityScanner:
                 },
                 {
                     'tool': 'curl',
-                    'args': '-I http://{target}',
+                    'args': '-IL http://{target}',
                     'output': 'headers_{target}.txt',
                     'timeout': 30,
                     'required': False
@@ -240,14 +240,14 @@ class VulnerabilityScanner:
                 },
                 {
                     'tool': 'nikto',
-                    'args': '-h http://{target} -Tuning 123456789ab',
+                    'args': '-h https://{target} -Tuning 123456789ab',
                     'output': 'nikto_{target}.txt',
                     'timeout': 1800,
                     'required': False
                 },
                 {
                     'tool': 'curl',
-                    'args': '-I http://{target}',
+                    'args': '-IL http://{target}',
                     'output': 'headers_{target}.txt',
                     'timeout': 30,
                     'required': False
@@ -282,7 +282,7 @@ class VulnerabilityScanner:
                 },
                 {
                     'tool': 'curl',
-                    'args': '-s -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" -I http://{target}',
+                    'args': '-s -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" -IL http://{target}',
                     'output': 'headers_stealth_{target}.txt',
                     'timeout': 30,
                     'required': False
@@ -346,14 +346,14 @@ class VulnerabilityScanner:
                 },
                 {
                     'tool': 'curl',
-                    'args': '-I http://{target}',
+                    'args': '-IL http://{target}',
                     'output': 'headers_http_{target}.txt',
                     'timeout': 30,
                     'required': False
                 },
                 {
                     'tool': 'curl',
-                    'args': '-I https://{target}',
+                    'args': '-IL https://{target}',
                     'output': 'headers_https_{target}.txt',
                     'timeout': 30,
                     'required': False
@@ -388,7 +388,7 @@ class VulnerabilityScanner:
                 },
                 {
                     'tool': 'curl',
-                    'args': '-I -H "Accept: application/json" http://{target}',
+                    'args': '-IL -H "Accept: application/json" http://{target}',
                     'output': 'headers_{target}.txt',
                     'timeout': 30,
                     'required': False
@@ -452,7 +452,7 @@ class VulnerabilityScanner:
                 },
                 {
                     'tool': 'curl',
-                    'args': '-I -H "Accept: application/json" http://{target}',
+                    'args': '-IL -H "Accept: application/json" http://{target}',
                     'output': 'headers_{target}.txt',
                     'timeout': 30,
                     'required': False
@@ -487,7 +487,7 @@ class VulnerabilityScanner:
                 },
                 {
                     'tool': 'nikto',
-                    'args': '-h http://{target} -timeout 10 -maxtime 120',
+                    'args': '-h https://{target} -timeout 10 -maxtime 120',
                     'output': 'nikto_{target}.txt',
                     'timeout': 180,
                     'required': False
@@ -508,7 +508,7 @@ class VulnerabilityScanner:
                 },
                 {
                     'tool': 'curl',
-                    'args': '-I http://{target}',
+                    'args': '-IL http://{target}',
                     'output': 'headers_{target}.txt',
                     'timeout': 30,
                     'required': False
@@ -530,7 +530,7 @@ class VulnerabilityScanner:
                 },
                 {
                     'tool': 'curl',
-                    'args': '-I http://{target}',
+                    'args': '-IL http://{target}',
                     'output': 'headers_{target}.txt',
                     'timeout': 30,
                     'required': False
@@ -588,7 +588,7 @@ class VulnerabilityScanner:
                 {
                     # Panel HTTP de administración (FreePBX/Asterisk GUI)
                     'tool': 'curl',
-                    'args': '-I http://{target}',
+                    'args': '-IL http://{target}',
                     'output': 'headers_{target}.txt',
                     'timeout': 15,
                     'required': False,
@@ -630,7 +630,7 @@ class VulnerabilityScanner:
                 },
                 {
                     'tool': 'curl',
-                    'args': '-I http://{target}',
+                    'args': '-IL http://{target}',
                     'output': 'headers_{target}.txt',
                     'timeout': 30,
                     'required': False

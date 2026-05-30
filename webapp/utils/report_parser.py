@@ -230,6 +230,9 @@ class ScanResultParser:
             # curl verbose: inicio de respuesta HTTP
             if line.startswith('< HTTP/') or line.startswith('HTTP/1') or line.startswith('HTTP/2'):
                 in_response = True
+                # Resetear al inicio de cada respuesta para quedarnos solo con la final
+                # (necesario cuando curl sigue redirects HTTP→HTTPS con -L)
+                self.results["headers"].clear()
                 continue
 
             # Cabeceras nmap: formato "| http-headers:" con "|   Header: value"
