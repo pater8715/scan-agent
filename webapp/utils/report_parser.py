@@ -60,6 +60,13 @@ class ScanResultParser:
                     self.parse_nmap_output(content)
                     if 'nse' in filename_lower or 'vuln' in filename_lower:
                         self.parse_nse_output(content, file.name)
+                        # Fallback: extraer security headers del script http-headers de NSE
+                        # cuando curl falló (p.ej. CDN que bloquea IPs de datacenter en TCP).
+                        # parse_headers() soporta el formato "|   Header: value" de nmap y
+                        # hace clear() por bloque, quedándose con los headers del último
+                        # puerto procesado (normalmente 443 con los headers reales).
+                        if '| http-headers:' in content and not self._has_security_headers():
+                            self.parse_headers(content)
                     if 'service' in filename_lower:
                         # Fallback: extraer cabeceras del fingerprint nmap cuando curl falla
                         self.parse_nmap_fingerprint_for_headers(content)
@@ -217,6 +224,13 @@ class ScanResultParser:
         server_match = re.search(r'\|_http-server-header:\s*(.+)', content)
         if server_match:
             self.results["http_info"]["server"] = server_match.group(1).strip()
+
+    def _has_security_headers(self) -> bool:
+        """True si results["headers"] ya contiene al menos un security header relevante."""
+        present = {k.lower() for k in self.results.get("headers", {})}
+        security = {'strict-transport-security', 'content-security-policy',
+                    'x-frame-options', 'x-content-type-options'}
+        return bool(present & security)
 
     def parse_headers(self, content: str):
         """
