@@ -845,6 +845,37 @@ SEMANA 23:   Fase 13 — Dashboard de análisis + mejoras de historial (stats en
 
 ---
 
+### FASE 15 — Robustez en detección de security headers y calidad de scan
+
+**Prioridad:** ALTA | **Estimado:** ~8h | **Estado:** 🔄 En progreso (iniciado 2026-05-30)  
+**Referencia detallada:** [`docs/ANOMALIAS_PENDIENTES.md`](docs/ANOMALIAS_PENDIENTES.md)
+
+**Contexto:** Durante sesión de corroboración contra sitios en producción (Cloudflare Pages, Render.com, Netlify) se detectaron falsos positivos y negativos en la detección de security headers HTTP. Tres anomalías ya resueltas; tres pendientes.
+
+#### Anomalías resueltas en esta fase
+
+| ID | Descripción | Commit | Estado |
+|----|-------------|--------|--------|
+| ANO-01 | `curl -I` sin `-L` capturaba headers del redirect 301 en vez de la respuesta HTTPS final | `2533693`, `caf0db0` | ✅ |
+| ANO-02 | Wildcard `http-vuln*` en NSE crasheaba nmap y abortaba el scan (`required: True`) | `ee31e6e` | ✅ |
+| ANO-03 | Headers NSE (`\| http-headers:`) no se extraían a `results["headers"]` cuando curl fallaba | `bd1b216` | ✅ |
+
+#### Tareas pendientes
+
+| # | Tarea | Archivo | Estado |
+|---|-------|---------|--------|
+| 15.1 | **ANO-04** — Cuando el scan no puede conectar al objetivo (0 puertos, 0 headers), añadir hallazgo `scan_data_unavailable` (severidad INFO) y campo `scan_quality: complete/partial/failed` en el JSON. Mostrar advertencia en el reporte HTML. | `webapp/utils/report_builder.py`, `webapp/api/scans.py` | ⬜ Pendiente |
+| 15.2 | **ANO-05** — Filtrar en `parse_nse_output()` los findings de `http-security-headers` que reporten ausencia de headers cuando el puerto analizado es 80 (HTTP). El script evalúa HTTP en vez de HTTPS y genera ruido. | `webapp/utils/report_parser.py` | ⬜ Pendiente |
+| 15.3 | **ANO-06** — En `parse_nmap_fingerprint_for_headers()`: extraer headers del bloque de puerto 443/SSL en vez del primero encontrado (que es siempre puerto 80 sin security headers). | `webapp/utils/report_parser.py` | ⬜ Pendiente |
+| 15.4 | **ANO-07** — CDN con bloqueo por IP de datacenter (Netlify): investigar alternativas para obtener headers cuando curl y nmap fallan (p.ej. ejecutar curl desde el host via API del sistema, o emitir advertencia específica de "target inaccesible desde este origen"). Confirmado: securityheaders.com sí detecta los headers — el problema es exclusivamente el IP del contenedor Docker. | `scanner.py`, `report_builder.py` | ⬜ Pendiente |
+
+### Notas técnicas Fase 15
+
+- **ANO-04**: El caso más confuso para el usuario: Risk Score 0 / Level LOW cuando el scan no pudo conectar. Prioridad alta para evitar la interpretación errónea de "sitio seguro".
+- **ANO-07**: Netlify bloquea IPs de rangos AWS/datacenter dinámicamente. securityheaders.com (IPs propias/residenciales) sí puede conectar. La solución más viable a largo plazo es documentar la limitación en el reporte y sugerir al usuario ejecutar la verificación manual con herramientas externas cuando el scan no obtiene datos.
+
+---
+
 ## Convenciones de Estado
 
 - ⬜ Pendiente
